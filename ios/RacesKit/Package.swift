@@ -23,16 +23,30 @@ let package = Package(
         .library(name: "RacesKit", targets: ["RacesKit"]),
     ],
     targets: [
+        // Deliberately NOT `.defaultIsolation(MainActor.self)`, unlike Family Hub.
+        //
+        // That kit is mostly a networking client driven from SwiftUI, so a
+        // MainActor default fitted it. This one is overwhelmingly pure value
+        // types and a pure algorithm, and making those MainActor-isolated is
+        // simply wrong: it contradicts the rule in CLAUDE.md that everything the
+        // rater needs is pure, and it forces hundreds of isolated conformances
+        // to Equatable, Codable and OptionSet that no value type should have.
+        //
+        // It is also not survivable in practice — the volume of those isolated
+        // conformances crashed the compiler during module emission.
+        //
+        // The two types that genuinely need isolation say so themselves:
+        // `RacingAPIClient` is an actor because it caches tier state, and
+        // `RateLimiter` is an actor because it hands out slots.
         .target(
             name: "RacesKit",
             swiftSettings: [
                 .swiftLanguageMode(.v5),
-                .defaultIsolation(MainActor.self),
             ]
         ),
-        // No .defaultIsolation here: it would make XCTestCase subclasses
-        // MainActor-isolated, which cannot override XCTestCase's nonisolated
-        // init(name:testClosure:). The library keeps it; the tests don't need it.
+        // Likewise no .defaultIsolation: it would make XCTestCase subclasses
+        // MainActor-isolated, and those cannot override XCTestCase's nonisolated
+        // init(name:testClosure:) — which breaks the build on Linux outright.
         .testTarget(
             name: "RacesKitTests",
             dependencies: ["RacesKit"],

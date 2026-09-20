@@ -6,9 +6,13 @@ import Foundation
 /// independently — the user may not have configured Betfair, or a race may fail to
 /// match between the two. Both absences are ordinary states the app is built to
 /// work in, so they should not be able to break each other.
-public protocol RacingDataProviding: AnyObject {
+public protocol RacingDataProviding: AnyObject, Sendable {
     /// What this provider's tier allows. Narrows as tier-gated endpoints refuse.
-    var capability: ProviderCapability { get }
+    ///
+    /// `async` because a client that caches this is an actor: the value is
+    /// discovered from a 403 at runtime, so it is mutable state and needs an
+    /// isolation domain.
+    var capability: ProviderCapability { get async }
 
     func courses(regionCodes: [String]) async throws -> [Course]
     func racecards(day: RaceDay, regionCodes: [String]) async throws -> [Race]
