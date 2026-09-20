@@ -149,8 +149,8 @@ final class ResultReconcilerTests: XCTestCase {
     /// Captured now because the free results endpoint will not have this race
     /// tomorrow, and the baseline is the only honest answer to "is this any good?"
     func test_theFavouritesOutcomeIsCapturedAtSettlement() throws {
-        let tip = TipRecord.make(selection: "hrs_2", marketFavouriteHorseID: "hrs_1",
-                                 agreedWithFavourite: false, offAt: off)
+        let tip = TipRecord.make(selection: "hrs_2", offAt: off,
+                                 marketFavouriteHorseID: "hrs_1", agreedWithFavourite: false)
         let result = TestResult.result(
             finishing: [("hrs_1", "1"), ("hrs_2", "2"), ("hrs_3", "3")],
             startingPrices: ["hrs_1": 2.5]
@@ -165,8 +165,8 @@ final class ResultReconcilerTests: XCTestCase {
     }
 
     func test_aWithdrawnFavouriteIsNotRecordedAsBeaten() {
-        let tip = TipRecord.make(selection: "hrs_2", marketFavouriteHorseID: "hrs_9",
-                                 agreedWithFavourite: false, offAt: off)
+        let tip = TipRecord.make(selection: "hrs_2", offAt: off,
+                                 marketFavouriteHorseID: "hrs_9", agreedWithFavourite: false)
         let result = TestResult.result(finishing: [("hrs_1", "1"), ("hrs_2", "2"), ("hrs_3", "3")])
 
         let settled = ResultReconciler.settle(tip: tip, result: result, now: evening)

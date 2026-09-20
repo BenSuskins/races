@@ -5,8 +5,8 @@ extension TipRecord {
     /// A tip with sensible defaults, so each test states only what it is about.
     static func make(
         raceID: String = "rac_1",
-        offAt: Date? = Date(timeIntervalSince1970: 1_800_000_000),
         selection: String = "hrs_1",
+        offAt: Date? = Date(timeIntervalSince1970: 1_800_000_000),
         predictedProbability: Double = 0.30,
         marketFavouriteHorseID: String? = "hrs_1",
         agreedWithFavourite: Bool? = true,
