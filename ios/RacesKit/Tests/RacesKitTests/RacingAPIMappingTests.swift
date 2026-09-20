@@ -205,6 +205,16 @@ final class RacingAPIMappingTests: XCTestCase {
         XCTAssertEqual(wetherby.finisher(horseID: "hrs_7")?.position, .fell)
     }
 
+    /// Regression: `position` is declared a string and holds "PU" over jumps, but
+    /// also arrives as a bare JSON number. Before `LenientText` one unquoted value
+    /// threw a type mismatch that discarded the entire race.
+    func test_results_positionDecodesWhetherQuotedOrNot() throws {
+        let ascot = try XCTUnwrap(try loadResults().first { $0.id == "rac_1001" })
+
+        XCTAssertEqual(ascot.finisher(horseID: "hrs_2")?.position, .finished(1), "quoted")
+        XCTAssertEqual(ascot.finisher(horseID: "hrs_4")?.position, .finished(3), "unquoted")
+    }
+
     /// A horse absent from a settled result was withdrawn. That is a void bet,
     /// not a losing one, and the accuracy tracker depends on the distinction.
     func test_results_didRunDistinguishesAbsenceFromDefeat() throws {

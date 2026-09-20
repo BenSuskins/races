@@ -64,3 +64,44 @@ public struct LenientNumber: Codable, Hashable, Sendable {
         }
     }
 }
+
+/// A string the provider might send as a number.
+///
+/// The mirror image of `LenientNumber`, and learned the hard way: `position` is
+/// declared as a string, holds `"PU"` and `"F"` over jumps, and also arrives as a
+/// bare JSON `1`. Any field that is nominally text but sometimes numeric needs
+/// this, or one unquoted value throws away the whole race.
+public struct LenientText: Codable, Hashable, Sendable {
+    public let value: String?
+
+    public init(_ value: String?) {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.value = (trimmed?.isEmpty ?? true) ? nil : trimmed
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+
+        if container.decodeNil() {
+            self.init(nil)
+        } else if let text = try? container.decode(String.self) {
+            self.init(text)
+        } else if let int = try? container.decode(Int.self) {
+            self.init(String(int))
+        } else if let double = try? container.decode(Double.self) {
+            // Render 3.0 as "3": these are positions and classes, not measurements.
+            self.init(double == double.rounded() ? String(Int(double)) : String(double))
+        } else {
+            self.init(nil)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        if let value {
+            try container.encode(value)
+        } else {
+            try container.encodeNil()
+        }
+    }
+}

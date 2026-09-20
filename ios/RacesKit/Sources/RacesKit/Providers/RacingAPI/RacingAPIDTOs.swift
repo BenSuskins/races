@@ -104,7 +104,7 @@ struct RacingAPIResult: Decodable {
     let pattern: String?
     // `class` is a Swift keyword, so it is spelled with backticks here rather
     // than renamed — the wire key has to match.
-    let `class`: String?
+    let `class`: LenientText?
     let type: String?
     let ageBand: String?
     let ratingBand: String?
@@ -116,7 +116,7 @@ struct RacingAPIResult: Decodable {
 struct RacingAPIResultRunner: Decodable {
     let horseId: String?
     let horse: String?
-    let position: String?
+    let position: LenientText?
     let number: LenientNumber?
     let draw: LenientNumber?
     let weightLbs: LenientNumber?

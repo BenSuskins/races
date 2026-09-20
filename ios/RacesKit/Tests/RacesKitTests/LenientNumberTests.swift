@@ -87,9 +87,59 @@ final class LenientNumberTests: XCTestCase {
         let original = Holder(value: LenientNumber(95))
         let data = try JSONEncoder().encode(original)
         XCTAssertEqual(try JSONDecoder().decode(Holder.self, from: data), original)
+    }
 
+    /// An unknown value survives a round trip *as unknown*, which is what the app
+    /// cares about. It does not survive as the same Optional nesting: encoding
+    /// `.some(LenientNumber(nil))` writes `null`, and `null` decodes back to
+    /// `.none`. Both mean "we do not know this", every reader treats them
+    /// identically, and asserting on the nesting instead of the meaning would be
+    /// testing an implementation detail nothing depends on.
+    func test_unknownRoundTripsAsUnknown() throws {
         let unknown = Holder(value: LenientNumber(nil))
-        let unknownData = try JSONEncoder().encode(unknown)
-        XCTAssertEqual(try JSONDecoder().decode(Holder.self, from: unknownData), unknown)
+        let data = try JSONEncoder().encode(unknown)
+
+        XCTAssertEqual(String(decoding: data, as: UTF8.self), #"{"value":null}"#)
+
+        let decoded = try JSONDecoder().decode(Holder.self, from: data)
+        XCTAssertNil(decoded.value?.double)
+        XCTAssertNil(decoded.value?.int)
+    }
+}
+
+final class LenientTextTests: XCTestCase {
+
+    private struct TextHolder: Codable, Equatable {
+        let value: LenientText?
+    }
+
+    private func decode(_ json: String) throws -> LenientText? {
+        try JSONDecoder().decode(TextHolder.self, from: Data(json.utf8)).value
+    }
+
+    func test_decodesStrings() throws {
+        XCTAssertEqual(try decode(#"{"value": "PU"}"#)?.value, "PU")
+        XCTAssertEqual(try decode(#"{"value": "  1  "}"#)?.value, "1")
+    }
+
+    /// The failure that prompted this type: `position` is declared a string, holds
+    /// "PU" over jumps, and also arrives as a bare JSON number. One unquoted value
+    /// was throwing away the whole race.
+    func test_decodesNumbersAsText() throws {
+        XCTAssertEqual(try decode(#"{"value": 3}"#)?.value, "3")
+        XCTAssertEqual(try decode(#"{"value": 3.0}"#)?.value, "3")
+        XCTAssertEqual(try decode(#"{"value": 3.5}"#)?.value, "3.5")
+    }
+
+    func test_blanksAndNullsAreUnknown() throws {
+        XCTAssertNil(try decode(#"{"value": null}"#)?.value)
+        XCTAssertNil(try decode(#"{"value": ""}"#)?.value)
+        XCTAssertNil(try decode(#"{"value": "   "}"#)?.value)
+        XCTAssertNil(try decode(#"{}"#))
+    }
+
+    func test_unexpectedShapeDoesNotThrow() throws {
+        XCTAssertNil(try decode(#"{"value": {"a": 1}}"#)?.value)
+        XCTAssertNil(try decode(#"{"value": [1]}"#)?.value)
     }
 }

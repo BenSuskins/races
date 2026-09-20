@@ -101,7 +101,7 @@ enum RacingAPIMapping {
             going: Going(raw: dto.going),
             surface: Surface(raw: dto.surface),
             type: RaceType(raw: dto.type),
-            raceClass: raceClass(from: dto.`class`),
+            raceClass: raceClass(from: dto.`class`?.value),
             finishers: (dto.runners ?? []).compactMap(finisher(from:))
         )
     }
@@ -111,7 +111,7 @@ enum RacingAPIMapping {
         return Finisher(
             horseID: horseID,
             horseName: nonEmpty(dto.horse) ?? "Unknown",
-            position: FinishPosition(raw: dto.position),
+            position: FinishPosition(raw: dto.position?.value),
             clothNumber: dto.number?.int,
             draw: dto.draw?.int,
             weightPounds: dto.weightLbs?.int,
@@ -143,9 +143,9 @@ enum RacingAPIMapping {
             distance: Distance(furlongs: dto.distF?.double),
             going: Going(raw: dto.going),
             raceType: RaceType(raw: dto.type),
-            raceClass: raceClass(from: dto.`class`),
+            raceClass: raceClass(from: dto.`class`?.value),
             fieldSize: dto.runners?.count,
-            position: FinishPosition(raw: runner.position),
+            position: FinishPosition(raw: runner.position?.value),
             beatenLengths: runner.btn?.double,
             overallBeatenLengths: runner.ovrBtn?.double,
             startingPriceDecimal: runner.spDec?.double,

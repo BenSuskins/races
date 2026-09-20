@@ -63,6 +63,12 @@ this for you.
 
 ## Gotchas
 
+- **The Racing API is inconsistent about JSON types, in both directions.** Its own
+  spec declares `ofr`, `lbs`, `draw`, `number` and `last_run` as `type: string`,
+  and they arrive both quoted and bare. `position` and `class` are declared
+  strings and do the same. Decode numerics through `LenientNumber` and
+  parsed text through `LenientText`; a bare `String?` or `Int?` will throw and
+  discard the whole race.
 - **The Racing API's endpoint names are inverted relative to its tiers.**
   `/v1/racecards/free` returns the *Basic* schema; `/v1/racecards/basic` returns the
   *full* one. Read the tier column in `docs/providers.md`, not the path.
