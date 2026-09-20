@@ -1,0 +1,67 @@
+name: iOS CI
+
+on:
+  push:
+    branches: [main]
+    paths: ['ios/**', '.github/workflows/ios.yml']
+  pull_request:
+    paths: ['ios/**', '.github/workflows/ios.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+# Toolchain versions are pinned here and nowhere else. GitHub Actions has no YAML
+# anchors, so a workflow-level env block is the only single source of truth
+# available — the alternative is the same version literal drifting across jobs.
+env:
+  SWIFT_VERSION: '6.2'
+  PACKAGE_PATH: ios/RacesKit
+
+jobs:
+  # RacesKit is deliberately Foundation-only, so it builds and tests on Linux in
+  # a fraction of the time a macOS runner takes. It covers the rating algorithm,
+  # the provider clients (via a fake transport), the matcher and the store — most
+  # of what can actually break — long before any Xcode job would finish.
+  #
+  # This job is also what *enforces* the Foundation-only rule: it fails the moment
+  # anyone imports SwiftUI or Security.framework into the package.
+  package:
+    name: RacesKit (Linux)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: ${{ env.SWIFT_VERSION }}
+
+      # Keyed on the Swift version as well as the sources: a .build tree left by
+      # a different toolchain is worse than no cache at all. The restore-keys
+      # prefix means an ordinary source edit still reuses most object files.
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/org.swift.swiftpm
+            ${{ env.PACKAGE_PATH }}/.build
+          key: spm-${{ runner.os }}-${{ env.SWIFT_VERSION }}-${{ hashFiles('ios/RacesKit/Package.swift', 'ios/RacesKit/Sources/**/*.swift', 'ios/RacesKit/Tests/**/*.swift') }}
+          restore-keys: |
+            spm-${{ runner.os }}-${{ env.SWIFT_VERSION }}-
+
+      - name: Build
+        run: swift build --package-path ${{ env.PACKAGE_PATH }}
+
+      - name: Test
+        run: swift test --package-path ${{ env.PACKAGE_PATH }} --parallel
+
+# The macOS `xcodebuild` job, the CodeQL workflow and the algorithm back-test job
+# land alongside the pieces they test:
+#   * macOS job  — with ios/Races/Races.xcodeproj (next change)
+#   * back-test  — with the rating engine
+# Adding them before the code they build would just be a red check with nothing
+# behind it.
