@@ -1,7 +1,7 @@
 import Foundation
 
 /// What one factor did to one runner's chance.
-public struct FactorContribution: Hashable, Sendable, Identifiable {
+public struct FactorContribution: Codable, Hashable, Sendable, Identifiable {
     public let factor: FactorID
     public let label: String
     /// What the factor read, e.g. "OR 82".

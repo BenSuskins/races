@@ -83,6 +83,17 @@ this for you.
 - A `+` in a form-encoded body decodes as a space. `HTTPClient` percent-encodes it;
   Betfair passwords routinely contain one.
 
+## Accuracy
+
+`docs/accuracy.md` records what the tracker measures and what it refuses to. Three
+things in it exist specifically to stop the app flattering itself, and none should
+be removed without a good reason: the **favourite baseline**, the
+**agree/disagree split**, and **separate denominators** for strike rate and ROI.
+
+The **sealing rule** is what makes any of it mean anything: a tip is a draft until
+five minutes before the off, immutable after, and a race first opened after it has
+run is never recorded at all.
+
 ## Testing
 
 - XCTest throughout, table-driven where it fits.

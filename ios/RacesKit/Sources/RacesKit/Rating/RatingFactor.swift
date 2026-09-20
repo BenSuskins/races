@@ -117,7 +117,7 @@ public protocol RatingFactor: Sendable {
 }
 
 /// A win record, for strike rates derived from the app's own accumulated results.
-public struct StrikeRate: Hashable, Sendable {
+public struct StrikeRate: Codable, Hashable, Sendable {
     public let runs: Int
     public let wins: Int
 
