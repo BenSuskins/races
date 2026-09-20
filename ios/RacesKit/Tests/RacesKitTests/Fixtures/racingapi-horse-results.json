@@ -1,0 +1,60 @@
+{
+  "results": [
+    {
+      "race_id": "rac_900",
+      "course": "York",
+      "course_id": "crs_9",
+      "date": "2026-08-21",
+      "off_dt": "2026-08-21T15:35:00+01:00",
+      "race_name": "Juddmonte International",
+      "dist_f": "10.4",
+      "class": "Class 1",
+      "type": "Flat",
+      "going": "Good",
+      "surface": "Turf",
+      "runners": [
+        {
+          "horse_id": "hrs_1", "horse": "Kyprios", "position": "1",
+          "number": "3", "draw": "5", "weight_lbs": "133", "or": "94",
+          "sp_dec": "3.5", "btn": "0", "ovr_btn": "0",
+          "rpr": "118", "tsr": "105", "comment": "travelled strongly, led 1f out",
+          "jockey_id": "jky_1", "trainer_id": "trn_1"
+        },
+        {
+          "horse_id": "hrs_2", "horse": "Stradivarius", "position": "2",
+          "number": "1", "weight_lbs": "133", "sp_dec": "2.75",
+          "btn": "1.5", "ovr_btn": "1.5", "rpr": "115"
+        }
+      ]
+    },
+    {
+      "race_id": "rac_901",
+      "course": "Goodwood",
+      "date": "2026-07-30",
+      "race_name": "Nassau Stakes",
+      "dist_f": "9.9",
+      "class": "1",
+      "type": "Flat",
+      "going": "Good To Soft",
+      "surface": "Turf",
+      "runners": [
+        {
+          "horse_id": "hrs_1", "horse": "Kyprios", "position": "4",
+          "weight_lbs": "130", "sp_dec": "5.0",
+          "btn": "2.25", "ovr_btn": "6.75", "rpr": "109", "tsr": "98"
+        }
+      ]
+    },
+    {
+      "race_id": "rac_902",
+      "course": "Newbury",
+      "date": "2026-06-15",
+      "race_name": "Some Other Race",
+      "type": "Flat",
+      "runners": [
+        { "horse_id": "hrs_99", "horse": "Not Our Horse", "position": "1" }
+      ]
+    }
+  ],
+  "total": 3
+}

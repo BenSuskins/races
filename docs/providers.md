@@ -74,6 +74,24 @@ curl -s -u "$RACING_USER:$RACING_PASS" \
   "https://api.theracingapi.com/v1/results/today/free"
 ```
 
+#### `GET /v1/racecards/{horse_id}/results`
+- **Usecase:** A horse's past runs, with the going, trip, class, field size and
+  beaten margin the form string lacks. Feeds the deep-form rating factors.
+- **Tier:** **Basic (paid)** · **Rate limit:** 5 req/s
+- **Called anyway, once.** `RacingAPIClient.formHistory(horseID:)` attempts it. On
+  the free tier the first call returns 403, `ProviderCapability` narrows, and every
+  later call short-circuits to `APIError.tierUnavailable` **without touching the
+  network** — twenty runners would otherwise mean twenty 403s, each burning a
+  rate-limit slot a useful request could have had.
+- **This is the whole upgrade path.** Subscribe to Basic and the same call starts
+  succeeding, capability widens, and the deep-form factors activate with no change
+  at any call site.
+
+```bash
+curl -s -u "$RACING_USER:$RACING_PASS" \
+  "https://api.theracingapi.com/v1/racecards/hrs_1/results"
+```
+
 ### Endpoints deliberately NOT used (paid tiers)
 
 Listed because the code is built to light them up, and because the gap between
@@ -81,7 +99,6 @@ them and the free tier is the single biggest limitation on tip quality.
 
 | Endpoint | Tier | What it would unlock |
 |---|---|---|
-| `/v1/racecards/{horse_id}/results` | Basic | **Per-horse form history** — the deep-form factors. The most valuable upgrade by a distance. |
 | `/v1/racecards/basic` | Basic | Full racecard schema: `rpr`, `ts`, `spotlight`, `comment`, `trainer_14_days`, `going_detailed`, `stalls`, `weather`, `silk_url` |
 | `/v1/results` | Standard | Historical results with `sp_dec` — ROI without needing Betfair |
 | `/v1/horses/{horse_id}/results` | Pro | Full career history rather than just runners on an upcoming card |
