@@ -77,9 +77,14 @@ this for you.
 - **Betfair runner names carry country suffixes** (`Kyprios (IRE)`) and sometimes a
   cloth-number prefix. Match on `CLOTH_NUMBER` against the Racing API's `number`
   first; names are the fallback, never the primary key.
-- `.defaultIsolation(MainActor.self)` is set on the library target but **not** the
-  test target — it would make `XCTestCase` subclasses MainActor-isolated, which
-  cannot override the nonisolated `init(name:testClosure:)`.
+- **`.defaultIsolation(MainActor.self)` is set on neither target**, unlike Family
+  Hub. This kit is mostly pure value types and a pure algorithm, so a MainActor
+  default forces hundreds of isolated conformances to `Equatable`, `Codable` and
+  `OptionSet` — enough of them to crash the compiler during module emission. The
+  two types that need isolation declare it themselves: `RacingAPIClient` (it
+  caches tier state) and `RateLimiter`. On the *test* target it is doubly wrong:
+  it would make `XCTestCase` subclasses MainActor-isolated, and those cannot
+  override the nonisolated `init(name:testClosure:)`.
 - A `+` in a form-encoded body decodes as a space. `HTTPClient` percent-encodes it;
   Betfair passwords routinely contain one.
 

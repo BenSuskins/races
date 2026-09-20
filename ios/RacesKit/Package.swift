@@ -11,9 +11,8 @@ import PackageDescription
 // It matters more here than it did in Family Hub: the rating algorithm lives in
 // this package, so the back-test runs on Linux in seconds too.
 //
-// The Swift settings mirror the app target's build settings
-// (SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor, SWIFT_VERSION = 5.0) so isolation
-// behaves identically on both sides of the module boundary.
+// The language mode (SWIFT_VERSION = 5.0) mirrors the app target. The default
+// actor isolation deliberately does not — see the note on the library target.
 let package = Package(
     name: "RacesKit",
     platforms: [
