@@ -35,7 +35,9 @@ final class DocumentStoreTests: XCTestCase {
         try await store.save(sample, to: "tips.json")
         try await store.delete("tips.json")
 
-        XCTAssertNil(try await store.load(Payload.self, from: "tips.json"))
+        let afterDelete = try await store.load(Payload.self, from: "tips.json")
+        XCTAssertNil(afterDelete)
+
         try await store.delete("tips.json")  // deleting twice is fine
     }
 
@@ -49,14 +51,16 @@ final class DocumentStoreTests: XCTestCase {
             as: "tips.json"
         )
 
-        XCTAssertNil(try await store.load(Payload.self, from: "tips.json"))
+        let loaded = try await store.load(Payload.self, from: "tips.json")
+        XCTAssertNil(loaded)
     }
 
     func test_aCorruptedDocumentDegradesToNothing() async throws {
         let store = InMemoryDocumentStore()
         await store.plantRawDocument("{ this is not json", as: "tips.json")
 
-        XCTAssertNil(try await store.load(Payload.self, from: "tips.json"))
+        let loaded = try await store.load(Payload.self, from: "tips.json")
+        XCTAssertNil(loaded)
     }
 
     // MARK: - On disk
@@ -73,7 +77,8 @@ final class DocumentStoreTests: XCTestCase {
             FileManager.default.fileExists(atPath: directory.appendingPathComponent("tips.json").path),
             "the directory should have been created on demand"
         )
-        XCTAssertEqual(try await store.load(Payload.self, from: "tips.json"), sample)
+        let loaded = try await store.load(Payload.self, from: "tips.json")
+        XCTAssertEqual(loaded, sample)
     }
 
     func test_fileStoreOverwritesCleanly() async throws {
@@ -85,7 +90,8 @@ final class DocumentStoreTests: XCTestCase {
         try await store.save(sample, to: "tips.json")
         try await store.save(Payload(name: "York", count: 1, when: sample.when), to: "tips.json")
 
-        XCTAssertEqual(try await store.load(Payload.self, from: "tips.json")?.name, "York")
+        let loaded = try await store.load(Payload.self, from: "tips.json")
+        XCTAssertEqual(loaded?.name, "York")
     }
 
     func test_fileStoreLoadOfAMissingFileIsNil() async throws {
@@ -93,7 +99,8 @@ final class DocumentStoreTests: XCTestCase {
             directory: FileManager.default.temporaryDirectory
                 .appendingPathComponent("races-tests-\(UUID().uuidString)")
         )
-        XCTAssertNil(try await store.load(Payload.self, from: "nothing.json"))
+        let loaded = try await store.load(Payload.self, from: "nothing.json")
+        XCTAssertNil(loaded)
     }
 
     /// The ledger and the archive are what the accuracy figures are built from,
