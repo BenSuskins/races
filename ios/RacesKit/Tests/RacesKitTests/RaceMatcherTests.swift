@@ -7,15 +7,16 @@ final class RaceMatcherTests: XCTestCase {
 
     // MARK: - The ordinary case
 
-    func test_aCardMatchesItsMarkets() {
+    func test_aCardMatchesItsMarkets() throws {
         let race = TestMatching.race(horses: field)
         let market = TestMatching.market(selections: field)
 
         let report = RaceMatcher.match(races: [race], markets: [market])
+        let match = try XCTUnwrap(report.matches.first)
 
         XCTAssertEqual(report.matches.count, 1)
-        XCTAssertEqual(report.matches.first?.marketID, "1.100")
-        XCTAssertEqual(report.matches.first?.runnerOverlap, 1, accuracy: 0.0001)
+        XCTAssertEqual(match.marketID, "1.100")
+        XCTAssertEqual(match.runnerOverlap, 1, accuracy: 0.0001)
         XCTAssertEqual(report.matchRate, 1, accuracy: 0.0001)
         XCTAssertTrue(report.refusals.isEmpty)
         XCTAssertTrue(report.unclaimedMarketIDs.isEmpty)
@@ -30,13 +31,15 @@ final class RaceMatcherTests: XCTestCase {
     }
 
     /// Betfair's decoration does not reach the matcher's conclusions.
-    func test_decoratedSelectionNamesStillMatch() {
+    func test_decoratedSelectionNamesStillMatch() throws {
         let race = TestMatching.race(horses: ["Kyprios", "Stradivarius"])
         let market = TestMatching.market(
             selections: ["1. Kyprios (IRE)", "2. Stradivarius (GB)"])
 
         let report = RaceMatcher.match(races: [race], markets: [market])
-        XCTAssertEqual(report.matches.first?.runnerOverlap, 1, accuracy: 0.0001)
+        let match = try XCTUnwrap(report.matches.first)
+
+        XCTAssertEqual(match.runnerOverlap, 1, accuracy: 0.0001)
     }
 
     // MARK: - The time window
@@ -193,7 +196,7 @@ final class RaceMatcherTests: XCTestCase {
 
     /// A tie on the field is broken by the clock, which is a real signal even if
     /// it is the weaker one.
-    func test_atieOnRunnersIsBrokenByTime() {
+    func test_aTieOnRunnersIsBrokenByTime() {
         let race = TestMatching.race(horses: field)
         let near = TestMatching.market(
             id: "1.near", startAt: TestMatching.at(1), selections: field)
@@ -226,7 +229,7 @@ final class RaceMatcherTests: XCTestCase {
 
     /// A removed selection is excluded rather than counted as a miss. Otherwise a
     /// race that matched perfectly would lose its market to withdrawals.
-    func test_removedSelectionsDoNotCountAgainstTheOverlap() {
+    func test_removedSelectionsDoNotCountAgainstTheOverlap() throws {
         let race = TestMatching.race(horses: ["Kyprios", "Stradivarius"])
         let market = TestMatching.market(
             detailed: [
@@ -236,9 +239,10 @@ final class RaceMatcherTests: XCTestCase {
             ])
 
         let report = RaceMatcher.match(races: [race], markets: [market])
+        let match = try XCTUnwrap(report.matches.first)
 
-        XCTAssertEqual(report.matches.first?.runnerOverlap, 1, accuracy: 0.0001)
-        XCTAssertTrue(report.matches.first?.runners.unmatchedSelectionIDs.isEmpty ?? false)
+        XCTAssertEqual(match.runnerOverlap, 1, accuracy: 0.0001)
+        XCTAssertTrue(match.runners.unmatchedSelectionIDs.isEmpty)
     }
 
     // MARK: - Nothing to match on
