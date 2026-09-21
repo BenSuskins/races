@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Export-compliance declaration, answered here so TestFlight does not ask
+	     per build. `false` means "uses no non-exempt encryption": the app's only
+	     cryptography is ATS/TLS for the two provider APIs and the Keychain for
+	     the user's credentials, both supplied by the operating system. It
+	     implements none of its own and ships none.
+
+	     Without this key every upload sits at "Missing Compliance" in App Store
+	     Connect until the questionnaire is answered by hand. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+</dict>
+</plist>
