@@ -141,6 +141,18 @@ told their credentials are wrong rather than that a field is blank.
   version of this note claimed Family Hub has that bug. It does not: it has no
   `ci_scripts/` and no `agvtool` call at all, and sets
   `CURRENT_PROJECT_VERSION` by hand.)
+- **Two TestFlight prerequisites live in the project and are easy to delete by
+  accident.** `ITSAppUsesNonExemptEncryption = false` in
+  `ios/Races/Races/Info.plist` is the export-compliance declaration — without it
+  every upload sits at "Missing Compliance" until the questionnaire is answered
+  by hand. And `AppIcon.appiconset` must contain a real 1024×1024 PNG **with no
+  alpha channel**; App Store Connect rejects the marketing icon otherwise.
+  `scripts/make-app-icon.py` regenerates the placeholder.
+- **`Info.plist` needs its membership exception in the pbxproj.** It sits inside
+  a folder-synced group, so without
+  `PBXFileSystemSynchronizedBuildFileExceptionSet` listing it, the group copies
+  it into the bundle as a resource and the build fails with "Multiple commands
+  produce .../Info.plist" — the generated one against the copied one.
 - **The app target defaults to MainActor isolation; the kit does not.** So a class
   in the app that conforms to a kit protocol with nonisolated requirements —
   `KeychainCredentialsStore` — must be declared `nonisolated`, or the conformance
