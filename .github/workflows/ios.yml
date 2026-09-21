@@ -10,9 +10,19 @@ on:
 permissions:
   contents: read
 
+# Superseding is right for a pull request — a new push makes the previous run
+# irrelevant — and wrong for main, where every commit's result matters.
+#
+# It bit twice on 2026-09-21. Merging four PRs in quick succession meant each
+# push to main cancelled the one before, and the run left standing was for an
+# *older* commit than the branch head: `main` showed a green tick while its
+# actual head had never been compiled. Worse, the untested commits were the ones
+# whose PR CI had not finished either, so nothing had ever built them.
+#
+# A cancelled run on main is not a saved minute, it is a lost answer.
 concurrency:
   group: ios-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 # Paths and the Xcode version are pinned here and nowhere else. GitHub Actions
 # has no YAML anchors, so a workflow-level env block is the only single source of
