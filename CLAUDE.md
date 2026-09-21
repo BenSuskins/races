@@ -145,6 +145,13 @@ told their credentials are wrong rather than that a field is blank.
   in the app that conforms to a kit protocol with nonisolated requirements —
   `KeychainCredentialsStore` — must be declared `nonisolated`, or the conformance
   is MainActor-isolated and the kit cannot call it from off the main actor.
+  **This has to hold all the way down.** Marking the outermost type is not
+  enough: `KeychainOperating` and `SystemKeychain` inherited the MainActor default
+  and produced six "call to main actor-isolated instance method in a synchronous
+  nonisolated context" warnings, because every call through the seam was crossing
+  an isolation boundary. Warnings in Swift 5 mode, errors under Swift 6. Any new
+  app-side type that the kit calls into needs `nonisolated` on the type *and* on
+  the protocol requirements it satisfies.
 
 ## Accuracy
 
