@@ -1,0 +1,97 @@
+{
+  "racecards": [
+    {
+      "race_id": "rac_1001",
+      "course": "Ascot",
+      "date": "2026-09-20",
+      "off_time": "2:30",
+      "off_dt": "2026-09-20T14:30:00+01:00",
+      "race_name": "Sky Bet Handicap",
+      "distance_f": "8.0",
+      "region": "GB",
+      "pattern": "",
+      "race_class": "Class 3",
+      "type": "Flat",
+      "age_band": "3yo+",
+      "rating_band": "0-95",
+      "sex_restriction": "",
+      "prize": "£12,450",
+      "field_size": "4",
+      "going": "Good To Firm",
+      "surface": "Turf",
+      "race_status": "Declared",
+      "runners": [
+        {
+          "horse_id": "hrs_1", "horse": "Kyprios", "age": "5", "sex": "gelding",
+          "colour": "b", "region": "IRE", "number": "1", "draw": "3",
+          "headgear": "b", "lbs": "133", "ofr": "95", "last_run": "21",
+          "form": "1-3241", "jockey": "R Moore", "jockey_id": "jky_1",
+          "trainer": "A O'Brien", "trainer_id": "trn_1",
+          "owner": "Coolmore", "owner_id": "own_1", "sire": "Galileo", "dam": "Polished Gem"
+        },
+        {
+          "horse_id": "hrs_2", "horse": "Stradivarius", "age": "6", "sex": "gelding",
+          "colour": "ch", "region": "GB", "number": "2", "draw": "1",
+          "headgear": null, "lbs": "130", "ofr": "92", "last_run": "14",
+          "form": "21-113", "jockey": "F Dettori", "jockey_id": "jky_2",
+          "trainer": "J Gosden", "trainer_id": "trn_2",
+          "owner": "B Nielsen", "owner_id": "own_2", "sire": "Sea The Stars", "dam": "Private Life"
+        },
+        {
+          "horse_id": "hrs_3", "horse": "Unraced Newcomer", "age": "3", "sex": "filly",
+          "colour": "b", "region": "GB", "number": "3", "draw": "4",
+          "headgear": "", "lbs": "126", "ofr": "", "last_run": "-",
+          "form": null, "jockey": "T Marquand", "jockey_id": "jky_3",
+          "trainer": "W Haggas", "trainer_id": "trn_3",
+          "owner": "Godolphin", "owner_id": "own_3", "sire": "Dubawi", "dam": "Zarkava"
+        },
+        {
+          "horse_id": "hrs_4", "horse": "Numeric Types", "age": 4, "sex": "colt",
+          "colour": "gr", "region": "FR", "number": 4, "draw": 2,
+          "headgear": "p", "lbs": 128, "ofr": 88, "last_run": 35,
+          "form": "0-P42", "jockey": "O Murphy", "jockey_id": "jky_4",
+          "trainer": "R Varian", "trainer_id": "trn_4",
+          "owner": "Qatar Racing", "owner_id": "own_4", "sire": "Frankel", "dam": "Kind"
+        }
+      ]
+    },
+    {
+      "race_id": "rac_1002",
+      "course": "Wetherby",
+      "date": "2026-09-20",
+      "off_time": "3:05",
+      "race_name": "Novices' Chase",
+      "distance_f": "20.0",
+      "region": "GB",
+      "race_class": "4",
+      "type": "Chase",
+      "going": "Soft",
+      "surface": "Turf",
+      "field_size": "2",
+      "runners": [
+        {
+          "horse_id": "hrs_5", "horse": "Jumper One", "age": "7",
+          "number": "1", "draw": "", "headgear": "t", "lbs": "161",
+          "ofr": "140", "last_run": "42", "form": "F1-2P",
+          "jockey_id": "jky_5", "trainer_id": "trn_5"
+        },
+        {
+          "horse_id": "hrs_6", "horse": "Jumper Two", "age": "8",
+          "number": "2", "headgear": null, "lbs": "158",
+          "ofr": "135", "last_run": "180", "form": "3/12-1",
+          "jockey_id": "jky_6", "trainer_id": "trn_6"
+        }
+      ]
+    },
+    {
+      "race_id": "",
+      "course": "Should Be Dropped",
+      "date": "2026-09-20",
+      "race_name": "No Race ID",
+      "runners": []
+    }
+  ],
+  "total": 3,
+  "limit": 50,
+  "skip": 0
+}
