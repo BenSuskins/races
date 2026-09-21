@@ -66,7 +66,7 @@ public actor RacingAPIClient: RacingDataProviding {
 
     /// `.convertFromSnakeCase` rather than ~60 hand-written `CodingKeys`, which is
     /// both less code and fewer places to typo a wire key.
-    nonisolated(unsafe) static let decoder: JSONDecoder = {
+    nonisolated static let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return decoder

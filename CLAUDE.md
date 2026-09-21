@@ -128,10 +128,19 @@ told their credentials are wrong rather than that a field is blank.
   edit at all — drop it in `ios/Races/Races/` and it is in the target. Opening the
   project in Xcode and changing a setting will rewrite the file with Xcode's own
   UUIDs; that is fine and expected.
+- **Never name a simulator model in a `-destination`.** `name=iPhone 16,OS=latest`
+  looks like a pin on the project and is really a pin on the runner image's
+  installed device list, which is not ours and changes without notice. It took
+  `main` red the day it was added: the image that ran the merge commit had no
+  iPhone 16, so `xcodebuild` could offer only its placeholder destinations. CI
+  resolves a UDID at run time instead, and the step prints the installed runtimes
+  and devices when it finds none.
 - **`VERSIONING_SYSTEM = "apple-generic"` is set at project level and must stay.**
   Without it the `agvtool` call in `ci_scripts/ci_post_clone.sh` silently does
-  nothing and every Xcode Cloud build ships the same build number. Family Hub has
-  this bug.
+  nothing and every Xcode Cloud build ships the same build number. (An earlier
+  version of this note claimed Family Hub has that bug. It does not: it has no
+  `ci_scripts/` and no `agvtool` call at all, and sets
+  `CURRENT_PROJECT_VERSION` by hand.)
 - **Two TestFlight prerequisites live in the project and are easy to delete by
   accident.** `ITSAppUsesNonExemptEncryption = false` in
   `ios/Races/Races/Info.plist` is the export-compliance declaration — without it
@@ -148,6 +157,13 @@ told their credentials are wrong rather than that a field is blank.
   in the app that conforms to a kit protocol with nonisolated requirements —
   `KeychainCredentialsStore` — must be declared `nonisolated`, or the conformance
   is MainActor-isolated and the kit cannot call it from off the main actor.
+  **This has to hold all the way down.** Marking the outermost type is not
+  enough: `KeychainOperating` and `SystemKeychain` inherited the MainActor default
+  and produced six "call to main actor-isolated instance method in a synchronous
+  nonisolated context" warnings, because every call through the seam was crossing
+  an isolation boundary. Warnings in Swift 5 mode, errors under Swift 6. Any new
+  app-side type that the kit calls into needs `nonisolated` on the type *and* on
+  the protocol requirements it satisfies.
 
 ## Accuracy
 
@@ -174,9 +190,10 @@ run is never recorded at all.
 swift test --package-path ios/RacesKit          # the fast loop; also what CI runs first
 swift test --package-path ios/RacesKit --filter BackTest
 
-# The app half. Needs macOS; CI runs exactly this.
+# The app half. Needs macOS. CI runs this, resolving the simulator the same way.
 xcodebuild test -project ios/Races/Races.xcodeproj -scheme Races \
-  -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+  -destination "platform=iOS Simulator,id=$(xcrun simctl list devices available -j \
+    | jq -r '[.devices[][] | select(.name | startswith("iPhone"))] | .[0].udid')" \
   CODE_SIGNING_ALLOWED=NO
 ```
 

@@ -133,14 +133,24 @@ enum KeychainError: Error, Equatable {
 /// a test that only runs on a signed device. The query-construction and
 /// status-mapping logic is the part that actually breaks, and this seam lets CI
 /// cover it.
+/// Each requirement is `nonisolated`, and so is the implementation below.
+///
+/// This target defaults to MainActor isolation, which silently applied to both
+/// and produced six "call to main actor-isolated instance method in a
+/// synchronous nonisolated context" warnings — `KeychainCredentialsStore` is
+/// `nonisolated`, so every call through this seam crossed an isolation boundary
+/// it had no business crossing. Warnings in Swift 5 mode; errors under Swift 6.
+///
+/// The seam has to be nonisolated the whole way down, because the kit reads
+/// credentials while building requests off the main actor.
 protocol KeychainOperating: Sendable {
-    func copyMatching(_ query: [String: Any]) -> (status: OSStatus, item: CFTypeRef?)
-    func add(_ attributes: [String: Any]) -> OSStatus
-    func update(_ query: [String: Any], _ attributes: [String: Any]) -> OSStatus
-    func delete(_ query: [String: Any]) -> OSStatus
+    nonisolated func copyMatching(_ query: [String: Any]) -> (status: OSStatus, item: CFTypeRef?)
+    nonisolated func add(_ attributes: [String: Any]) -> OSStatus
+    nonisolated func update(_ query: [String: Any], _ attributes: [String: Any]) -> OSStatus
+    nonisolated func delete(_ query: [String: Any]) -> OSStatus
 }
 
-struct SystemKeychain: KeychainOperating {
+nonisolated struct SystemKeychain: KeychainOperating {
     func copyMatching(_ query: [String: Any]) -> (status: OSStatus, item: CFTypeRef?) {
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)

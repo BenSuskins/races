@@ -31,9 +31,14 @@ public final class HTTPClient: @unchecked Sendable {
     /// nothing we POST is a mutation, but the gate stays so that stays true.
     private static let idempotentMethods: Set<String> = ["GET", "PUT", "DELETE"]
 
-    /// `nonisolated(unsafe)` because `JSONDecoder` is not `Sendable` but this one
-    /// is only ever read, never reconfigured, and is used as a default argument.
-    public nonisolated(unsafe) static let defaultDecoder = JSONDecoder()
+    /// Shared because it is only ever read, never reconfigured, and is used as a
+    /// default argument.
+    ///
+    /// This carried `nonisolated(unsafe)` on the belief that `JSONDecoder` is not
+    /// `Sendable`. It is — the compiler says so itself where the same attribute
+    /// was flagged as unnecessary elsewhere — so the annotation was both
+    /// redundant and a misleading comment.
+    public static let defaultDecoder = JSONDecoder()
 
     public init(
         baseURL: URL,

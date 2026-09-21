@@ -222,8 +222,14 @@ final class RaceRaterTests: XCTestCase {
     /// A field where nothing is known about anybody should come out uniform, not
     /// arbitrarily ordered.
     func test_aFieldWeKnowNothingAboutRatesUniformly() {
-        let race = TestRace.race(runners: (1...6).map {
-            TestRace.runner("h\($0)", number: $0, age: nil, officialRating: nil,
+        // The closure parameter is typed explicitly. Every other value here is
+        // nil, so `number:` — which takes an `Int?` — was the only thing
+        // constraining it, and the compiler warned that the interpolation was
+        // printing an optional's debug description. Naming the type removes the
+        // freedom rather than silencing the symptom, and the warning was
+        // repeated once per compile unit: about thirty lines a build.
+        let race = TestRace.race(runners: (1...6).map { (index: Int) in
+            TestRace.runner("h\(index)", number: index, age: nil, officialRating: nil,
                             weightPounds: nil, form: nil, daysSinceLastRun: nil)
         })
         let assessment = RaceRater().rate(race)
