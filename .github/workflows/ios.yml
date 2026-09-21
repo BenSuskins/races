@@ -14,11 +14,16 @@ concurrency:
   group: ios-${{ github.ref }}
   cancel-in-progress: true
 
-# Toolchain versions are pinned here and nowhere else. GitHub Actions has no YAML
-# anchors, so a workflow-level env block is the only single source of truth
-# available — the alternative is the same version literal drifting across jobs.
+# Paths and the Xcode version are pinned here and nowhere else. GitHub Actions
+# has no YAML anchors, so a workflow-level env block is the only single source of
+# truth available — the alternative is the same literal drifting across jobs.
+#
+# The Swift version is NOT here, and that is not an oversight: the `env` context
+# is unavailable in `jobs.<id>.container`, which is evaluated before the job
+# starts. A one-entry matrix is available there, so the Linux job carries its
+# toolchain version in `strategy.matrix` instead — still one place, and it also
+# makes testing a second toolchain a two-character change.
 env:
-  SWIFT_VERSION: '6.2'
   XCODE_VERSION: '26.1'
   PACKAGE_PATH: ios/RacesKit
   PROJECT_PATH: ios/Races/Races.xcodeproj
@@ -36,25 +41,46 @@ jobs:
     name: RacesKit (Linux)
     runs-on: ubuntu-latest
 
+    # The toolchain arrives as a container image rather than as an install step.
+    #
+    # `swift-actions/setup-swift` downloads and unpacks a toolchain on every run,
+    # and on 2026-09-21 it hung for 26 minutes on this job without emitting a
+    # line — no timeout, no failure, just a stalled step. The official image is
+    # pulled by the runner's own container machinery, which retries and caches,
+    # so there is no third-party download in the critical path at all. It is also
+    # faster: the toolchain is baked in rather than fetched and unpacked.
+    #
+    # Family Hub still uses the action. Worth changing there too.
+    container: swift:${{ matrix.swift }}
+
+    strategy:
+      matrix:
+        # The Swift version lives here because `container` cannot read `env`.
+        swift: ['6.2']
+
     steps:
       - uses: actions/checkout@v4
 
-      - uses: swift-actions/setup-swift@v2
-        with:
-          swift-version: ${{ env.SWIFT_VERSION }}
+      # Cheap, and it puts the exact toolchain in the log — useful when a build
+      # succeeds locally and fails here, or the reverse.
+      - name: Toolchain
+        run: swift --version
 
       # Keyed on the Swift version as well as the sources: a .build tree left by
       # a different toolchain is worse than no cache at all. The restore-keys
       # prefix means an ordinary source edit still reuses most object files.
+      #
+      # `~` is the container's HOME (/root), not the runner's, which is the point:
+      # the cache has to match the toolchain that produced it.
       - name: Cache SwiftPM
         uses: actions/cache@v4
         with:
           path: |
             ~/.cache/org.swift.swiftpm
             ${{ env.PACKAGE_PATH }}/.build
-          key: spm-${{ runner.os }}-${{ env.SWIFT_VERSION }}-${{ hashFiles('ios/RacesKit/Package.swift', 'ios/RacesKit/Sources/**/*.swift', 'ios/RacesKit/Tests/**/*.swift') }}
+          key: spm-swift${{ matrix.swift }}-${{ hashFiles('ios/RacesKit/Package.swift', 'ios/RacesKit/Sources/**/*.swift', 'ios/RacesKit/Tests/**/*.swift') }}
           restore-keys: |
-            spm-${{ runner.os }}-${{ env.SWIFT_VERSION }}-
+            spm-swift${{ matrix.swift }}-
 
       - name: Build
         run: swift build --package-path ${{ env.PACKAGE_PATH }}
