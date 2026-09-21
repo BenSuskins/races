@@ -19,7 +19,10 @@ concurrency:
 # available — the alternative is the same version literal drifting across jobs.
 env:
   SWIFT_VERSION: '6.2'
+  XCODE_VERSION: '26.1'
   PACKAGE_PATH: ios/RacesKit
+  PROJECT_PATH: ios/Races/Races.xcodeproj
+  SCHEME: Races
 
 jobs:
   # RacesKit is deliberately Foundation-only, so it builds and tests on Linux in
@@ -59,9 +62,60 @@ jobs:
       - name: Test
         run: swift test --package-path ${{ env.PACKAGE_PATH }} --parallel
 
-# The macOS `xcodebuild` job, the CodeQL workflow and the algorithm back-test job
-# land alongside the pieces they test:
-#   * macOS job  — with ios/Races/Races.xcodeproj (next change)
-#   * back-test  — with the rating engine
-# Adding them before the code they build would just be a red check with nothing
-# behind it.
+  # The Xcode half. Slower and dearer than the Linux job, so it runs in parallel
+  # rather than after it — a pbxproj mistake and a kit mistake are independent,
+  # and waiting to learn about the second is no cheaper.
+  #
+  # This job is what validates `Races.xcodeproj` at all. The project file was
+  # written by hand rather than by Xcode, so "does it open and build" is a claim
+  # that needs checking on every change, not an assumption.
+  app:
+    name: Races (Xcode)
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode ${{ env.XCODE_VERSION }}
+        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+
+      # The project resolves RacesKit as a local package, so SwiftPM's cache
+      # applies here too. Keyed on the pbxproj as well as the package: a project
+      # change can alter which products get resolved.
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/org.swift.swiftpm
+          key: spm-${{ runner.os }}-${{ env.XCODE_VERSION }}-${{ hashFiles('ios/RacesKit/Package.swift', 'ios/Races/Races.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            spm-${{ runner.os }}-${{ env.XCODE_VERSION }}-
+
+      # `CODE_SIGNING_ALLOWED=NO` throughout: signing needs the team's
+      # certificates, which CI has no business holding. It also means the app
+      # bundle has no keychain-access entitlement, which is exactly why
+      # KeychainCredentialsStore is tested through a seam rather than against
+      # the real Keychain — the real one returns errSecMissingEntitlement here.
+      - name: Test
+        run: |
+          xcodebuild test \
+            -project ${{ env.PROJECT_PATH }} \
+            -scheme ${{ env.SCHEME }} \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -resultBundlePath ios-test-results \
+            CODE_SIGNING_ALLOWED=NO
+
+      # Family Hub writes a result bundle and then never uploads it, so a red
+      # check there can't be inspected without re-running locally. `always()`
+      # is the point: the bundle matters most when the step above failed.
+      - name: Upload result bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-results
+          path: ios-test-results.xcresult
+          retention-days: 7
+          if-no-files-found: warn
+
+# Still to land, each alongside the code it covers:
+#   * back-test  — a floor on strike rate and ROI over fixture races
+#   * CodeQL     — Swift analysis on macOS
