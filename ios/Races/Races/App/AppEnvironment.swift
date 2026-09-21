@@ -29,6 +29,10 @@ final class AppEnvironment {
     private let credentials: any CredentialsStoring
     private let makeRacingProvider: (ProviderConfiguration.RacingAPI) -> any RacingDataProviding
 
+    /// Persistence, the tip ledger, the results archive and the rater.
+    let store: RacesStore
+
+
     private(set) var configuration: ProviderConfiguration?
     /// Non-nil when the Keychain itself failed.
     ///
@@ -40,9 +44,11 @@ final class AppEnvironment {
 
     init(
         credentials: any CredentialsStoring,
+        store: RacesStore? = nil,
         makeRacingProvider: ((ProviderConfiguration.RacingAPI) -> any RacingDataProviding)? = nil
     ) {
         self.credentials = credentials
+        self.store = store ?? RacesStore(documents: AppEnvironment.makeDocumentStore())
         self.makeRacingProvider = makeRacingProvider ?? { racingAPI in
             RacingAPIClient(
                 credentials: RacingAPICredentials(
@@ -95,5 +101,52 @@ final class AppEnvironment {
         if let credentialsFailure { return credentialsFailure }
         if racingProvider == nil { return .notConfigured(provider: "The Racing API") }
         return nil
+    }
+
+    /// Application Support, falling back to memory.
+    ///
+    /// If the directory cannot be created there is nothing the user can do, and
+    /// running without history beats refusing to launch — but the fallback is
+    /// in-memory rather than Caches, because iOS may evict Caches whenever it
+    /// likes and a silently truncated accuracy record looks exactly like a real
+    /// one.
+    private static func makeDocumentStore() -> any DocumentStoring {
+        do {
+            return try JSONFileStore.applicationSupport()
+        } catch {
+            return InMemoryDocumentStore()
+        }
+    }
+
+    /// A loader bound to the current provider and store.
+    ///
+    /// Made per screen rather than held, so that re-entering a tab after saving
+    /// credentials picks up the new provider without any invalidation dance.
+    func makeRacecardLoader() -> RacecardLoader {
+        RacecardLoader(provider: racingProvider, store: store)
+    }
+
+    /// Fetch today's results, archive them, and settle whatever they answer.
+    ///
+    /// The single path for this, shared by launch, the Record tab and the
+    /// background task. It matters that it is one path: the free results endpoint
+    /// covers **today only**, so a day the app never runs this is a day of
+    /// results gone for good, and a second implementation is a second thing that
+    /// can quietly stop working.
+    @discardableResult
+    func refreshResults(now: Date = Date()) async -> ResultsIngestion? {
+        await store.loadIfNeeded()
+        guard let provider = racingProvider else { return nil }
+
+        do {
+            let results = try await provider.results(day: .today)
+            return await store.ingest(results: results, now: now)
+        } catch {
+            // Never surfaced as an error: a provider that cannot give results
+            // right now is not a fault the user can act on, and the tips it would
+            // have settled stay pending until they expire, which the report
+            // counts and displays.
+            return nil
+        }
     }
 }
