@@ -14,7 +14,7 @@ public enum RaceDates {
     /// yyyy-MM-dd, the form both providers use and the form we key caches by.
     /// `en_GB_POSIX` so the format is stable regardless of the device's locale —
     /// a user with a non-Gregorian calendar would otherwise get unparseable dates.
-    public nonisolated(unsafe) static let dayFormatter: DateFormatter = {
+    public static let dayFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.locale = Locale(identifier: "en_GB_POSIX")
