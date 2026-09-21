@@ -2,6 +2,10 @@ import XCTest
 @testable import Races
 import RacesKit
 
+/// Every test here is `@MainActor async`, and the `async` is load-bearing even
+/// where nothing is awaited: a synchronous `@MainActor` test method never runs its
+/// body, reports `failed` in 0.000s with no message, and stops the rest of the
+/// suite from reporting at all. See the gotcha in CLAUDE.md.
 final class SettingsViewModelTests: XCTestCase {
 
     @MainActor
@@ -15,7 +19,7 @@ final class SettingsViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_theUsernameIsShownBackButThePasswordIsNot() {
+    func test_theUsernameIsShownBackButThePasswordIsNot() async {
         let (environment, _) = makeEnvironment([
             .racingAPIUsername: "ben",
             .racingAPIPassword: "secret",
@@ -28,7 +32,7 @@ final class SettingsViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_saveRequiresBothFields() {
+    func test_saveRequiresBothFields() async {
         let (environment, _) = makeEnvironment()
         let model = SettingsViewModel(environment: environment)
 
@@ -40,7 +44,7 @@ final class SettingsViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_aWhitespaceOnlyUsernameCannotBeSaved() {
+    func test_aWhitespaceOnlyUsernameCannotBeSaved() async {
         let (environment, _) = makeEnvironment()
         let model = SettingsViewModel(environment: environment)
         model.username = "   "
@@ -50,7 +54,7 @@ final class SettingsViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_savingTrimsTheUsernameAndClearsTheDraftPassword() {
+    func test_savingTrimsTheUsernameAndClearsTheDraftPassword() async {
         let (environment, store) = makeEnvironment()
         let model = SettingsViewModel(environment: environment)
         model.username = "  ben  "
@@ -66,7 +70,7 @@ final class SettingsViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_aKeychainFailureOnSaveIsSurfaced() {
+    func test_aKeychainFailureOnSaveIsSurfaced() async {
         let store = InMemoryCredentialsStore()
         let environment = AppEnvironment(credentials: store, makeRacingProvider: { _ in
             FakeRacingDataProvider()
@@ -131,7 +135,7 @@ final class SettingsViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_clearingResetsEverything() {
+    func test_clearingResetsEverything() async {
         let (environment, store) = makeEnvironment([
             .racingAPIUsername: "ben",
             .racingAPIPassword: "secret",

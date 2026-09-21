@@ -194,6 +194,20 @@ told their credentials are wrong rather than that a field is blank.
   otherwise pure — `RatingContext`, `FormDisplay`, `BrowseRegions`,
   `CoursesViewModel.CourseListing` and `SettingsViewModel.TestResult` all carry it
   for exactly this reason. Kit types are unaffected: the kit sets no default.
+- **A `@MainActor` XCTest method must be `async`.** A *synchronous* one does not
+  run: XCTest invokes test methods from its own worker thread, and a synchronous
+  main-actor-isolated method has no suspension point at which to hop, so it never
+  executes its body. It does not error at compile time and it does not report an
+  assertion failure — it reports `failed` in `0.000 seconds` with no message, and
+  it takes the **rest of its suite** down with it, which is the confusing part: the
+  remaining tests simply never appear in the results at all.
+  This landed on `main` once. Of 55 tests, 41 passed, 6 "failed" with no message
+  and 8 were never reported, and the split was exactly: every nonisolated test
+  passed, every `@MainActor async` test passed, every `@MainActor` synchronous test
+  failed. The tell is the arithmetic — reported count below the real count — so
+  when a suite goes quiet, compare the two before hunting for a logic bug. Write
+  `@MainActor func test_x() async`, with `async throws` when it throws, even when
+  the body awaits nothing.
 - **Don't hand `Optional.map` a main-actor closure.** `configuration.racingAPI.map(makeRacingProvider)`
   is the natural way to write `AppEnvironment.refresh()` and it fails: `map` wants
   a nonisolated closure, so passing an isolated one loses the global actor. An

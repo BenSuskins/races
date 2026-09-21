@@ -2,10 +2,14 @@ import XCTest
 @testable import Races
 import RacesKit
 
+/// Every test here is `@MainActor async`, and the `async` is load-bearing even
+/// where nothing is awaited: a synchronous `@MainActor` test method never runs its
+/// body, reports `failed` in 0.000s with no message, and stops the rest of the
+/// suite from reporting at all. See the gotcha in CLAUDE.md.
 final class AppEnvironmentTests: XCTestCase {
 
     @MainActor
-    func test_completeCredentialsProduceAProvider() {
+    func test_completeCredentialsProduceAProvider() async {
         let store = InMemoryCredentialsStore([
             .racingAPIUsername: "ben",
             .racingAPIPassword: "secret",
@@ -20,7 +24,7 @@ final class AppEnvironmentTests: XCTestCase {
     }
 
     @MainActor
-    func test_halfConfiguredIsNotConfigured() {
+    func test_halfConfiguredIsNotConfigured() async {
         // A username with no password would 401, and the user would be told their
         // credentials are wrong rather than that a field is blank.
         let store = InMemoryCredentialsStore([.racingAPIUsername: "ben"])
@@ -36,7 +40,7 @@ final class AppEnvironmentTests: XCTestCase {
     }
 
     @MainActor
-    func test_aBrokenKeychainIsNotReportedAsMissingCredentials() {
+    func test_aBrokenKeychainIsNotReportedAsMissingCredentials() async {
         let store = InMemoryCredentialsStore(failure: APIError.decoding)
 
         let environment = AppEnvironment(credentials: store, makeRacingProvider: { _ in
@@ -52,7 +56,7 @@ final class AppEnvironmentTests: XCTestCase {
     }
 
     @MainActor
-    func test_writingCredentialsRebuildsTheProviderWithoutARelaunch() throws {
+    func test_writingCredentialsRebuildsTheProviderWithoutARelaunch() async throws {
         let store = InMemoryCredentialsStore()
         let builds = CallCounter()
         let environment = AppEnvironment(credentials: store, makeRacingProvider: { _ in
@@ -72,7 +76,7 @@ final class AppEnvironmentTests: XCTestCase {
     }
 
     @MainActor
-    func test_clearingCredentialsDropsTheProvider() throws {
+    func test_clearingCredentialsDropsTheProvider() async throws {
         let store = InMemoryCredentialsStore([
             .racingAPIUsername: "ben",
             .racingAPIPassword: "secret",
