@@ -1,68 +1,37 @@
 import SwiftUI
 import RacesKit
 
-/// Placeholder root.
+/// The app's tabs.
 ///
-/// The real navigation — Today, Courses, Tips, Record, Settings — arrives with
-/// the browse milestone. This exists so the project has a buildable app target
-/// that genuinely links RacesKit, and so the disclaimer is present from the
-/// first build rather than remembered later.
+/// Three for now. Tips and Record are deliberately absent rather than present and
+/// empty: a tab that leads nowhere is a promise the app hasn't kept, and each one
+/// arrives with the milestone that fills it — Tips with the rating UI, Record once
+/// the ledger has settled tips to report on.
 struct RootView: View {
-    private let credentials: any CredentialsStoring
-
-    @State private var configuration: ProviderConfiguration?
-    @State private var configurationError: String?
+    @State private var environment: AppEnvironment
 
     init(credentials: any CredentialsStoring) {
-        self.credentials = credentials
+        _environment = State(initialValue: AppEnvironment(credentials: credentials))
+    }
+
+    /// For previews and tests, which supply their own provider.
+    init(environment: AppEnvironment) {
+        _environment = State(initialValue: environment)
     }
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section("Providers") {
-                    if let configurationError {
-                        Label(configurationError, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        providerRow(
-                            "The Racing API",
-                            isConfigured: configuration?.racingAPI != nil)
-                        providerRow(
-                            "Betfair Exchange",
-                            isConfigured: configuration?.betfair != nil)
-                    }
-                }
-
-                Section {
-                    Text("Racecards, ratings and tip tracking arrive in the next milestone.")
-                        .foregroundStyle(.secondary)
-                }
-
-                Section {
-                    Text("For information only. Not betting advice.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
+        TabView {
+            Tab("Today", systemImage: "calendar") {
+                TodayView(environment: environment)
             }
-            .navigationTitle("Races")
-        }
-        .task {
-            do {
-                configuration = try ProviderConfiguration(reading: credentials)
-            } catch {
-                // A failing Keychain is worth saying out loud. Reading it as
-                // "nothing configured" would invite the user to re-enter
-                // credentials they have already given us.
-                configurationError = "Couldn't read the Keychain."
-            }
-        }
-    }
 
-    private func providerRow(_ name: String, isConfigured: Bool) -> some View {
-        LabeledContent(name) {
-            Text(isConfigured ? "Configured" : "Not set up")
-                .foregroundStyle(isConfigured ? .primary : .secondary)
+            Tab("Courses", systemImage: "map") {
+                CoursesView(environment: environment)
+            }
+
+            Tab("Settings", systemImage: "gear") {
+                SettingsView(environment: environment)
+            }
         }
     }
 }
