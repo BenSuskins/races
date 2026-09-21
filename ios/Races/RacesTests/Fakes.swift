@@ -19,15 +19,21 @@ final class FakeRacingDataProvider: RacingDataProviding, @unchecked Sendable {
 
     private let coursesResult: Result<[Course], APIError>
     private let racecardsResult: Result<[Race], APIError>
+    private let resultsResult: Result<[RaceResult], APIError>
     private let capabilityValue: ProviderCapability
+
+    private var _resultsCalls = 0
+    var resultsCalls: Int { lock.withLock { _resultsCalls } }
 
     init(
         courses: Result<[Course], APIError> = .success([]),
         racecards: Result<[Race], APIError> = .success([]),
+        results: Result<[RaceResult], APIError> = .success([]),
         capability: ProviderCapability = .free
     ) {
         self.coursesResult = courses
         self.racecardsResult = racecards
+        self.resultsResult = results
         self.capabilityValue = capability
     }
 
@@ -48,7 +54,10 @@ final class FakeRacingDataProvider: RacingDataProviding, @unchecked Sendable {
         return try racecardsResult.get()
     }
 
-    func results(day: RaceDay) async throws -> [RaceResult] { [] }
+    func results(day: RaceDay) async throws -> [RaceResult] {
+        lock.withLock { _resultsCalls += 1 }
+        return try resultsResult.get()
+    }
 }
 
 /// In-memory credentials, so `AppEnvironment` and `SettingsViewModel` are testable
@@ -134,4 +143,71 @@ final class CallCounter: @unchecked Sendable {
 
     func increment() { lock.withLock { value += 1 } }
     var count: Int { lock.withLock { value } }
+}
+
+extension Runner {
+    static func fixture(
+        id: String = "hrs_1",
+        name: String = "Frankel",
+        clothNumber: Int? = 1,
+        officialRating: Int? = 100,
+        form: String? = "1111",
+        jockeyID: String? = "joc_1",
+        trainerID: String? = "trn_1"
+    ) -> Runner {
+        Runner(
+            id: id,
+            name: name,
+            clothNumber: clothNumber,
+            officialRating: officialRating,
+            form: form,
+            jockeyID: jockeyID,
+            jockeyName: "A Jockey",
+            trainerID: trainerID,
+            trainerName: "A Trainer")
+    }
+}
+
+extension RaceResult {
+    static func fixture(
+        id: String = "rac_1",
+        courseName: String = "Ascot",
+        date: String = "2026-06-16",
+        finishers: [Finisher]
+    ) -> RaceResult {
+        RaceResult(
+            id: id,
+            courseName: courseName,
+            name: "A Race",
+            date: date,
+            offDateTime: nil,
+            distance: nil,
+            going: .unknown,
+            surface: .unknown,
+            type: .unknown,
+            raceClass: nil,
+            finishers: finishers)
+    }
+}
+
+extension Finisher {
+    static func fixture(
+        horseID: String,
+        position: Int,
+        jockeyID: String? = "joc_1",
+        trainerID: String? = "trn_1",
+        startingPriceDecimal: Double? = nil
+    ) -> Finisher {
+        Finisher(
+            horseID: horseID,
+            horseName: horseID.uppercased(),
+            position: FinishPosition(raw: "\(position)"),
+            clothNumber: nil,
+            draw: nil,
+            weightPounds: nil,
+            officialRating: nil,
+            jockeyID: jockeyID,
+            trainerID: trainerID,
+            startingPriceDecimal: startingPriceDecimal)
+    }
 }

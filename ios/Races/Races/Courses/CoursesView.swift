@@ -3,10 +3,12 @@ import RacesKit
 
 /// Every course, searchable, with today's card attached where there is one.
 struct CoursesView: View {
+    private let environment: AppEnvironment
     @State private var model: CoursesViewModel
     @State private var query = ""
 
     init(environment: AppEnvironment) {
+        self.environment = environment
         _model = State(initialValue: CoursesViewModel(environment: environment))
     }
 
@@ -42,7 +44,9 @@ struct CoursesView: View {
             .navigationDestination(for: CoursesViewModel.CourseListing.self) { listing in
                 CourseView(listing: listing)
             }
-            .navigationDestination(for: Race.self) { RaceView(race: $0) }
+            .navigationDestination(for: Race.self) {
+                RaceView(race: $0, environment: environment)
+            }
         }
         .task { await model.loadIfNeeded() }
     }

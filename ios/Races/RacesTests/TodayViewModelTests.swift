@@ -2,19 +2,35 @@ import XCTest
 @testable import Races
 import RacesKit
 
+/// Every test here is `@MainActor async`, and the `async` is load-bearing even
+/// where nothing is awaited: a synchronous `@MainActor` test method never runs its
+/// body, reports `failed` in 0.000s with no message, and stops the rest of the
+/// suite from reporting at all. See the gotcha in CLAUDE.md.
 final class TodayViewModelTests: XCTestCase {
 
     @MainActor
+    private func makeModel(
+        _ provider: FakeRacingDataProvider?,
+        unavailable: APIError? = nil,
+        now: Date = Date(timeIntervalSince1970: 1_000_000)
+    ) -> TodayViewModel {
+        let store = RacesStore(documents: InMemoryDocumentStore())
+        return TodayViewModel(
+            loader: RacecardLoader(provider: provider, store: store),
+            unavailable: unavailable,
+            now: { now })
+    }
+
+    @MainActor
     func test_loadGroupsRacesIntoMeetingsOrderedByFirstRace() async throws {
-        let provider = FakeRacingDataProvider(racecards: .success([
+        let model = makeModel(FakeRacingDataProvider(racecards: .success([
             .fixture(id: "r2", courseName: "Ascot", offTime: "3:05",
                      offDateTime: Date(timeIntervalSince1970: 3_600)),
             .fixture(id: "r1", courseName: "Ascot", offTime: "2:30",
                      offDateTime: Date(timeIntervalSince1970: 1_800)),
             .fixture(id: "r3", courseName: "Ayr", offTime: "2:00",
                      offDateTime: Date(timeIntervalSince1970: 900)),
-        ]))
-        let model = TodayViewModel(provider: provider, unavailable: nil)
+        ])))
 
         await model.load()
 
@@ -25,24 +41,24 @@ final class TodayViewModelTests: XCTestCase {
 
     @MainActor
     func test_noProviderReportsNotConfiguredRatherThanFailing() async {
-        let model = TodayViewModel(
-            provider: nil,
-            unavailable: .notConfigured(provider: "The Racing API"))
+        let model = makeModel(nil)
 
         await model.load()
 
         guard case .failed(let error) = model.state else {
             return XCTFail("Expected a failed state, got \(model.state)")
         }
-        // The distinction the UI keys off: an unconfigured provider is information,
-        // not a fault, so `ErrorStateView` must not offer a pointless retry.
+        // An unconfigured provider is information, not a fault, so
+        // `ErrorStateView` must not offer a pointless retry.
         XCTAssertTrue(error.isExpectedLimitation)
     }
 
     @MainActor
-    func test_aBrokenKeychainOutranksAMissingKey() async {
-        // `AppEnvironment` decides this; the model must simply not second-guess it.
-        let model = TodayViewModel(provider: nil, unavailable: .decoding)
+    func test_aBrokenKeychainShortCircuitsBeforeTheLoader() async {
+        // A missing key does not short-circuit: the cache may still hold a card.
+        // A broken Keychain does, because nothing downstream can be trusted.
+        let provider = FakeRacingDataProvider(racecards: .success([.fixture()]))
+        let model = makeModel(provider, unavailable: .decoding)
 
         await model.load()
 
@@ -50,72 +66,85 @@ final class TodayViewModelTests: XCTestCase {
             return XCTFail("Expected a failed state, got \(model.state)")
         }
         XCTAssertEqual(error, .decoding)
-        XCTAssertFalse(error.isExpectedLimitation)
+        XCTAssertEqual(provider.racecardCalls, 0)
     }
 
     @MainActor
-    func test_loadIfNeededSkipsARefetchWhileFresh() async {
+    func test_loadIfNeededDoesNotRefetchOnceLoaded() async {
         let provider = FakeRacingDataProvider(racecards: .success([.fixture()]))
-        var now = Date(timeIntervalSince1970: 0)
-        let model = TodayViewModel(provider: provider, unavailable: nil, now: { now })
+        let model = makeModel(provider)
 
         await model.loadIfNeeded()
+        await model.loadIfNeeded()
+
         XCTAssertEqual(provider.racecardCalls, 1)
-
-        now = now.addingTimeInterval(TodayViewModel.freshness - 1)
-        await model.loadIfNeeded()
-        XCTAssertEqual(provider.racecardCalls, 1, "Should still be inside the freshness window")
-
-        now = now.addingTimeInterval(2)
-        await model.loadIfNeeded()
-        XCTAssertEqual(provider.racecardCalls, 2, "Window elapsed, so it should refetch")
-    }
-
-    @MainActor
-    func test_anExplicitRefreshIgnoresTheFreshnessWindow() async {
-        let provider = FakeRacingDataProvider(racecards: .success([.fixture()]))
-        let now = Date(timeIntervalSince1970: 0)
-        let model = TodayViewModel(provider: provider, unavailable: nil, now: { now })
-
-        await model.load()
-        await model.load()
-
-        // Pull to refresh exists precisely for the case where the user knows
-        // something has changed and the clock disagrees.
-        XCTAssertEqual(provider.racecardCalls, 2)
-    }
-
-    @MainActor
-    func test_aFailedLoadDoesNotCountAsFresh() async {
-        let provider = FakeRacingDataProvider(racecards: .failure(.offline))
-        let now = Date(timeIntervalSince1970: 0)
-        let model = TodayViewModel(provider: provider, unavailable: nil, now: { now })
-
-        await model.load()
-        XCTAssertTrue(model.isStale, "A failure must not suppress the next attempt")
-
-        await model.loadIfNeeded()
-        XCTAssertEqual(provider.racecardCalls, 2)
     }
 
     @MainActor
     func test_anEmptyCardLoadsRatherThanErroring() async throws {
-        let provider = FakeRacingDataProvider(racecards: .success([]))
-        let model = TodayViewModel(provider: provider, unavailable: nil)
+        let model = makeModel(FakeRacingDataProvider(racecards: .success([])))
 
         await model.load()
 
         // A day with no British or Irish racing is a real day, not a failure.
-        XCTAssertEqual(try XCTUnwrap(model.state.value).count, 0)
+        let meetings = try XCTUnwrap(model.state.value)
+        XCTAssertEqual(meetings.count, 0)
     }
 
     @MainActor
-    func test_asksForBothBritishAndIrishRacing() async {
-        let provider = FakeRacingDataProvider(racecards: .success([]))
-        let model = TodayViewModel(provider: provider, unavailable: nil)
+    func test_switchingDayReloads() async {
+        let provider = FakeRacingDataProvider(racecards: .success([.fixture()]))
+        let model = makeModel(provider)
+
+        await model.loadIfNeeded()
+        XCTAssertEqual(model.day, .today)
+
+        await model.select(.tomorrow)
+
+        XCTAssertEqual(model.day, .tomorrow)
+        XCTAssertEqual(provider.racecardCalls, 2, "Tomorrow is a different card")
+    }
+
+    @MainActor
+    func test_selectingTheSameDayIsANoOp() async {
+        let provider = FakeRacingDataProvider(racecards: .success([.fixture()]))
+        let model = makeModel(provider)
+        await model.loadIfNeeded()
+
+        await model.select(.today)
+
+        XCTAssertEqual(provider.racecardCalls, 1)
+    }
+
+    @MainActor
+    func test_aStaleCardIsFlaggedSoTheScreenCanSayWhenItWasSaved() async {
+        let store = RacesStore(documents: InMemoryDocumentStore())
+        let start = Date(timeIntervalSince1970: 1_000_000)
+
+        let working = RacecardLoader(
+            provider: FakeRacingDataProvider(racecards: .success([.fixture()])), store: store)
+        _ = try? await working.load(day: .today, now: start)
+
+        let later = start.addingTimeInterval(StoreDocument.racecardFreshness + 1)
+        let model = TodayViewModel(
+            loader: RacecardLoader(
+                provider: FakeRacingDataProvider(racecards: .failure(.offline)), store: store),
+            unavailable: nil,
+            now: { later })
 
         await model.load()
 
-        XCTAssertEqual(provider.lastRegionCodes, ["gb", "ire"])
+        XCTAssertNotNil(model.state.value, "A stale card still loads")
+        XCTAssertEqual(model.staleSince?.timeIntervalSince1970 ?? 0, start.timeIntervalSince1970, accuracy: 1)
+    }
+
+    @MainActor
+    func test_aFreshCardClearsTheStaleFlag() async {
+        let provider = FakeRacingDataProvider(racecards: .success([.fixture()]))
+        let model = makeModel(provider)
+
+        await model.load()
+
+        XCTAssertNil(model.staleSince)
     }
 }

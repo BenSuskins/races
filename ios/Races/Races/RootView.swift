@@ -2,35 +2,52 @@ import SwiftUI
 import RacesKit
 
 /// The app's tabs.
-///
-/// Three for now. Tips and Record are deliberately absent rather than present and
-/// empty: a tab that leads nowhere is a promise the app hasn't kept, and each one
-/// arrives with the milestone that fills it — Tips with the rating UI, Record once
-/// the ledger has settled tips to report on.
 struct RootView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var environment: AppEnvironment
 
     init(credentials: any CredentialsStoring) {
         _environment = State(initialValue: AppEnvironment(credentials: credentials))
     }
 
-    /// For previews and tests, which supply their own provider.
+    /// For previews and tests, which supply their own store and provider.
     init(environment: AppEnvironment) {
         _environment = State(initialValue: environment)
     }
 
     var body: some View {
         TabView {
-            Tab("Today", systemImage: "calendar") {
+            Tab("Racing", systemImage: "calendar") {
                 TodayView(environment: environment)
+            }
+
+            Tab("Tips", systemImage: "sparkles") {
+                TipsView(environment: environment)
             }
 
             Tab("Courses", systemImage: "map") {
                 CoursesView(environment: environment)
             }
 
+            Tab("Record", systemImage: "chart.line.uptrend.xyaxis") {
+                RecordView(environment: environment)
+            }
+
             Tab("Settings", systemImage: "gear") {
                 SettingsView(environment: environment)
+            }
+        }
+        .task {
+            // Collect today's results on every launch. The free endpoint is
+            // today-only, so a launch is an opportunity that does not come back.
+            await environment.refreshResults()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Ask for the next background run on the way out, which is when the
+            // system wants to hear it and when we know we are about to stop
+            // collecting in the foreground.
+            if phase == .background {
+                BackgroundRefresh.schedule()
             }
         }
     }

@@ -10,6 +10,8 @@ import RacesKit
 struct RunnerView: View {
     let runner: Runner
     let race: Race
+    let assessment: RunnerAssessment?
+    let isFormOnly: Bool
 
     private var form: FormLine { FormParser.parse(runner.form) }
 
@@ -27,6 +29,10 @@ struct RunnerView: View {
 
     var body: some View {
         List {
+            if let assessment {
+                assessmentSection(assessment)
+            }
+
             Section("Card") {
                 if let clothNumber = runner.clothNumber {
                     LabeledContent("Cloth", value: "\(clothNumber)")
@@ -110,6 +116,43 @@ struct RunnerView: View {
         }
         .navigationTitle(runner.name)
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    /// Why the model arrived at this number.
+    ///
+    /// Every factor is listed, including the ones that had nothing to say —
+    /// `.missing` is information. A breakdown that silently omitted the absent
+    /// factors would read as a fuller analysis than the free tier can support.
+    @ViewBuilder
+    private func assessmentSection(_ assessment: RunnerAssessment) -> some View {
+        Section {
+            LabeledContent("Model") {
+                ProbabilityBadge(probability: assessment.winProbability)
+            }
+            LabeledContent("Fair odds", value: assessment.fairOdds.formatted(
+                .number.precision(.fractionLength(2))))
+            if let marketProbability = assessment.marketProbability {
+                LabeledContent(
+                    "Market",
+                    value: marketProbability.formatted(.percent.precision(.fractionLength(0))))
+            }
+        } header: {
+            Text("The model's view")
+        } footer: {
+            Text(isFormOnly
+                ? "Form only. Without Betfair there is no market to anchor this to, so it is a read of the racecard and no more."
+                : "Market-anchored, then adjusted on form.")
+        }
+
+        Section {
+            ForEach(assessment.contributions) { contribution in
+                ContributionRow(contribution: contribution)
+            }
+        } header: {
+            Text("What moved it")
+        } footer: {
+            Text("Factors are compared against the other runners in this race, not against racing as a whole — an official rating only means something relative to the field it is running in.")
+        }
     }
 
     @ViewBuilder

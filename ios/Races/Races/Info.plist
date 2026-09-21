@@ -12,5 +12,24 @@
 	     Connect until the questionnaire is answered by hand. -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+
+	<!-- Background results collection. The free results endpoint covers today
+	     only, so a race day the app never runs on is a day of results lost for
+	     good — along with the jockey and trainer records that accumulate from
+	     them. `fetch` is what lets the app pick them up in the evening without
+	     being opened. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
+
+	<!-- Must list every identifier passed to BGTaskScheduler.register.
+	     Registering an identifier absent from this array traps at launch, so
+	     this array and `BackgroundRefresh.taskIdentifier` have to agree
+	     exactly. -->
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>uk.co.suskins.Races.refresh</string>
+	</array>
 </dict>
 </plist>

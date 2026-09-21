@@ -1,42 +1,69 @@
 import SwiftUI
 import RacesKit
 
-/// Today's racing, by meeting, with the next race off highlighted.
+/// Today's or tomorrow's racing, by meeting.
 struct TodayView: View {
+    private let environment: AppEnvironment
     @State private var model: TodayViewModel
 
     init(environment: AppEnvironment) {
+        self.environment = environment
         _model = State(initialValue: TodayViewModel(environment: environment))
     }
 
     var body: some View {
         NavigationStack {
-            StateContentView(state: model.state, retry: { await model.load() }) { meetings in
-                if meetings.isEmpty {
-                    ContentUnavailableView(
-                        "No racing today",
-                        systemImage: "calendar",
-                        description: Text("There are no British or Irish fixtures on today's card."))
-                } else {
-                    List {
-                        ForEach(meetings) { meeting in
-                            Section {
-                                ForEach(meeting.races) { race in
-                                    NavigationLink(value: race) {
-                                        RaceRow(race: race)
-                                    }
+            VStack(spacing: 0) {
+                Picker("Day", selection: Binding(
+                    get: { model.day },
+                    set: { day in Task { await model.select(day) } }
+                )) {
+                    Text("Today").tag(RaceDay.today)
+                    Text("Tomorrow").tag(RaceDay.tomorrow)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+
+                StateContentView(state: model.state, retry: { await model.load() }) { meetings in
+                    if meetings.isEmpty {
+                        ContentUnavailableView(
+                            model.day == .today ? "No racing today" : "No racing tomorrow",
+                            systemImage: "calendar",
+                            description: Text("There are no British or Irish fixtures on this card."))
+                    } else {
+                        List {
+                            if let staleSince = model.staleSince {
+                                Section {
+                                    Label(
+                                        "Couldn't refresh — showing the card saved \(staleSince.formatted(date: .omitted, time: .shortened)).",
+                                        systemImage: "wifi.exclamationmark")
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
                                 }
-                            } header: {
-                                MeetingHeader(meeting: meeting)
+                            }
+
+                            ForEach(meetings) { meeting in
+                                Section {
+                                    ForEach(meeting.races) { race in
+                                        NavigationLink(value: race) {
+                                            RaceRow(race: race)
+                                        }
+                                    }
+                                } header: {
+                                    MeetingHeader(meeting: meeting)
+                                }
                             }
                         }
+                        .listStyle(.insetGrouped)
+                        .refreshable { await model.load(forceRefresh: true) }
                     }
-                    .listStyle(.insetGrouped)
-                    .refreshable { await model.load() }
                 }
             }
-            .navigationTitle("Today")
-            .navigationDestination(for: Race.self) { RaceView(race: $0) }
+            .navigationTitle("Racing")
+            .navigationDestination(for: Race.self) {
+                RaceView(race: $0, environment: environment)
+            }
         }
         .task { await model.loadIfNeeded() }
     }
