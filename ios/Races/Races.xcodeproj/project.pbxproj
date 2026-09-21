@@ -26,9 +26,22 @@
 		0A00000000000000000000C2 /* RacesTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RacesTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		0A00000000000000000000B0 /* Exceptions for "Races" folder in "Races" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 0A00000000000000000000B1 /* Races */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		0A00000000000000000000B3 /* Races */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				0A00000000000000000000B0 /* Exceptions for "Races" folder in "Races" target */,
+			);
 			path = Races;
 			sourceTree = "<group>";
 		};
@@ -345,6 +358,7 @@
 				DEVELOPMENT_TEAM = PF88YZ2HU7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Races/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Races;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.sports";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -380,6 +394,7 @@
 				DEVELOPMENT_TEAM = PF88YZ2HU7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Races/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Races;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.sports";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
