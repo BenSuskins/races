@@ -14,12 +14,20 @@ concurrency:
   group: ios-${{ github.ref }}
   cancel-in-progress: true
 
-# Toolchain versions are pinned here and nowhere else. GitHub Actions has no YAML
-# anchors, so a workflow-level env block is the only single source of truth
-# available — the alternative is the same version literal drifting across jobs.
+# Paths and the Xcode version are pinned here and nowhere else. GitHub Actions
+# has no YAML anchors, so a workflow-level env block is the only single source of
+# truth available — the alternative is the same literal drifting across jobs.
+#
+# The Swift version is NOT here, and that is not an oversight: the `env` context
+# is unavailable in `jobs.<id>.container`, which is evaluated before the job
+# starts. A one-entry matrix is available there, so the Linux job carries its
+# toolchain version in `strategy.matrix` instead — still one place, and it also
+# makes testing a second toolchain a two-character change.
 env:
-  SWIFT_VERSION: '6.2'
+  XCODE_VERSION: '26.1'
   PACKAGE_PATH: ios/RacesKit
+  PROJECT_PATH: ios/Races/Races.xcodeproj
+  SCHEME: Races
 
 jobs:
   # RacesKit is deliberately Foundation-only, so it builds and tests on Linux in
@@ -33,25 +41,46 @@ jobs:
     name: RacesKit (Linux)
     runs-on: ubuntu-latest
 
+    # The toolchain arrives as a container image rather than as an install step.
+    #
+    # `swift-actions/setup-swift` downloads and unpacks a toolchain on every run,
+    # and on 2026-09-21 it hung for 26 minutes on this job without emitting a
+    # line — no timeout, no failure, just a stalled step. The official image is
+    # pulled by the runner's own container machinery, which retries and caches,
+    # so there is no third-party download in the critical path at all. It is also
+    # faster: the toolchain is baked in rather than fetched and unpacked.
+    #
+    # Family Hub still uses the action. Worth changing there too.
+    container: swift:${{ matrix.swift }}
+
+    strategy:
+      matrix:
+        # The Swift version lives here because `container` cannot read `env`.
+        swift: ['6.2']
+
     steps:
       - uses: actions/checkout@v4
 
-      - uses: swift-actions/setup-swift@v2
-        with:
-          swift-version: ${{ env.SWIFT_VERSION }}
+      # Cheap, and it puts the exact toolchain in the log — useful when a build
+      # succeeds locally and fails here, or the reverse.
+      - name: Toolchain
+        run: swift --version
 
       # Keyed on the Swift version as well as the sources: a .build tree left by
       # a different toolchain is worse than no cache at all. The restore-keys
       # prefix means an ordinary source edit still reuses most object files.
+      #
+      # `~` is the container's HOME (/root), not the runner's, which is the point:
+      # the cache has to match the toolchain that produced it.
       - name: Cache SwiftPM
         uses: actions/cache@v4
         with:
           path: |
             ~/.cache/org.swift.swiftpm
             ${{ env.PACKAGE_PATH }}/.build
-          key: spm-${{ runner.os }}-${{ env.SWIFT_VERSION }}-${{ hashFiles('ios/RacesKit/Package.swift', 'ios/RacesKit/Sources/**/*.swift', 'ios/RacesKit/Tests/**/*.swift') }}
+          key: spm-swift${{ matrix.swift }}-${{ hashFiles('ios/RacesKit/Package.swift', 'ios/RacesKit/Sources/**/*.swift', 'ios/RacesKit/Tests/**/*.swift') }}
           restore-keys: |
-            spm-${{ runner.os }}-${{ env.SWIFT_VERSION }}-
+            spm-swift${{ matrix.swift }}-
 
       - name: Build
         run: swift build --package-path ${{ env.PACKAGE_PATH }}
@@ -59,9 +88,60 @@ jobs:
       - name: Test
         run: swift test --package-path ${{ env.PACKAGE_PATH }} --parallel
 
-# The macOS `xcodebuild` job, the CodeQL workflow and the algorithm back-test job
-# land alongside the pieces they test:
-#   * macOS job  — with ios/Races/Races.xcodeproj (next change)
-#   * back-test  — with the rating engine
-# Adding them before the code they build would just be a red check with nothing
-# behind it.
+  # The Xcode half. Slower and dearer than the Linux job, so it runs in parallel
+  # rather than after it — a pbxproj mistake and a kit mistake are independent,
+  # and waiting to learn about the second is no cheaper.
+  #
+  # This job is what validates `Races.xcodeproj` at all. The project file was
+  # written by hand rather than by Xcode, so "does it open and build" is a claim
+  # that needs checking on every change, not an assumption.
+  app:
+    name: Races (Xcode)
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode ${{ env.XCODE_VERSION }}
+        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+
+      # The project resolves RacesKit as a local package, so SwiftPM's cache
+      # applies here too. Keyed on the pbxproj as well as the package: a project
+      # change can alter which products get resolved.
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/org.swift.swiftpm
+          key: spm-${{ runner.os }}-${{ env.XCODE_VERSION }}-${{ hashFiles('ios/RacesKit/Package.swift', 'ios/Races/Races.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            spm-${{ runner.os }}-${{ env.XCODE_VERSION }}-
+
+      # `CODE_SIGNING_ALLOWED=NO` throughout: signing needs the team's
+      # certificates, which CI has no business holding. It also means the app
+      # bundle has no keychain-access entitlement, which is exactly why
+      # KeychainCredentialsStore is tested through a seam rather than against
+      # the real Keychain — the real one returns errSecMissingEntitlement here.
+      - name: Test
+        run: |
+          xcodebuild test \
+            -project ${{ env.PROJECT_PATH }} \
+            -scheme ${{ env.SCHEME }} \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -resultBundlePath ios-test-results \
+            CODE_SIGNING_ALLOWED=NO
+
+      # Family Hub writes a result bundle and then never uploads it, so a red
+      # check there can't be inspected without re-running locally. `always()`
+      # is the point: the bundle matters most when the step above failed.
+      - name: Upload result bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-results
+          path: ios-test-results.xcresult
+          retention-days: 7
+          if-no-files-found: warn
+
+# Still to land, each alongside the code it covers:
+#   * back-test  — a floor on strike rate and ROI over fixture races
+#   * CodeQL     — Swift analysis on macOS
