@@ -23,7 +23,8 @@ final class TipsViewModelTests: XCTestCase {
     private func makeModel(
         races: [Race],
         store: RacesStore = RacesStore(documents: InMemoryDocumentStore()),
-        unavailable: APIError? = nil
+        unavailable: APIError? = nil,
+        now: Date = TipsViewModelTests.now
     ) -> (TipsViewModel, RacesStore) {
         let provider = FakeRacingDataProvider(racecards: .success(races))
         return (
@@ -31,7 +32,7 @@ final class TipsViewModelTests: XCTestCase {
                 loader: RacecardLoader(provider: provider, store: store),
                 store: store,
                 unavailable: unavailable,
-                now: { Self.now }),
+                now: { now }),
             store
         )
     }
@@ -154,6 +155,32 @@ final class TipsViewModelTests: XCTestCase {
             return XCTFail("Expected a failed state, got \(bare.state)")
         }
         XCTAssertTrue(error.isExpectedLimitation)
+    }
+
+    @MainActor
+    func test_theInjectedClockDecidesWhatHasRunNotTheRealOne() async throws {
+        // The direction that actually proves it. This race is decades in the
+        // future, so `Race.hasStarted` — which reads the real `Date()` — would
+        // say it has not run. Our clock is a minute later than the off, so it
+        // has, and it must be dropped.
+        //
+        // The reverse direction is what broke: every fixture off time is in 1970,
+        // so against the real clock the whole card read as already run and Tips
+        // produced nothing at all.
+        let off = Date(timeIntervalSince1970: 4_000_000_000)
+        let race = Race(
+            id: "rac_1", courseName: "Ascot", name: "A Race", offTime: "2:30",
+            offDateTime: off, date: "2096-10-08",
+            runners: [.fixture(id: "a", officialRating: 100),
+                      .fixture(id: "b", officialRating: 60)])
+        let (model, store) = makeModel(races: [race], now: off.addingTimeInterval(60))
+
+        await model.load()
+
+        let selections = try XCTUnwrap(model.state.value)
+        XCTAssertEqual(selections.count, 0, "Past by our clock, so not tipped")
+        let tips = await store.tips
+        XCTAssertEqual(tips.count, 0, "And never recorded — the sealing rule")
     }
 
     @MainActor

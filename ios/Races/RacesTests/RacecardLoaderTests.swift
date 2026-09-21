@@ -105,8 +105,11 @@ final class RacecardLoaderTests: XCTestCase {
 
         // Credentials cleared. The card they last saw was real, so it is still
         // worth showing.
+        // Stay inside the same London day: the cache is keyed by day string, so
+        // advancing 24 hours would look up a different key and miss by design.
         let loader = makeLoader(nil, store: store)
-        let load = try await loader.load(day: .today, now: start.addingTimeInterval(86_400))
+        let load = try await loader.load(
+            day: .today, now: start.addingTimeInterval(StoreDocument.racecardFreshness + 1))
 
         XCTAssertEqual(load.races.map(\.id), ["r1"])
         XCTAssertFalse(load.isFresh)

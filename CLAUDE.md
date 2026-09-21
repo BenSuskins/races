@@ -227,6 +227,22 @@ told their credentials are wrong rather than that a field is blank.
   when a suite goes quiet, compare the two before hunting for a logic bug. Write
   `@MainActor func test_x() async`, with `async throws` when it throws, even when
   the body awaits nothing.
+- **`Race.hasStarted` reads the real `Date()`**, so anything that takes an
+  injected clock must not use it. `TipsViewModel` did, and the result was a view
+  model that accepted a `now` closure and then ignored it for the one decision
+  that mattered — what to rate and what to record. Every fixture off time sits in
+  1970, so against the real clock the whole card read as already run and Tips
+  produced nothing: eight tests failed at once with no obvious cause. Compare
+  `offDateTime` against the injected instant instead, and keep `hasStarted` for
+  display, where the real clock is the right one.
+- **`RaceResult.didRun(horseID:)` returns `nil` below three finishers**, and that
+  is deliberate: a truncated payload would otherwise settle every runner as a
+  non-runner and wipe a day's tips in one pass. The consequence for tests is that
+  a two-runner result fixture leaves its tip `.unresolved` rather than won or
+  lost, which reads as a bug in `RacesStore` and is actually the guard doing its
+  job. `RaceResult.settleable(winner:)` and `settleableLoss(loser:)` in
+  `Fakes.swift` build a field that clears the floor — use those unless the test
+  is specifically about a short field.
 - **`await` does not go inside an `XCTAssert`.** `XCTAssertEqual(await store.tips.count, 1)`
   and `try XCTUnwrap(await store.tip(forRace: id))` both fail to compile: the
   assertions take non-async autoclosures, and an `await` inside one is an error.

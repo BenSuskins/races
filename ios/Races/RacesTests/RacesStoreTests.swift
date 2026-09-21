@@ -115,10 +115,7 @@ final class RacesStoreTests: XCTestCase {
         let tip = try XCTUnwrap(recorded)
         XCTAssertNil(tip.outcome)
 
-        let result = RaceResult.fixture(id: "rac_1", finishers: [
-            .fixture(horseID: tip.selectionHorseID, position: 1),
-            .fixture(horseID: "z", position: 2),
-        ])
+        let result = RaceResult.settleable(id: "rac_1", winner: tip.selectionHorseID)
         let ingestion = await store.ingest(
             results: [result], now: offAt.addingTimeInterval(600))
         let settledRecord = await store.tip(forRace: "rac_1")
@@ -138,16 +135,11 @@ final class RacesStoreTests: XCTestCase {
         let recorded = await store.tip(forRace: "rac_1")
         let tip = try XCTUnwrap(recorded)
 
-        let won = RaceResult.fixture(id: "rac_1", finishers: [
-            .fixture(horseID: tip.selectionHorseID, position: 1),
-        ])
+        let won = RaceResult.settleable(id: "rac_1", winner: tip.selectionHorseID)
         await store.ingest(results: [won], now: offAt.addingTimeInterval(600))
 
         // A contradictory later payload must not rewrite history.
-        let lost = RaceResult.fixture(id: "rac_1", finishers: [
-            .fixture(horseID: tip.selectionHorseID, position: 5),
-            .fixture(horseID: "z", position: 1),
-        ])
+        let lost = RaceResult.settleableLoss(id: "rac_1", loser: tip.selectionHorseID)
         let second = await store.ingest(results: [lost], now: offAt.addingTimeInterval(1_200))
         let finalRecord = await store.tip(forRace: "rac_1")
         let final = try XCTUnwrap(finalRecord)
