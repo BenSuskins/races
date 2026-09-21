@@ -26,7 +26,12 @@ public struct RacingAPICredentials: Hashable, Sendable {
 /// `/v1/racecards/free` returns the *Basic* schema and `/v1/racecards/basic`
 /// returns the *full* one. The paths here are the ones the free tier can actually
 /// reach; see `docs/providers.md` for the tier of every call.
-public final class RacingAPIClient: RacingDataProviding {
+///
+/// An **actor** because it caches what it learns — the detected tier, and whether
+/// the paid endpoint has already refused. That is mutable state reached from
+/// concurrent requests, so it needs an isolation domain of its own. Nothing else
+/// in the package does, which is why the package no longer imposes one globally.
+public actor RacingAPIClient: RacingDataProviding {
 
     public static let productionBaseURL = URL(string: "https://api.theracingapi.com")!
     /// The free tier's published limit. Everything else in the app is paced to it.

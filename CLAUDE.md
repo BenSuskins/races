@@ -77,11 +77,27 @@ this for you.
 - **Betfair runner names carry country suffixes** (`Kyprios (IRE)`) and sometimes a
   cloth-number prefix. Match on `CLOTH_NUMBER` against the Racing API's `number`
   first; names are the fallback, never the primary key.
-- `.defaultIsolation(MainActor.self)` is set on the library target but **not** the
-  test target — it would make `XCTestCase` subclasses MainActor-isolated, which
-  cannot override the nonisolated `init(name:testClosure:)`.
+- **`.defaultIsolation(MainActor.self)` is set on neither target**, unlike Family
+  Hub. This kit is mostly pure value types and a pure algorithm, so a MainActor
+  default forces hundreds of isolated conformances to `Equatable`, `Codable` and
+  `OptionSet` — enough of them to crash the compiler during module emission. The
+  two types that need isolation declare it themselves: `RacingAPIClient` (it
+  caches tier state) and `RateLimiter`. On the *test* target it is doubly wrong:
+  it would make `XCTestCase` subclasses MainActor-isolated, and those cannot
+  override the nonisolated `init(name:testClosure:)`.
 - A `+` in a form-encoded body decodes as a space. `HTTPClient` percent-encodes it;
   Betfair passwords routinely contain one.
+
+## Accuracy
+
+`docs/accuracy.md` records what the tracker measures and what it refuses to. Three
+things in it exist specifically to stop the app flattering itself, and none should
+be removed without a good reason: the **favourite baseline**, the
+**agree/disagree split**, and **separate denominators** for strike rate and ROI.
+
+The **sealing rule** is what makes any of it mean anything: a tip is a draft until
+five minutes before the off, immutable after, and a race first opened after it has
+run is never recorded at all.
 
 ## Testing
 

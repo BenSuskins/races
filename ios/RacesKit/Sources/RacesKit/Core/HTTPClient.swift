@@ -18,7 +18,9 @@ public enum HTTPAuthorization: Sendable {
 ///
 /// Both provider clients are thin layers over this. Keeping the pipeline in one
 /// place means rate limiting and status mapping can't drift between them.
-public final class HTTPClient {
+/// `@unchecked Sendable`: every stored property is a `let`, and the one
+/// non-`Sendable` member — the decoder — is only ever read.
+public final class HTTPClient: @unchecked Sendable {
     private let baseURL: URL
     private let transport: any HTTPPerforming
     private let limiter: RateLimiter

@@ -8,12 +8,14 @@ import FoundationNetworking
 /// Every provider client talks to this rather than to `URLSession` directly, so
 /// the whole stack — request building, status mapping, decoding, retries, rate
 /// limiting — is exercised on Linux against committed fixtures, with no network.
-public protocol HTTPPerforming: AnyObject {
+public protocol HTTPPerforming: AnyObject, Sendable {
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse)
 }
 
 /// The live transport.
-public final class URLSessionTransport: HTTPPerforming {
+/// `@unchecked Sendable`: `URLSession` is safe to use concurrently, but is not
+/// formally `Sendable` on every platform we build for.
+public final class URLSessionTransport: HTTPPerforming, @unchecked Sendable {
     private let session: URLSession
 
     public init(session: URLSession = .shared) {
