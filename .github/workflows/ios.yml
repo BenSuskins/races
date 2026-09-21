@@ -116,6 +116,48 @@ jobs:
           restore-keys: |
             spm-${{ runner.os }}-${{ env.XCODE_VERSION }}-
 
+      # Resolve the simulator at run time instead of naming a model.
+      #
+      # `name=iPhone 16,OS=latest` reads like a sensible pin and is actually a
+      # pin on the runner image's installed device list. It broke exactly that
+      # way: the run on main after #5 merged landed on an image with no iPhone 16
+      # installed, and xcodebuild could offer only its two placeholder
+      # destinations. Picking the newest installed iOS runtime's first iPhone
+      # survives the device list changing underneath us.
+      #
+      # The diagnostics matter as much as the fix. When there genuinely is no
+      # simulator, the original failure said only that one device was missing;
+      # this says so plainly and prints what the runner does have.
+      - name: Pick a simulator
+        id: simulator
+        run: |
+          devices=$(xcrun simctl list devices available -j)
+
+          # Runtime keys look like com.apple.CoreSimulator.SimRuntime.iOS-26-1,
+          # so reverse identifier order is newest-first in practice.
+          udid=$(printf '%s' "$devices" | jq -r '
+            .devices
+            | to_entries
+            | map(select(.key | test("iOS")))
+            | sort_by(.key)
+            | reverse
+            | (.[0].value // [])
+            | map(select(.name | startswith("iPhone")))
+            | (.[0].udid // empty)
+          ')
+
+          if [ -z "$udid" ]; then
+            echo "::error::No iOS simulator is installed on this runner."
+            xcrun simctl list runtimes
+            xcrun simctl list devices
+            exit 1
+          fi
+
+          name=$(printf '%s' "$devices" | jq -r --arg udid "$udid" '
+            [.devices[][] | select(.udid == $udid)] | (.[0].name // "unknown")')
+          echo "Testing on $name ($udid)"
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+
       # `CODE_SIGNING_ALLOWED=NO` throughout: signing needs the team's
       # certificates, which CI has no business holding. It also means the app
       # bundle has no keychain-access entitlement, which is exactly why
@@ -126,19 +168,25 @@ jobs:
           xcodebuild test \
             -project ${{ env.PROJECT_PATH }} \
             -scheme ${{ env.SCHEME }} \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
             -resultBundlePath ios-test-results \
             CODE_SIGNING_ALLOWED=NO
 
       # Family Hub writes a result bundle and then never uploads it, so a red
       # check there can't be inspected without re-running locally. `always()`
       # is the point: the bundle matters most when the step above failed.
+      #
+      # Both paths because xcodebuild is inconsistent about the extension: the
+      # failing run logged "Writing result bundle at path: .../ios-test-results"
+      # while the upload looked for ios-test-results.xcresult and found nothing.
       - name: Upload result bundle
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ios-test-results
-          path: ios-test-results.xcresult
+          path: |
+            ios-test-results
+            ios-test-results.xcresult
           retention-days: 7
           if-no-files-found: warn
 
