@@ -137,8 +137,10 @@ told their credentials are wrong rather than that a field is blank.
   and devices when it finds none.
 - **`VERSIONING_SYSTEM = "apple-generic"` is set at project level and must stay.**
   Without it the `agvtool` call in `ci_scripts/ci_post_clone.sh` silently does
-  nothing and every Xcode Cloud build ships the same build number. Family Hub has
-  this bug.
+  nothing and every Xcode Cloud build ships the same build number. (An earlier
+  version of this note claimed Family Hub has that bug. It does not: it has no
+  `ci_scripts/` and no `agvtool` call at all, and sets
+  `CURRENT_PROJECT_VERSION` by hand.)
 - **The app target defaults to MainActor isolation; the kit does not.** So a class
   in the app that conforms to a kit protocol with nonisolated requirements —
   `KeychainCredentialsStore` — must be declared `nonisolated`, or the conformance
