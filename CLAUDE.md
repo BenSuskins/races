@@ -71,6 +71,12 @@ back-test run on Linux in seconds, and it is a rule worth defending.
 tier is 1 req/s. Always `await limiter.acquire()` before sending; `HTTPClient` does
 this for you.
 
+**Matching refuses rather than guesses** — `docs/matching.md` has the design.
+The rule that shapes it: a race with no market falls back to form only and says
+so, while a race with the *wrong* market silently anchors every runner to another
+race's prices and looks entirely normal. So ties, thin overlaps and ambiguity are
+all refused, and every refusal carries a reason.
+
 **Credentials cross the module boundary as a protocol** — `CredentialsStoring` and
 `ProviderConfiguration` live in the kit; `KeychainCredentialsStore` implements them
 in the app. *Which* secrets count as a configured provider is kit logic, and
@@ -94,6 +100,18 @@ told their credentials are wrong rather than that a field is blank.
 - **Betfair runner names carry country suffixes** (`Kyprios (IRE)`) and sometimes a
   cloth-number prefix. Match on `CLOTH_NUMBER` against the Racing API's `number`
   first; names are the fallback, never the primary key.
+- **That cloth-number rule is about runners within a race, never about which race
+  a market is.** Every race numbers its runners from one, so cloths agree between
+  any two races of the same size. `RaceMatcher` therefore scores candidate markets
+  with `allowClothNumbers: false` and only enables them once the market is
+  settled. Getting this the wrong way round gives a matcher that confidently
+  prices every race off whatever market shares its course and time — it is the
+  worst thing this component can do, and the easiest to write by accident.
+  `test_clothNumbersAloneCannotIdentifyARace` exists to stop it coming back.
+- **No course-normalisation rule is acceptable unless
+  `test_noTwoRealCoursesShareAKey` still passes.** It runs every British and Irish
+  course through `CourseNameNormaliser` and asserts the keys stay distinct. A rule
+  that collapsed two real courses would price one meeting off another's market.
 - **`.defaultIsolation(MainActor.self)` is set on neither target**, unlike Family
   Hub. This kit is mostly pure value types and a pure algorithm, so a MainActor
   default forces hundreds of isolated conformances to `Equatable`, `Codable` and
