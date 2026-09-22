@@ -77,6 +77,8 @@ ios/RacesKit/Sources/RacesKit/
 ├── Core/          # ViewState, APIError, RetryPolicy, RateLimiter, HTTPClient
 ├── Models/        # Course, Race, Runner, RaceResult — provider-agnostic domain types
 ├── Providers/     # RacingAPI + Betfair clients behind two protocols
+│   ├── RacingAPI/ # Client, DTOs, mapping
+│   └── Betfair/   # Session (login/keep-alive), client, DTOs, faults, mapping
 ├── Matching/      # Joins the two providers' views of the same race
 ├── Rating/        # The algorithm: factors, weights, the rater
 ├── Tracking/      # Tip ledger, reconciliation, accuracy metrics
@@ -94,6 +96,14 @@ behind a protocol declared in `Core/`.
 `MarketDataProviding` (prices, SP). They are separate because either can be absent:
 the user may not have configured Betfair, or a race may not match. Both absences are
 normal states, never errors.
+
+`MarketDataProviding` returns `ExchangeMarketPrices`, keyed by Betfair's own
+**selection id** — deliberately not `MarketSnapshot`, which is keyed by *our*
+horse id and can only exist after matching has joined the two providers. Handing
+the rater exchange-keyed prices would mean it had to know two providers exist,
+which is the thing the matching layer is for. `BetfairMapping.snapshot(from:horseIDsBySelectionID:)`
+is the one place that crossing happens, and it **drops** unmatched selections
+rather than guessing.
 
 **Tier degradation is a feature** — `formHistory(horseID:)` throws
 `APIError.tierUnavailable` on the free tier. The rater catches it and drops those
@@ -160,6 +170,30 @@ told their credentials are wrong rather than that a field is blank.
   override the nonisolated `init(name:testClosure:)`.
 - A `+` in a form-encoded body decodes as a space. `HTTPClient` percent-encodes it;
   Betfair passwords routinely contain one.
+- **Betfair reports failure with HTTP 200.** A refused login comes back `200` with
+  `status: "FAIL"` and the reason in `error`, so a status-code check reads it as a
+  success that happens to have no token. Betting calls do the same with a
+  `detail.APINGException.errorCode` envelope — and there the cost is worse,
+  because an unhandled fault decodes as an **empty array**, which is
+  indistinguishable from "no racing today". Every betting call therefore decodes
+  the fault envelope speculatively; see `BetfairRawResponse`.
+- **`TOO_MUCH_DATA` is an instruction, not an error.** The same markets come back
+  if asked for in smaller groups, so `BetfairClient` halves the batch recursively
+  rather than surfacing it. Mapping it to an `APIError` like the other codes would
+  turn a recoverable condition into a card with no prices.
+- **A `CLOTH_NUMBER` of `"0"` means "not published", not "number zero".** Betfair
+  sends it on markets without published numbers, and cloth number is the
+  matcher's *primary* join key — so treating it as real would join on a value
+  every such runner shares. `BetfairMapping.clothNumber` requires `> 0`. All the
+  metadata arrives as strings, including the numeric fields.
+- **Betfair's price ladder is best-price-first**, so the best available is
+  `.first`, never `max`. `max` happens to be right for backing and is wrong for
+  laying, which is the sort of asymmetry that survives a casual read.
+- **Betfair's session lifetime is still unmeasured**, and the client does not
+  depend on it: it renews *reactively* when the exchange reports
+  `INVALID_SESSION_INFORMATION`, retrying exactly once. A 2FA or certificate
+  failure is **latched** instead, because retrying that on every card refresh
+  would look like a hang and could lock the account.
 - **`Races.xcodeproj` was hand-written, so treat the macOS CI job as the thing
   that proves it works.** It uses `objectVersion = 77` with
   `PBXFileSystemSynchronizedRootGroup`, so adding a source file needs no project
