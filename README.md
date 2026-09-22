@@ -26,8 +26,9 @@ Two things are outstanding and neither is a feature: the **Betfair login spike**
 **real race days** — the archive starts empty, so the strike-rate factors, ROI and
 the favourite baseline all need a sample before they mean anything.
 
-See [`docs/providers.md`](docs/providers.md) for the data sources and
-[`CLAUDE.md`](CLAUDE.md) for developer context.
+See [`docs/providers.md`](docs/providers.md) for the data sources in use,
+[`docs/data-sources.md`](docs/data-sources.md) for the ones evaluated and turned
+down, and [`CLAUDE.md`](CLAUDE.md) for developer context.
 
 ## How the recommendation works
 
