@@ -8,16 +8,26 @@ own history on device.
 
 ## Status
 
-Early. See [`docs/providers.md`](docs/providers.md) for the data sources and
-[`CLAUDE.md`](CLAUDE.md) for developer context.
+Everything in the original plan is built and on TestFlight. What is left, and what
+each item is actually blocked on, is in [`docs/roadmap.md`](docs/roadmap.md).
 
 | Milestone | State |
 |---|---|
-| M0 — package skeleton, core networking, CI | In progress |
-| M1 — Racing API client and browse | Not started |
-| M2 — Betfair market data | Not started |
-| M3 — rating engine and explanations | Not started |
-| M4 — tip ledger and accuracy tracking | Not started |
+| M0 — package skeleton, core networking, CI | Done |
+| M1 — Racing API client and browse | Done |
+| M2 — Betfair market data | Done |
+| M3 — rating engine and explanations | Done |
+| M4 — tip ledger and accuracy tracking | Done |
+| M5 — Betfair SP, so ROI has a price source | Done |
+| M6 — the model on screen: every weight, and why | Done |
+
+Two things are outstanding and neither is a feature: the **Betfair login spike**
+(two minutes, on a device, and three merged changes depend on the answer), and
+**real race days** — the archive starts empty, so the strike-rate factors, ROI and
+the favourite baseline all need a sample before they mean anything.
+
+See [`docs/providers.md`](docs/providers.md) for the data sources and
+[`CLAUDE.md`](CLAUDE.md) for developer context.
 
 ## How the recommendation works
 
