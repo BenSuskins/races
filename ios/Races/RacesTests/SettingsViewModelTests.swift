@@ -75,7 +75,7 @@ final class SettingsViewModelTests: XCTestCase {
         let environment = AppEnvironment(credentials: store, makeRacingProvider: { _ in
             FakeRacingDataProvider()
         })
-        store.failure = APIError.decoding
+        store.failure = APIError.decoding(nil)
 
         let model = SettingsViewModel(environment: environment)
         model.username = "ben"

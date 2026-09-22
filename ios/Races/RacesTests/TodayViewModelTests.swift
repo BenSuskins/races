@@ -58,14 +58,14 @@ final class TodayViewModelTests: XCTestCase {
         // A missing key does not short-circuit: the cache may still hold a card.
         // A broken Keychain does, because nothing downstream can be trusted.
         let provider = FakeRacingDataProvider(racecards: .success([.fixture()]))
-        let model = makeModel(provider, unavailable: .decoding)
+        let model = makeModel(provider, unavailable: .decoding(nil))
 
         await model.load()
 
         guard case .failed(let error) = model.state else {
             return XCTFail("Expected a failed state, got \(model.state)")
         }
-        XCTAssertEqual(error, .decoding)
+        XCTAssertEqual(error, .decoding(nil))
         XCTAssertEqual(provider.racecardCalls, 0)
     }
 

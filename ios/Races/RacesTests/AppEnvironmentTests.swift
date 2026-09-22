@@ -41,7 +41,7 @@ final class AppEnvironmentTests: XCTestCase {
 
     @MainActor
     func test_aBrokenKeychainIsNotReportedAsMissingCredentials() async {
-        let store = InMemoryCredentialsStore(failure: APIError.decoding)
+        let store = InMemoryCredentialsStore(failure: APIError.decoding(nil))
 
         let environment = AppEnvironment(credentials: store, makeRacingProvider: { _ in
             FakeRacingDataProvider()

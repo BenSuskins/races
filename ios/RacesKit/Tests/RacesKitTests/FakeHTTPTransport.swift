@@ -60,7 +60,7 @@ final class FakeHTTPTransport: HTTPPerforming, @unchecked Sendable {
                 httpVersion: "HTTP/1.1",
                 headerFields: headers
             ) else {
-                throw APIError.decoding
+                throw APIError.decoding(nil)
             }
             return (body, response)
         }
