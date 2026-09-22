@@ -168,6 +168,31 @@ the middle rows add up. Pretending otherwise would be a small lie that compounds
 > ↓ Days since last run — 118 days off · −1.2%
 > — Draw — not applied (no bias data for this course)
 
+## On screen
+
+The **Model tab** renders this document's numbers live from `RatingWeights.v1`
+rather than restating them, so the two cannot disagree: α, β, β-without-market,
+the z-score clip, the overround method, the coverage floor, the strike-rate
+sample floor, the form decay and the full points-per-finish table.
+
+Three things it does deliberately that a "settings" screen would not:
+
+- **All twelve factors are listed, including the four at zero**, each with its
+  rationale. A screen showing only the live ones would imply the model considers
+  nothing else. The zeros are decisions, and `FactorDescriptionTests` fails if
+  one arrives without a reason attached.
+- **A factor with weight but no data is shown as waiting, not live.** On a fresh
+  install the jockey and trainer strike rates would read as in play the moment
+  they were given a weight, when the archive behind them is empty.
+- **It is read-only.** `weightsID` is stamped onto every tip, so a weight edited
+  in the app either invalidates the accuracy history silently (same id) or splits
+  it in two (new id). Tuning waits for the back-test, which is the only thing
+  that can say whether a change is an improvement.
+
+The factor copy lives on `FactorID` in the kit — `summary` and `rationale`,
+beside `label` — so it is covered by the Linux job and cannot drift from the
+weights it describes.
+
 ## Back-test log
 
 Record every weight change here with its effect, so tuning is a trail rather than a

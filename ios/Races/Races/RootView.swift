@@ -25,8 +25,8 @@ struct RootView: View {
                 TipsView(environment: environment)
             }
 
-            Tab("Courses", systemImage: "map") {
-                CoursesView(environment: environment)
+            Tab("Model", systemImage: "slider.horizontal.3") {
+                AlgorithmView(environment: environment)
             }
 
             Tab("Record", systemImage: "chart.line.uptrend.xyaxis") {

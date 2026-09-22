@@ -32,7 +32,9 @@ the Keychain; nothing is bundled in the app.
 ### Endpoints in use
 
 #### `GET /v1/courses`
-- **Usecase:** The full list of British and Irish courses. Backs the Courses tab.
+- **Usecase:** The full list of British and Irish courses. Backs the course
+  directory, pushed from the Racing tab (it stopped being a tab of its own when
+  the Model tab took the fifth slot).
 - **Tier:** Free · **Rate limit:** 1 req/s
 - **Fields consumed:** `id`, `course`, `region_code`, `region`
 - **Caching:** Indefinite. Courses do not change.
