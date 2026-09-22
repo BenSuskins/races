@@ -241,6 +241,20 @@ told their credentials are wrong rather than that a field is blank.
   `INVALID_SESSION_INFORMATION`, retrying exactly once. A 2FA or certificate
   failure is **latched** instead, because retrying that on every card refresh
   would look like a hang and could lock the account.
+- **`APIError.decoding` is a dead end on the Betfair login, so that one call
+  does not use it.** Every field on `BetfairLoginResponse` is optional, so any
+  JSON *object* decodes — which means a decode failure there is never a schema
+  surprise, it is Betfair not answering with JSON at all. Reported from a device
+  abroad as "We received an unexpected response. Please try again.": untrue
+  (trying again cannot help), unactionable, and it sent the user back to re-type
+  a password that had never been checked. `BetfairSession.logIn()` therefore
+  reads the body raw and, when it will not parse, throws
+  `BetfairLoginFailure.unreadableResponse(_:)` carrying an `HTTPResponseShape` —
+  status, content type, byte count and a whitespace-collapsed, token-redacted
+  snippet. A jurisdiction block, a captive portal and a proxy all answer `200`
+  with HTML, and the content type alone usually names which. It is deliberately
+  **not latched** like a 2FA or certificate failure: the cause is outside the
+  account and may be gone by the next attempt.
 - **`Races.xcodeproj` was hand-written, so treat the macOS CI job as the thing
   that proves it works.** It uses `objectVersion = 77` with
   `PBXFileSystemSynchronizedRootGroup`, so adding a source file needs no project
