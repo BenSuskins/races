@@ -164,6 +164,47 @@ final class RacesStoreTests: XCTestCase {
         XCTAssertEqual(tips.count, 0)
     }
 
+    // MARK: - Markets
+
+    func test_aSuppliedMarketAnchorsTheAssessment() async {
+        let store = RacesStore(documents: InMemoryDocumentStore())
+        await store.loadIfNeeded()
+        let race = makeRace()
+        let market = MarketSnapshot(
+            marketID: "1.234",
+            prices: ["a": RunnerPrice(backPrice: 1.5), "b": RunnerPrice(backPrice: 4.0)])
+
+        let assessment = await store.assess(race, market: market)
+
+        XCTAssertFalse(assessment.isFormOnly)
+        XCTAssertEqual(assessment.marketSource, .liveExchange)
+        XCTAssertNotNil(assessment.runners.first?.marketProbability)
+    }
+
+    func test_aCardIsRatedRacebyRaceSoAPartialMarketIsNormal() async {
+        // Some races match and some do not. A card is not all-or-nothing, and a
+        // store that demanded a market for every race would drop the tips it
+        // could have given.
+        let store = RacesStore(documents: InMemoryDocumentStore())
+        await store.loadIfNeeded()
+        let priced = makeRace(id: "priced")
+        let unpriced = makeRace(id: "unpriced")
+
+        let assessments = await store.assessAndRecord(
+            [priced, unpriced],
+            markets: [
+                "priced": MarketSnapshot(
+                    marketID: "1.234",
+                    prices: ["a": RunnerPrice(backPrice: 1.5),
+                             "b": RunnerPrice(backPrice: 4.0)])
+            ])
+
+        XCTAssertEqual(assessments["priced"]?.isFormOnly, false)
+        XCTAssertEqual(assessments["unpriced"]?.isFormOnly, true)
+        let tips = await store.tips
+        XCTAssertEqual(tips.count, 2)
+    }
+
     func test_withNoArchiveTheStrikeRateFactorsReportMissingNotZero() async throws {
         let store = RacesStore(documents: InMemoryDocumentStore())
         await store.loadIfNeeded()

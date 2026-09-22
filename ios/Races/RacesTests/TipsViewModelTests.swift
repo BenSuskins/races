@@ -23,6 +23,7 @@ final class TipsViewModelTests: XCTestCase {
     private func makeModel(
         races: [Race],
         store: RacesStore = RacesStore(documents: InMemoryDocumentStore()),
+        markets: MarketLoader? = nil,
         unavailable: APIError? = nil,
         now: Date = TipsViewModelTests.now
     ) -> (TipsViewModel, RacesStore) {
@@ -30,6 +31,7 @@ final class TipsViewModelTests: XCTestCase {
         return (
             TipsViewModel(
                 loader: RacecardLoader(provider: provider, store: store),
+                markets: markets,
                 store: store,
                 unavailable: unavailable,
                 now: { now }),
@@ -147,7 +149,8 @@ final class TipsViewModelTests: XCTestCase {
 
     @MainActor
     func test_noCredentialsReportsAnExpectedLimitation() async {
-        let bare = TipsViewModel(loader: nil, store: nil, unavailable: nil, now: { Self.now })
+        let bare = TipsViewModel(
+            loader: nil, markets: nil, store: nil, unavailable: nil, now: { Self.now })
 
         await bare.load()
 
@@ -155,6 +158,93 @@ final class TipsViewModelTests: XCTestCase {
             return XCTFail("Expected a failed state, got \(bare.state)")
         }
         XCTAssertTrue(error.isExpectedLimitation)
+    }
+
+    // MARK: - Markets
+
+    @MainActor
+    func test_aMatchedMarketAnchorsTheTipAndIsReportedAsCovered() async throws {
+        let race = Race(
+            id: "rac_1", courseName: "Ascot", name: "A Race", offTime: "2:30",
+            offDateTime: Self.now.addingTimeInterval(3_600), date: "2026-06-16",
+            runners: [
+                .fixture(id: "hrs_1", name: "Frankel", clothNumber: 1),
+                .fixture(id: "hrs_2", name: "Kyprios", clothNumber: 2),
+                .fixture(id: "hrs_3", name: "Baaeed", clothNumber: 3),
+            ])
+        let provider = FakeMarketDataProvider(
+            markets: .success([
+                .fixture(startTime: race.offDateTime!, runners: [
+                    (clothNumber: 1, name: "Frankel"),
+                    (clothNumber: 2, name: "Kyprios (IRE)"),
+                    (clothNumber: 3, name: "Baaeed"),
+                ])
+            ]),
+            prices: .success([.fixture(backPricesByClothNumber: [1: 2.0, 2: 4.0, 3: 8.0])]))
+        let (model, _) = makeModel(
+            races: [race], markets: MarketLoader(provider: provider))
+
+        await model.load()
+
+        let selections = try XCTUnwrap(model.state.value)
+        XCTAssertFalse(selections[0].assessment.isFormOnly)
+        XCTAssertEqual(selections[0].assessment.marketSource, .liveExchange)
+        XCTAssertEqual(model.marketCoverage?.pricedRaces, 1)
+        XCTAssertEqual(model.marketCoverage?.totalRaces, 1)
+        XCTAssertTrue(model.marketCoverage?.isComplete == true)
+    }
+
+    @MainActor
+    func test_noBetfairLeavesTipsFormOnlyRatherThanFailing() async throws {
+        // The whole screen has to keep working without a market. This is the
+        // case the app ships in until Betfair is configured, and treating it as
+        // an error would leave a working card behind an error banner.
+        let (model, _) = makeModel(
+            races: [upcoming()], markets: MarketLoader(provider: nil))
+
+        await model.load()
+
+        let selections = try XCTUnwrap(model.state.value)
+        XCTAssertEqual(selections.count, 1)
+        XCTAssertTrue(selections[0].assessment.isFormOnly)
+        XCTAssertEqual(model.marketCoverage?.pricedRaces, 0)
+        XCTAssertEqual(model.marketCoverage?.failure, .notConfigured(provider: "Betfair"))
+    }
+
+    @MainActor
+    func test_aPartlyPricedCardIsReportedAsPartlyPriced() async throws {
+        // Two races, one market. Coverage has to show the shortfall: eighteen
+        // form-only tips in twenty is a materially weaker card than twenty
+        // market-anchored ones, and this is the only place that is visible.
+        let matched = Race(
+            id: "matched", courseName: "Ascot", name: "A Race", offTime: "2:30",
+            offDateTime: Self.now.addingTimeInterval(3_600), date: "2026-06-16",
+            runners: [
+                .fixture(id: "hrs_1", name: "Frankel", clothNumber: 1),
+                .fixture(id: "hrs_2", name: "Kyprios", clothNumber: 2),
+                .fixture(id: "hrs_3", name: "Baaeed", clothNumber: 3),
+            ])
+        let unmatched = upcoming(id: "unmatched", minutesAway: 120)
+        let provider = FakeMarketDataProvider(
+            markets: .success([
+                .fixture(startTime: matched.offDateTime!, runners: [
+                    (clothNumber: 1, name: "Frankel"),
+                    (clothNumber: 2, name: "Kyprios (IRE)"),
+                    (clothNumber: 3, name: "Baaeed"),
+                ])
+            ]),
+            prices: .success([.fixture(backPricesByClothNumber: [1: 2.0, 2: 4.0, 3: 8.0])]))
+        let (model, _) = makeModel(
+            races: [matched, unmatched], markets: MarketLoader(provider: provider))
+
+        await model.load()
+
+        let selections = try XCTUnwrap(model.state.value)
+        XCTAssertEqual(selections.count, 2)
+        XCTAssertEqual(model.marketCoverage?.pricedRaces, 1)
+        XCTAssertEqual(model.marketCoverage?.totalRaces, 2)
+        XCTAssertFalse(model.marketCoverage?.isComplete == true)
+        XCTAssertNil(model.marketCoverage?.failure)
     }
 
     @MainActor

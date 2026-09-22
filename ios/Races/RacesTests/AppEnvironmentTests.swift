@@ -56,6 +56,69 @@ final class AppEnvironmentTests: XCTestCase {
     }
 
     @MainActor
+    func test_theTwoProvidersAreIndependent() async {
+        // No Betfair is a working app, not a broken one. Conflating the two
+        // reasons would refuse to show a card because prices were missing.
+        let store = InMemoryCredentialsStore([
+            .racingAPIUsername: "ben",
+            .racingAPIPassword: "secret",
+        ])
+
+        let environment = AppEnvironment(
+            credentials: store,
+            makeRacingProvider: { _ in FakeRacingDataProvider() },
+            makeMarketProvider: { _ in FakeMarketDataProvider() })
+
+        XCTAssertNotNil(environment.racingProvider)
+        XCTAssertNil(environment.unavailabilityReason)
+        XCTAssertNil(environment.marketProvider)
+        XCTAssertEqual(
+            environment.marketUnavailabilityReason, .notConfigured(provider: "Betfair"))
+        XCTAssertFalse(environment.marketLoader.isConfigured)
+    }
+
+    @MainActor
+    func test_theMarketLoaderIsRepointedNotReplaced() async throws {
+        // A view model captures the loader when SwiftUI builds it, and `@State`
+        // keeps it alive across a credential change. Replacing the object would
+        // leave Tips holding one with no Betfair provider until a relaunch.
+        let store = InMemoryCredentialsStore()
+        let environment = AppEnvironment(
+            credentials: store,
+            makeRacingProvider: { _ in FakeRacingDataProvider() },
+            makeMarketProvider: { _ in FakeMarketDataProvider() })
+        let captured = environment.marketLoader
+        XCTAssertFalse(captured.isConfigured)
+
+        try environment.write("appkey", to: .betfairAppKey)
+        try environment.write("ben", to: .betfairUsername)
+        try environment.write("secret", to: .betfairPassword)
+
+        XCTAssertTrue(captured === environment.marketLoader)
+        XCTAssertTrue(captured.isConfigured)
+    }
+
+    @MainActor
+    func test_aHalfEnteredCredentialStillCountsAsSomethingToClear() async throws {
+        // Not the same question as "is a provider configured". A half-entered
+        // Betfair username is not a provider and is still worth a clear button.
+        let store = InMemoryCredentialsStore()
+        let environment = AppEnvironment(
+            credentials: store,
+            makeRacingProvider: { _ in FakeRacingDataProvider() },
+            makeMarketProvider: { _ in FakeMarketDataProvider() })
+        XCTAssertFalse(environment.hasAnyStoredCredential)
+
+        try environment.write("ben", to: .betfairUsername)
+
+        XCTAssertTrue(environment.hasAnyStoredCredential)
+        XCTAssertNil(environment.marketProvider)
+
+        try environment.removeAllCredentials()
+        XCTAssertFalse(environment.hasAnyStoredCredential)
+    }
+
+    @MainActor
     func test_writingCredentialsRebuildsTheProviderWithoutARelaunch() async throws {
         let store = InMemoryCredentialsStore()
         let builds = CallCounter()

@@ -10,10 +10,38 @@ struct RaceView: View {
     @State private var model: RaceViewModel
 
     init(race: Race, environment: AppEnvironment) {
-        _model = State(initialValue: RaceViewModel(race: race, store: environment.store))
+        _model = State(initialValue: RaceViewModel(race: race, environment: environment))
     }
 
     private var race: Race { model.race }
+
+    /// Says where the number came from, in the three cases that differ.
+    ///
+    /// "Form only" has to be distinguishable from "market-anchored", and a
+    /// forecast price has to be distinguishable from a live one — the day before
+    /// racing there is no liquidity behind it, and presenting that as the
+    /// exchange's opinion would overstate it.
+    private func marketFooter(for assessment: RaceAssessment) -> String {
+        guard let source = assessment.marketSource else {
+            return "Form only — no market matched this race, so there's nothing to anchor it to. Treat it as a read of the racecard, nothing more."
+        }
+        switch source {
+        case .forecast:
+            return "Anchored to forecast prices and adjusted on form. Tomorrow's markets have little money in them, so the anchor is weaker than it looks."
+        case .liveExchange:
+            let delay = assessment.isMarketDelayed ? ", delayed by up to three minutes" : ""
+            return "Anchored to exchange prices\(delay) and adjusted on form.\(partialCoverage(assessment))"
+        }
+    }
+
+    /// Added only when the book was short of a full field. A runner the market
+    /// has not priced is given the shortest price in the race, which is an
+    /// assumption rather than a reading, so it is worth saying how many.
+    private func partialCoverage(_ assessment: RaceAssessment) -> String {
+        guard assessment.marketCoverage < 1 else { return "" }
+        let priced = Int((assessment.marketCoverage * Double(race.runnerCount)).rounded())
+        return " Prices for \(priced) of \(race.runnerCount) runners."
+    }
 
     var body: some View {
         List {
@@ -23,9 +51,7 @@ struct RaceView: View {
                 } header: {
                     Text("The model fancies")
                 } footer: {
-                    Text(assessment.isFormOnly
-                        ? "Form only — Betfair isn't connected, so there's no market to anchor this to. Treat it as a read of the racecard, nothing more."
-                        : "Anchored to the market and adjusted on form.")
+                    Text(marketFooter(for: assessment))
                 }
             }
 
@@ -156,6 +182,10 @@ private struct RunnerRow: View {
                             .percent.precision(.fractionLength(0))))
                             .monospacedDigit()
                             .foregroundStyle(.tint)
+                    }
+                    if let backPrice = assessment?.marketBackPrice {
+                        Text(backPrice.formatted(.number.precision(.fractionLength(0...2))))
+                            .monospacedDigit()
                     }
                     if let officialRating = runner.officialRating {
                         Text("OR \(officialRating)").monospacedDigit()

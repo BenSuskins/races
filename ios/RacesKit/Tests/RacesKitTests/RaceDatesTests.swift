@@ -45,6 +45,32 @@ final class RaceDatesTests: XCTestCase {
 
     // MARK: - Timestamps
 
+    /// The market endpoints take today or tomorrow, not a date, so a screen
+    /// holding one race needs this to know what to ask for. Guessing at the
+    /// nearer of the two would price a race off the wrong day's card.
+    func test_day_matchesOnlyTheTwoDaysAProviderCovers() throws {
+        let formatter = ISO8601DateFormatter()
+        let now = try XCTUnwrap(formatter.date(from: "2026-09-20T12:00:00Z"))
+
+        XCTAssertEqual(RaceDates.day(matching: "2026-09-20", now: now), .today)
+        XCTAssertEqual(RaceDates.day(matching: "2026-09-21", now: now), .tomorrow)
+        XCTAssertNil(RaceDates.day(matching: "2026-09-22", now: now))
+        XCTAssertNil(RaceDates.day(matching: "2026-09-19", now: now))
+        XCTAssertNil(RaceDates.day(matching: "", now: now))
+    }
+
+    /// A London day, like every other date decision here. Late on a BST evening
+    /// the UTC date is already tomorrow, and a race running at 20:15 must not
+    /// read as tomorrow's.
+    func test_day_usesLondonNotUTC() throws {
+        let formatter = ISO8601DateFormatter()
+        // 2026-07-15 23:30 UTC is 2026-07-16 00:30 in London.
+        let now = try XCTUnwrap(formatter.date(from: "2026-07-15T23:30:00Z"))
+
+        XCTAssertEqual(RaceDates.day(matching: "2026-07-16", now: now), .today)
+        XCTAssertNil(RaceDates.day(matching: "2026-07-15", now: now))
+    }
+
     func test_parseTimestamp_handlesProviderFormats() {
         XCTAssertNotNil(RaceDates.parseTimestamp("2026-09-20T14:30:00+01:00"))
         XCTAssertNotNil(RaceDates.parseTimestamp("2026-09-20T14:30:00Z"))

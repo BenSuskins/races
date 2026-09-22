@@ -28,6 +28,7 @@ final class AppEnvironment {
 
     private let credentials: any CredentialsStoring
     private let makeRacingProvider: (ProviderConfiguration.RacingAPI) -> any RacingDataProviding
+    private let makeMarketProvider: (ProviderConfiguration.Betfair) -> any MarketDataProviding
 
     /// Persistence, the tip ledger, the results archive and the rater.
     let store: RacesStore
@@ -41,11 +42,22 @@ final class AppEnvironment {
     /// and they'd have no way to tell that re-entering them cannot work.
     private(set) var credentialsFailure: APIError?
     private(set) var racingProvider: (any RacingDataProviding)?
+    private(set) var marketProvider: (any MarketDataProviding)?
+
+    /// Exchange prices for a day's card, matched to our races.
+    ///
+    /// One instance for the process, unlike `makeRacecardLoader()`: the catalogue
+    /// and book calls are the expensive part of a market fetch, so Tips and a
+    /// race detail screen should share one cache. `refresh()` re-points it
+    /// rather than replacing it, so a view model that captured it still sees a
+    /// newly entered app key without a relaunch.
+    let marketLoader = MarketLoader(provider: nil)
 
     init(
         credentials: any CredentialsStoring,
         store: RacesStore? = nil,
-        makeRacingProvider: ((ProviderConfiguration.RacingAPI) -> any RacingDataProviding)? = nil
+        makeRacingProvider: ((ProviderConfiguration.RacingAPI) -> any RacingDataProviding)? = nil,
+        makeMarketProvider: ((ProviderConfiguration.Betfair) -> any MarketDataProviding)? = nil
     ) {
         self.credentials = credentials
         self.store = store ?? RacesStore(documents: AppEnvironment.makeDocumentStore())
@@ -54,6 +66,14 @@ final class AppEnvironment {
                 credentials: RacingAPICredentials(
                     username: racingAPI.username,
                     password: racingAPI.password),
+                transport: SharedTransport.instance)
+        }
+        self.makeMarketProvider = makeMarketProvider ?? { betfair in
+            BetfairClient.make(
+                credentials: BetfairCredentials(
+                    appKey: betfair.appKey,
+                    username: betfair.username,
+                    password: betfair.password),
                 transport: SharedTransport.instance)
         }
         refresh()
@@ -66,15 +86,27 @@ final class AppEnvironment {
             let configuration = try ProviderConfiguration(reading: credentials)
             self.configuration = configuration
             self.credentialsFailure = nil
+            // An explicit `if let` rather than `Optional.map`: `map` wants a
+            // nonisolated closure, and these builders are main-actor-isolated.
             if let racingAPI = configuration.racingAPI {
                 self.racingProvider = makeRacingProvider(racingAPI)
             } else {
                 self.racingProvider = nil
             }
+            if let betfair = configuration.betfair {
+                self.marketProvider = makeMarketProvider(betfair)
+            } else {
+                self.marketProvider = nil
+            }
         } catch {
             self.configuration = nil
             self.credentialsFailure = .from(error)
             self.racingProvider = nil
+            self.marketProvider = nil
+        }
+        marketLoader.use(provider: marketProvider)
+        hasAnyStoredCredential = CredentialSlot.allCases.contains { slot in
+            (try? credentials.read(slot))?.isEmpty == false
         }
     }
 
@@ -102,6 +134,26 @@ final class AppEnvironment {
         if racingProvider == nil { return .notConfigured(provider: "The Racing API") }
         return nil
     }
+
+    /// The same question for the market side, which is allowed to be absent.
+    ///
+    /// Separate from `unavailabilityReason` because the two are not
+    /// interchangeable: no Racing API means no card and an empty screen, while
+    /// no Betfair means form-only tips, which is a working app. Anything that
+    /// conflated them would refuse to show a card because prices were missing.
+    var marketUnavailabilityReason: APIError? {
+        if let credentialsFailure { return credentialsFailure }
+        if marketProvider == nil { return .notConfigured(provider: "Betfair") }
+        return nil
+    }
+
+    /// Whether there is anything to clear. Not the same as either provider being
+    /// configured: a half-entered Betfair username counts here and not there.
+    ///
+    /// Computed once per `refresh()` rather than on demand, because Settings
+    /// reads it from a view body and the on-demand version is five `SecItem`
+    /// calls per render.
+    private(set) var hasAnyStoredCredential = false
 
     /// Application Support, falling back to memory.
     ///

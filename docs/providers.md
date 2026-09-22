@@ -175,18 +175,25 @@ All calls are `POST` with a JSON body.
 - **Implemented by** `BetfairClient.markets(day:countries:)`.
 - **Usecase:** Today's GB win markets with per-runner metadata — a free second
   racecard, and the join target for our Racing API cards.
-- **Filter:** `eventTypeIds: ["7"]` (Horse Racing), `marketCountries: ["GB"]`,
-  `marketTypeCodes: ["WIN"]`, a `marketStartTime` range.
+- **Filter:** `eventTypeIds: ["7"]` (Horse Racing), `marketCountries: ["GB", "IE"]`,
+  `marketTypeCodes: ["WIN"]`, a `marketStartTime` range. Ireland is included
+  because the Racing API cards we match against are GB **and** IE, and a
+  catalogue narrower than the card silently makes every Irish race form-only.
 - **`marketProjection`:** `RUNNER_METADATA`, `MARKET_START_TIME`, `EVENT`
 - **Metadata consumed:** `CLOTH_NUMBER` (the join key), `FORM`,
   `DAYS_SINCE_LAST_RUN`, `OFFICIAL_RATING`, `ADJUSTED_RATING`, `WEIGHT_VALUE`,
   `STALL_DRAW`, `JOCKEY_NAME`, `TRAINER_NAME`, `WEARING`, `COLOURS_FILENAME`
+- **Caching:** 15 minutes, applied by `MarketLoader` in the app — the same
+  window as a racecard, and for the same reason: the field changes through the
+  day, but far more slowly than the prices do.
 - **Note:** `maxResults` is required and capped; page through a day by start time.
 
 #### `listMarketBook`
 - **Usecase:** Current back/lay prices → implied probability, the model's anchor.
 - **Batching:** up to 40 market ids per call — respect this, it is a hard limit.
-- **Caching:** 5 minutes.
+- **Caching:** 5 minutes, applied by `MarketLoader` in the app, and **only for
+  markets a race actually matched** — pricing the whole catalogue would spend a
+  book call per forty markets on races we cannot join.
 - **Implemented by** `BetfairClient.prices(marketIDs:)`, which batches at 40 and
   then **splits further on `TOO_MUCH_DATA`**. That code is an instruction rather
   than a failure: the same markets come back when asked for in smaller groups,
