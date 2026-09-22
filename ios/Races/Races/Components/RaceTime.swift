@@ -42,10 +42,15 @@ nonisolated enum RaceTime {
         // `Date.FormatStyle` rather than a `DateFormatter`: this is called once
         // per row per render, and allocating a `DateFormatter` in a list body is
         // the standard way to make a card scroll badly.
-        return offDateTime.formatted(
-            Date.FormatStyle(date: .omitted, time: .shortened)
-                .locale(locale)
-                .timeZone(timeZone))
+        //
+        // Both are set as properties. `.locale(_:)` would also work, but
+        // `.timeZone(_:)` is *not* its counterpart — it is the field modifier
+        // that appends a zone symbol to a custom format, and it takes a
+        // `Date.FormatStyle.Symbol.TimeZone`. See the gotcha in CLAUDE.md.
+        var style = Date.FormatStyle(date: .omitted, time: .shortened)
+        style.locale = locale
+        style.timeZone = timeZone
+        return offDateTime.formatted(style)
     }
 
     /// Whether the device is somewhere that makes the printed UK time misleading.
