@@ -329,6 +329,17 @@ told their credentials are wrong rather than that a field is blank.
   and returns `nil` where none is needed: it compares the **current UTC offset**
   rather than the zone identifier, so Europe/Dublin is not nagged for a zone that
   keeps London's clock all year.
+- **`Date.FormatStyle.timeZone(_:)` is not the counterpart of `.locale(_:)`,
+  and the mistake compiles nowhere but reads perfectly.** `.locale(locale)`
+  returns a style using that locale, so `.timeZone(timeZone)` looks like it does
+  the same for the zone. It does not: it is one of the *field modifiers*
+  (`.year()`, `.month()`, `.hour()`, `.timeZone()`) that append a symbol to a
+  custom format, so it takes a `Date.FormatStyle.Symbol.TimeZone` and rejects a
+  `TimeZone` with "cannot convert value of type 'TimeZone'". Set `locale` and
+  `timeZone` as **properties** on a `var style`, which cannot be read as anything
+  else. This took `main` red in Xcode Cloud build 18, and it went in as an
+  unverified tidy-up of a `DateFormatter` that already worked — the actual fix
+  it rode in with was fine.
 - **`RaceResult.didRun(horseID:)` returns `nil` below three finishers**, and that
   is deliberate: a truncated payload would otherwise settle every runner as a
   non-runner and wipe a day's tips in one pass. The consequence for tests is that
