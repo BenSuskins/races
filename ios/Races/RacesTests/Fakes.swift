@@ -169,6 +169,13 @@ extension Runner {
 }
 
 extension RaceResult {
+    /// **A result used for settling needs at least three finishers.**
+    /// `RaceResult.didRun(horseID:)` returns `nil` below that, on purpose: a
+    /// truncated payload would otherwise settle every runner as a non-runner and
+    /// wipe a day's tips in one pass. A two-runner fixture therefore leaves the
+    /// tip `.unresolved` rather than won or lost, which looks like a bug in the
+    /// store and is actually the guard working. Use `settleable(winner:)` unless
+    /// the test is specifically about a short field.
     static func fixture(
         id: String = "rac_1",
         courseName: String = "Ascot",
@@ -209,5 +216,34 @@ extension Finisher {
             jockeyID: jockeyID,
             trainerID: trainerID,
             startingPriceDecimal: startingPriceDecimal)
+    }
+}
+
+extension RaceResult {
+    /// A result that `didRun` will actually answer: the given winner plus enough
+    /// also-rans to clear the three-finisher floor.
+    static func settleable(
+        id: String = "rac_1",
+        winner: String,
+        alsoRan: [String] = ["also_1", "also_2"]
+    ) -> RaceResult {
+        var finishers = [Finisher.fixture(horseID: winner, position: 1)]
+        for (index, horseID) in alsoRan.enumerated() {
+            finishers.append(.fixture(horseID: horseID, position: index + 2))
+        }
+        return .fixture(id: id, finishers: finishers)
+    }
+
+    /// The same field, with the named horse beaten rather than winning.
+    static func settleableLoss(
+        id: String = "rac_1",
+        loser: String,
+        winner: String = "other_winner"
+    ) -> RaceResult {
+        .fixture(id: id, finishers: [
+            .fixture(horseID: winner, position: 1),
+            .fixture(horseID: "also_1", position: 2),
+            .fixture(horseID: loser, position: 5),
+        ])
     }
 }

@@ -31,9 +31,7 @@ final class RecordViewModelTests: XCTestCase {
         let recorded = await store.tip(forRace: "rac_1")
         let tip = try XCTUnwrap(recorded)
         await store.ingest(
-            results: [.fixture(id: "rac_1", finishers: [
-                .fixture(horseID: tip.selectionHorseID, position: 1),
-            ])],
+            results: [.settleable(id: "rac_1", winner: tip.selectionHorseID)],
             now: offAt.addingTimeInterval(600))
 
         let model = RecordViewModel(environment: nil, store: store)

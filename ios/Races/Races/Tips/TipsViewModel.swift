@@ -75,7 +75,7 @@ final class TipsViewModel {
             let load = try await loader.load(day: .today, forceRefresh: forceRefresh, now: moment)
             await store.loadIfNeeded()
 
-            let upcoming = load.races.filter { !$0.hasStarted }
+            let upcoming = load.races.filter { !Self.hasStarted($0, by: moment) }
             let assessments = await store.assessAndRecord(upcoming, now: moment)
 
             var selections: [Selection] = []
@@ -96,5 +96,20 @@ final class TipsViewModel {
 
     private static func byOffTime(_ lhs: Race, _ rhs: Race) -> Bool {
         (lhs.offDateTime ?? .distantFuture) < (rhs.offDateTime ?? .distantFuture)
+    }
+
+    /// Deliberately not `Race.hasStarted`, which reads the real `Date()`.
+    ///
+    /// This screen decides what to rate and what to record, and both must be
+    /// judged against the same instant the tip is stamped with — otherwise the
+    /// filter and the sealing rule can disagree. It also made the view model
+    /// untestable: it accepted an injected clock and then ignored it for the one
+    /// decision that mattered, so every fixture race read as already run.
+    ///
+    /// A race with no known off time is treated as still to come, matching the
+    /// kit, and `TipLedger` seals it on first write.
+    private static func hasStarted(_ race: Race, by moment: Date) -> Bool {
+        guard let offDateTime = race.offDateTime else { return false }
+        return offDateTime < moment
     }
 }
