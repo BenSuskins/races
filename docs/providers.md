@@ -147,6 +147,22 @@ key**, which is for placing bets and which this app does not need.
   than collapsed into a generic failure. **Whatever the spike returns, the app
   will name it.**
 
+  There is a **fourth class**, added after the spike was first run on a device
+  abroad and the screen said only "We received an unexpected response. Please try
+  again.": Betfair answering with something that is not a login reply at all.
+  Every field of the response is optional, so any JSON object decodes — a decode
+  failure here therefore means the body was not JSON. `logIn()` reads it raw and
+  throws `BetfairLoginFailure.unreadableResponse(_:)` carrying status, content
+  type, byte count and a redacted snippet.
+
+  | Class | Codes | What the app does |
+  |---|---|---|
+  | Unreadable reply | `UNREADABLE_RESPONSE` (ours, not Betfair's) | Reports what came back instead; does **not** latch, and does not ask for the password again |
+
+  A jurisdiction block, a captive portal and a corporate proxy all answer `200`
+  with an HTML page, and the content type usually names which. Not latched,
+  because unlike a 2FA challenge the cause is outside the account.
+
 ```bash
 curl -s -X POST "https://identitysso.betfair.com/api/login" \
   -H "X-Application: $BF_APP_KEY" \

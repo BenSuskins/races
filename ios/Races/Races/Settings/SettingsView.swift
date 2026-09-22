@@ -143,6 +143,7 @@ private struct BetfairTestResultRow: View {
         case .succeeded(let marketCount):
             VStack(alignment: .leading, spacing: 4) {
                 Label("Connected — \(marketCount) win markets today", systemImage: "checkmark.circle")
+                    .foregroundStyle(Color.green)
                 if marketCount == 0 {
                     Text("The login worked; there is just no GB or Irish racing listed right now.")
                         .font(.caption)
@@ -153,13 +154,21 @@ private struct BetfairTestResultRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Label(
                     failure.message,
-                    systemImage: failure.isBadCredentials ? "xmark.circle" : "info.circle")
+                    systemImage: failure.isInformational ? "info.circle" : "xmark.circle")
+                    // Explicit, because a `Label` in this section otherwise
+                    // inherits the section's tint and renders a failure in the
+                    // same green as a success.
+                    .foregroundStyle(failure.isInformational ? Color.primary : Color.red)
                 if failure.requiresCertificateLogin {
                     Text("Nothing you can change here will fix this. Certificate login isn't supported yet — tips will stay form-only.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else if failure.requiresUserAction {
                     Text("Sign in at betfair.com, clear whatever it asks for, then test again.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if failure.isUnreadableResponse {
+                    Text("Your credentials were never sent for checking, so there is nothing to re-type. If you are abroad or on a VPN, try again from a UK connection.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -169,6 +178,7 @@ private struct BetfairTestResultRow: View {
                 Label(
                     error.errorDescription ?? "Couldn't connect",
                     systemImage: error.isExpectedLimitation ? "info.circle" : "xmark.circle")
+                    .foregroundStyle(error.isExpectedLimitation ? Color.primary : Color.red)
                 if let suggestion = error.recoverySuggestion {
                     Text(suggestion)
                         .font(.caption)
@@ -198,6 +208,7 @@ private struct TestResultRow: View {
                 Label(
                     error.errorDescription ?? "Couldn't connect",
                     systemImage: error.isExpectedLimitation ? "info.circle" : "xmark.circle")
+                    .foregroundStyle(error.isExpectedLimitation ? Color.primary : Color.red)
                 if let suggestion = error.recoverySuggestion {
                     Text(suggestion)
                         .font(.caption)

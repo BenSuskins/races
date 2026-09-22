@@ -96,18 +96,39 @@ public final class HTTPClient: @unchecked Sendable {
         authorization: HTTPAuthorization = .none,
         as type: T.Type = T.self
     ) async throws -> T {
+        let data = try await performValidated(
+            method: "POST", path: path, query: [], body: Self.formBody(form),
+            contentType: "application/x-www-form-urlencoded", authorization: authorization
+        )
+        return try decode(data, as: type)
+    }
+
+    /// Form-encoded POST returning the body undecoded, with the response beside
+    /// it.
+    ///
+    /// For the one caller that has to say *why* a reply could not be read rather
+    /// than only that it could not: `BetfairSession.logIn()`. Everywhere else
+    /// `APIError.decoding` is the right answer, because everywhere else the call
+    /// will simply be made again.
+    public func postFormForRawBody(
+        _ path: String,
+        form: [String: String],
+        authorization: HTTPAuthorization = .none
+    ) async throws -> (Data, HTTPURLResponse) {
+        try await performValidatedWithResponse(
+            method: "POST", path: path, query: [], body: Self.formBody(form),
+            contentType: "application/x-www-form-urlencoded", authorization: authorization
+        )
+    }
+
+    static func formBody(_ form: [String: String]) -> Data {
         var components = URLComponents()
         components.queryItems = form.map { URLQueryItem(name: $0.key, value: $0.value) }
         // `URLComponents` percent-encodes for a query string, which leaves `+`
         // literal — in a form body that decodes as a space. Encode it explicitly.
         let encoded = (components.percentEncodedQuery ?? "")
             .replacingOccurrences(of: "+", with: "%2B")
-
-        let data = try await performValidated(
-            method: "POST", path: path, query: [], body: Data(encoded.utf8),
-            contentType: "application/x-www-form-urlencoded", authorization: authorization
-        )
-        return try decode(data, as: type)
+        return Data(encoded.utf8)
     }
 
     // MARK: - Pipeline
@@ -120,6 +141,21 @@ public final class HTTPClient: @unchecked Sendable {
         contentType: String?,
         authorization: HTTPAuthorization
     ) async throws -> Data {
+        let (data, _) = try await performValidatedWithResponse(
+            method: method, path: path, query: query,
+            body: body, contentType: contentType, authorization: authorization
+        )
+        return data
+    }
+
+    private func performValidatedWithResponse(
+        method: String,
+        path: String,
+        query: [URLQueryItem],
+        body: Data?,
+        contentType: String?,
+        authorization: HTTPAuthorization
+    ) async throws -> (Data, HTTPURLResponse) {
         let isIdempotent = Self.idempotentMethods.contains(method)
         return try await withRetry(
             policy: retryPolicy,
@@ -132,7 +168,7 @@ public final class HTTPClient: @unchecked Sendable {
             try await self.limiter.acquire()
             let (data, response) = try await self.transport.send(request)
             try self.validate(response, data: data)
-            return data
+            return (data, response)
         }
     }
 

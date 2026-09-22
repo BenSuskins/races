@@ -95,7 +95,7 @@ public actor BetfairSession {
             throw APIError.notConfigured(provider: "Betfair")
         }
 
-        let response: BetfairLoginResponse = try await http.post(
+        let (body, httpResponse) = try await http.postFormForRawBody(
             "/api/login",
             form: ["username": credentials.username, "password": credentials.password],
             authorization: .headers([
@@ -103,6 +103,26 @@ public actor BetfairSession {
                 "Accept": "application/json",
             ])
         )
+
+        let response: BetfairLoginResponse
+        do {
+            response = try HTTPClient.defaultDecoder.decode(
+                BetfairLoginResponse.self, from: body)
+        } catch {
+            // Deliberately not `APIError.decoding`. That renders as "We received
+            // an unexpected response. Please try again.", which is unactionable
+            // and actively misleading here: trying again cannot help, and the
+            // user is left re-typing a password that was never checked. This is
+            // the one call in the app where what came back *instead* is the
+            // finding, so it is carried rather than discarded.
+            throw BetfairLoginFailure.unreadableResponse(
+                HTTPResponseShape(
+                    statusCode: httpResponse.statusCode,
+                    contentType: httpResponse.value(forHTTPHeaderField: "Content-Type"),
+                    body: body
+                )
+            )
+        }
 
         guard response.isSuccess, let token = response.token else {
             let failure = BetfairLoginFailure(code: response.failureCode)
