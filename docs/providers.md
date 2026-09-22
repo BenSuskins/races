@@ -8,6 +8,10 @@ This matters more than a normal API doc would, because we don't own these APIs a
 **the free/paid boundary is invisible until a 403 arrives at runtime**. This file
 is the map of that boundary.
 
+`scripts/capture-fixtures.py` calls the free-tier endpoints below and writes
+their replies as redacted test fixtures. If you change an endpoint here, change
+it there too — it is the one other place in the repo that names these paths.
+
 Conventions for the examples below:
 
 ```bash

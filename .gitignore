@@ -26,3 +26,7 @@ ios-test-results/
 *.credentials
 Secrets.plist
 Config.plist
+
+# Python bytecode from scripts/
+__pycache__/
+*.pyc

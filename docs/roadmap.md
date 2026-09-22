@@ -45,11 +45,20 @@ account.
 
 ### 1. A capture script, and real fixtures
 
-**Owner: Claude writes it, Ben runs it.**
+**Owner: Claude writes it, Ben runs it. Script written; not yet run.**
 
-A script that pulls a real card and its results with your Racing API credentials,
-plus the corresponding Betfair catalogue, strips credentials, and writes committed
-fixtures under `ios/RacesKit/Tests/RacesKitTests/Fixtures/`.
+`scripts/capture-fixtures.py` pulls a real card and its results with your Racing
+API credentials, plus the corresponding Betfair catalogue, redacts credentials,
+and writes committed fixtures under `ios/RacesKit/Tests/RacesKitTests/Fixtures/`.
+
+Its redactor works two ways — by key name at any depth, and by scanning for the
+literal credential strings — and refuses to write anything at all if a secret
+survives. `--self-test` checks that with no credentials and no network;
+`--dry-run` fetches and redacts without writing. Usernames are deliberately not
+scanned for as literals: they are short enough to collide with a jockey's name.
+
+**What remains is running it**, on an afternoon with racing on, and reading a file
+before committing.
 
 This is the **prerequisite nothing else admits to needing**. `docs/matching.md`
 already says it plainly under Known limitations:
