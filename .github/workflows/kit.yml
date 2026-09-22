@@ -1,0 +1,104 @@
+name: RacesKit
+
+# Split from the app workflow so a change to the kit's tests, fixtures or docs
+# does not spend macOS minutes. The repository is private, so every runner
+# minute is billed and macOS bills at 10x — one Xcode run costs roughly as much
+# as eighty Linux ones.
+#
+# Path filtering is GitHub's own rather than a scripted diff in a gate job:
+# there is no third-party action to trust and no fail-open logic to get wrong.
+#
+# The workflow file is in its own `paths` deliberately. Without that, a change
+# to CI cannot be tested by the CI it changes — which is how every workflow
+# edit in Family Hub went in unverified.
+on:
+  push:
+    branches: [main]
+    paths: ['ios/RacesKit/**', '.github/workflows/kit.yml']
+  pull_request:
+    paths: ['ios/RacesKit/**', '.github/workflows/kit.yml']
+
+permissions:
+  contents: read
+
+# Superseding is right for a pull request — a new push makes the previous run
+# irrelevant — and wrong for main, where every commit's result matters.
+#
+# It bit twice on 2026-09-21. Merging four PRs in quick succession meant each
+# push to main cancelled the one before, and the run left standing was for an
+# *older* commit than the branch head: `main` showed a green tick while its
+# actual head had never been compiled.
+#
+# A cancelled run on main is not a saved minute, it is a lost answer.
+#
+# The group is namespaced per workflow, or the kit and app runs would cancel
+# each other on the same ref.
+concurrency:
+  group: kit-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  PACKAGE_PATH: ios/RacesKit
+
+jobs:
+  # RacesKit is deliberately Foundation-only, so it builds and tests on Linux in
+  # a fraction of the time a macOS runner takes. It covers the rating algorithm,
+  # the provider clients (via a fake transport), the matcher and the store — most
+  # of what can actually break.
+  #
+  # This job is also what *enforces* the Foundation-only rule: it fails the moment
+  # anyone imports SwiftUI or Security.framework into the package.
+  package:
+    name: RacesKit (Linux)
+    runs-on: ubuntu-latest
+
+    # Observed at ~1 minute. Generous enough for a cold cache, tight enough that
+    # a hang is capped rather than left to GitHub's 6-hour default.
+    timeout-minutes: 15
+
+    # The toolchain arrives as a container image rather than as an install step.
+    #
+    # `swift-actions/setup-swift` downloads and unpacks a toolchain on every run,
+    # and on 2026-09-21 it hung for 26 minutes on this job without emitting a
+    # line — no timeout, no failure, just a stalled step. The official image is
+    # pulled by the runner's own container machinery, which retries and caches,
+    # so there is no third-party download in the critical path at all.
+    container: swift:${{ matrix.swift }}
+
+    strategy:
+      matrix:
+        # The Swift version lives here because `container` cannot read `env`:
+        # that context is evaluated before the job starts. A one-entry matrix is
+        # available there, so this is still one place — and it makes testing a
+        # second toolchain a two-character change.
+        swift: ['6.2']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Cheap, and it puts the exact toolchain in the log — useful when a build
+      # succeeds locally and fails here, or the reverse.
+      - name: Toolchain
+        run: swift --version
+
+      # Keyed on the Swift version as well as the sources: a .build tree left by
+      # a different toolchain is worse than no cache at all. The restore-keys
+      # prefix means an ordinary source edit still reuses most object files.
+      #
+      # `~` is the container's HOME (/root), not the runner's, which is the point:
+      # the cache has to match the toolchain that produced it.
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/org.swift.swiftpm
+            ${{ env.PACKAGE_PATH }}/.build
+          key: spm-swift${{ matrix.swift }}-${{ hashFiles('ios/RacesKit/Package.swift', 'ios/RacesKit/Sources/**/*.swift', 'ios/RacesKit/Tests/**/*.swift') }}
+          restore-keys: |
+            spm-swift${{ matrix.swift }}-
+
+      - name: Build
+        run: swift build --package-path ${{ env.PACKAGE_PATH }}
+
+      - name: Test
+        run: swift test --package-path ${{ env.PACKAGE_PATH }} --parallel

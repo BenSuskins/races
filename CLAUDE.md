@@ -262,6 +262,40 @@ told their credentials are wrong rather than that a field is blank.
   a nonisolated closure, so passing an isolated one loses the global actor. An
   explicit `if let` has no conversion to get wrong.
 
+## CI
+
+Two workflows, split by cost rather than by tidiness.
+
+| Workflow | Job | Runs when |
+|---|---|---|
+| `kit.yml` | `RacesKit (Linux)` | `ios/RacesKit/**` changes |
+| `app.yml` | `Races (Xcode)` | `ios/Races/**`, `ios/RacesKit/Sources/**` or `Package.swift` changes |
+
+**This repository is private, so every runner minute is billed — and macOS bills
+at 10x.** On 2026-09-22 roughly 112 minutes of Xcode wall time billed at about
+1,125 minutes, over half the 2,000-minute monthly allowance in a single day, and
+Actions stopped scheduling jobs entirely: both checks began failing in two
+seconds with no steps and no logs, which looks nothing like a build failure and
+is easy to misread as one.
+
+Two rules follow, and neither is cosmetic:
+
+- **Every job needs `timeout-minutes`.** Without one a stuck job runs to
+  GitHub's six-hour default, which on macOS is 3,600 billed minutes — 1.8x the
+  monthly allowance from a single hang. Hangs are not hypothetical here: eleven
+  synchronous `@MainActor` tests deadlocked on 2026-09-21 and the test phase ran
+  12.8 minutes.
+- **The Xcode job's paths include `ios/RacesKit/Sources/**`, and that is not an
+  oversight.** The app compiles against the kit, so a public API change there can
+  break the app target with no app file touched. Narrowing to `ios/Races/**`
+  would save more and would lose real coverage. What *is* excluded is only what
+  provably cannot affect the app build: the kit's own tests and fixtures.
+
+Each workflow lists itself in its own `paths`. Without that a CI change cannot
+be tested by the CI it changes, which is how every workflow edit in Family Hub
+went in unverified. The concurrency groups are namespaced per workflow
+(`kit-`/`app-`) or the two would cancel each other on the same ref.
+
 ## Accuracy
 
 `docs/accuracy.md` records what the tracker measures and what it refuses to. Three
