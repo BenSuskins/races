@@ -57,6 +57,10 @@ struct TodayView: View {
                         }
                     } else {
                         List {
+                            if let note = RaceTime.timeZoneNote() {
+                                Section { TimeZoneNote(note: note) }
+                            }
+
                             if let staleSince = model.staleSince {
                                 Section {
                                     Label(
@@ -130,7 +134,7 @@ private struct MeetingHeader: View {
             Spacer(minLength: 8)
 
             if let next = meeting.nextRace {
-                Text("Next \(next.offTime)")
+                Text("Next \(RaceTime.display(next))")
                     .font(.caption)
                     .monospacedDigit()
                     .textCase(nil)

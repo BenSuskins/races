@@ -101,7 +101,7 @@ struct RaceView: View {
                 Text("In racecard order. The percentage is the model's chance for each runner.")
             }
         }
-        .navigationTitle("\(race.offTime) \(race.courseName)")
+        .navigationTitle("\(RaceTime.display(race)) \(race.courseName)")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(for: Runner.self) { runner in
             RunnerView(
