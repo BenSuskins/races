@@ -132,9 +132,14 @@ key**, which is for placing bets and which this app does not need.
 - **Body:** `application/x-www-form-urlencoded`, `username` and `password`.
 - **Header:** `X-Application: $BF_APP_KEY`
 - **Returns:** `{"token": "...", "product": "...", "status": "SUCCESS", "error": ""}`
-- **Caveat:** interactive login can be challenged by 2FA or CAPTCHA, which an app
-  cannot transparently satisfy. If that proves common, the fallback is certificate
-  login at `identitysso-cert.betfair.com/api/certlogin`.
+- **Measured 2026-09-22: interactive login works for this account.** `Test Betfair`
+  returned `Connected`, so no certificate login is required and
+  `identitysso-cert.betfair.com/api/certlogin` stays unused. This was the design's
+  biggest open question; it is now closed in the cheap direction.
+- **Caveat, still live for other accounts:** interactive login can be challenged by
+  2FA or CAPTCHA, which an app cannot transparently satisfy. The fallback remains
+  certificate login at `identitysso-cert.betfair.com/api/certlogin`, and
+  `BetfairLoginFailure.requiresCertificateLogin` is what would say so.
 - **Implemented by** `BetfairSession`. Note that a refusal arrives as **HTTP 200
   with `status: "FAIL"`** and the reason in `error`, so a status-code check reads
   it as a success with no token. `BetfairLoginFailure` keys off the body and

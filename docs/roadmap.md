@@ -11,33 +11,43 @@ Updated 2026-09-22.
 
 ---
 
-## Blocked on you
+## Settled
 
-### Betfair login spike
+### Betfair login spike — **interactive login works**
 
-**Owner: Ben. Two minutes. The biggest remaining unknown in the design.**
+**Resolved 2026-09-22, ~20:49 London, on device.** Settings → Test Betfair
+returned the top row of the table below:
 
-Settings → Betfair → enter app key, username and password → **Test Betfair**.
-
-The screen reports which of three things happened, and carries Betfair's own code
-either way:
+> ✅ Connected — 0 win markets today
+> The login worked; there is just no GB or Irish racing listed right now.
 
 | Result | Meaning | What follows |
 |---|---|---|
-| Connected — *N* win markets today | Interactive login works | Nothing. Carry on |
+| **Connected — *N* win markets today** | **Interactive login works** | **Nothing. Carry on** ← this one |
 | Didn't recognise that username and password | Bad credentials | Re-enter them |
 | Sign in at betfair.com first (`SECURITY_QUESTION_REQUIRED`, `PENDING_AUTH`, …) | 2FA or a challenge | Clear it in a browser, test again |
-| Certificate login required (`CERT_AUTH_REQUIRED`, `SECURITY_RESTRICTED_LOCATION`) | **Interactive login can never work for this account** | Reshapes the Betfair layer |
+| Certificate login required (`CERT_AUTH_REQUIRED`, `SECURITY_RESTRICTED_LOCATION`) | Interactive login can never work for this account | Reshapes the Betfair layer |
 
-The last row is why this is urgent rather than tidy. Three merged PRs now sit on
-top of interactive login — the client (#15), the wiring (#17) and ROI (#19) — and
-certificate login is not a small change: it needs a `URLSessionDelegate` supplying
-a client identity from the Keychain, and Settings changes shape to collect a
-certificate rather than a password.
+This was the biggest remaining unknown in the design, and the answer is the
+cheap one. **No certificate login is needed**, so no `URLSessionDelegate`
+supplying a client identity from the Keychain, and Settings keeps its shape. The
+three merged PRs sitting on top of interactive login — the client (#15), the
+wiring (#17) and ROI (#19) — stand.
 
-`BetfairSession` **latches** that failure rather than retrying, so a wrong answer
-here is safe to discover: it will not hammer the exchange or risk locking the
-account.
+**"0 win markets" is the expected answer at that hour, not a second problem.**
+The catalogue is asked for today's *London* day, and by 20:49 London the GB and
+Irish cards have finished. A count of zero after racing means the request
+succeeded and the day was empty. What it does not yet prove is that prices flow:
+that needs one look at an afternoon card, and until then the market arm of the
+model is confirmed reachable rather than confirmed working.
+
+Two things this unblocks:
+
+- `scripts/capture-fixtures.py` can run in full rather than `--racing-only`, so a
+  **paired** capture — item 1 below — is now possible.
+- Session *lifetime* remains unmeasured, and the client still does not depend on
+  it: it renews reactively on `INVALID_SESSION_INFORMATION`. Record real figures
+  in `docs/providers.md` if they ever become known.
 
 ---
 
