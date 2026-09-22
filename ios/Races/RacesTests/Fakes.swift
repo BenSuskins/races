@@ -77,6 +77,12 @@ final class FakeMarketDataProvider: MarketDataProviding, @unchecked Sendable {
     var priceCalls: Int { lock.withLock { _priceCalls } }
     var lastPricedMarketIDs: [String] { lock.withLock { _lastPricedMarketIDs } }
 
+    private var _startingPriceCalls = 0
+    private var _lastStartingPriceMarketIDs: [String] = []
+
+    var startingPriceCalls: Int { lock.withLock { _startingPriceCalls } }
+    var lastStartingPriceMarketIDs: [String] { lock.withLock { _lastStartingPriceMarketIDs } }
+
     private let marketsResult: Result<[ExchangeMarket], Error>
     private let pricesResult: Result<[ExchangeMarketPrices], Error>
     private let startingPricesResult: Result<[String: [Int64: Double]], Error>
@@ -107,7 +113,11 @@ final class FakeMarketDataProvider: MarketDataProviding, @unchecked Sendable {
     }
 
     func startingPrices(marketIDs: [String]) async throws -> [String: [Int64: Double]] {
-        try startingPricesResult.get()
+        lock.withLock {
+            _startingPriceCalls += 1
+            _lastStartingPriceMarketIDs = marketIDs.sorted()
+        }
+        return try startingPricesResult.get()
     }
 }
 

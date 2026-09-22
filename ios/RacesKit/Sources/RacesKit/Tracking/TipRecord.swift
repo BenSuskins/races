@@ -94,6 +94,17 @@ public struct TipRecord: Codable, Hashable, Sendable, Identifiable {
     public let weightsID: String
     public let contributions: [FactorContribution]
 
+    /// Where the race sat on the exchange when the tip was made, so a settled
+    /// starting price can be found later.
+    ///
+    /// Optional, and optional for two different reasons that both have to keep
+    /// working: Betfair may not be configured, and a race may not have matched.
+    /// It is also `nil` on every tip recorded before this field existed — an
+    /// additive field so the stored ledger keeps decoding rather than being
+    /// discarded, which would throw away the accuracy record this whole
+    /// subsystem exists to protect.
+    public var marketReference: MarketReference?
+
     public let createdAt: Date
     /// Set once, when the tip enters the window before the off. After that the
     /// record is immutable.
@@ -123,6 +134,7 @@ public struct TipRecord: Codable, Hashable, Sendable, Identifiable {
         modelVersion: String,
         weightsID: String,
         contributions: [FactorContribution],
+        marketReference: MarketReference? = nil,
         createdAt: Date,
         sealedAt: Date? = nil,
         outcome: TipOutcome? = nil,
@@ -147,6 +159,7 @@ public struct TipRecord: Codable, Hashable, Sendable, Identifiable {
         self.modelVersion = modelVersion
         self.weightsID = weightsID
         self.contributions = contributions
+        self.marketReference = marketReference
         self.createdAt = createdAt
         self.sealedAt = sealedAt
         self.outcome = outcome
@@ -154,7 +167,12 @@ public struct TipRecord: Codable, Hashable, Sendable, Identifiable {
     }
 
     /// Build a tip from a rated race.
-    public init?(assessment: RaceAssessment, race: Race, now: Date) {
+    public init?(
+        assessment: RaceAssessment,
+        race: Race,
+        marketReference: MarketReference? = nil,
+        now: Date
+    ) {
         guard let selection = assessment.selection else { return nil }
         self.init(
             raceID: assessment.raceID,
@@ -176,6 +194,7 @@ public struct TipRecord: Codable, Hashable, Sendable, Identifiable {
             modelVersion: assessment.modelVersion,
             weightsID: assessment.weightsID,
             contributions: selection.contributions,
+            marketReference: marketReference,
             createdAt: now
         )
     }

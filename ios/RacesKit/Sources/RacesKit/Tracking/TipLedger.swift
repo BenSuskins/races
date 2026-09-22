@@ -65,6 +65,25 @@ public struct TipLedger: Codable, Hashable, Sendable {
         storage[raceID]
     }
 
+    /// Betfair market ids for the tips a starting price would still help.
+    ///
+    /// Scoped to `awaitingReconciliation`, which already excludes everything
+    /// settled, void or expired — so a tip that has its price is never asked
+    /// about again, and `listMarketBook`, the expensive call in the day, is only
+    /// spent on races that can still use an answer.
+    ///
+    /// Deduplicated and sorted: a repeated id would waste a slot in Betfair's
+    /// forty-market batch, and a stable order makes the request reproducible in
+    /// a log.
+    public func marketIDsAwaitingStartingPrice(now: Date = Date()) -> [String] {
+        var ids: Set<String> = []
+        for tip in awaitingReconciliation(now: now) {
+            guard let reference = tip.marketReference else { continue }
+            ids.insert(reference.marketID)
+        }
+        return ids.sorted()
+    }
+
     /// Tips whose race has run but which have no final outcome yet.
     public func awaitingReconciliation(now: Date = Date()) -> [TipRecord] {
         tips.filter { tip in
@@ -84,9 +103,15 @@ public struct TipLedger: Codable, Hashable, Sendable {
     public mutating func record(
         _ assessment: RaceAssessment,
         race: Race,
+        marketReference: MarketReference? = nil,
         now: Date = Date()
     ) -> RecordOutcome {
-        guard let candidate = TipRecord(assessment: assessment, race: race, now: now) else {
+        guard let candidate = TipRecord(
+            assessment: assessment,
+            race: race,
+            marketReference: marketReference,
+            now: now
+        ) else {
             return .rejectedNoSelection
         }
         return store(candidate, offAt: race.offDateTime, now: now)

@@ -17,6 +17,14 @@ nonisolated struct MarketLoad: Equatable, Sendable {
     /// By race id. A race absent here has no usable market, which is a normal
     /// state and never an error.
     let snapshots: [String: MarketSnapshot]
+    /// Settlement coordinates by race id, for every race that **matched** —
+    /// which is deliberately a wider set than `snapshots`.
+    ///
+    /// A market can match and still have nothing priced yet (an early-morning
+    /// book with no money in it), and that race will still settle with a Betfair
+    /// SP hours later. Gating the reference on live prices would lose the ROI
+    /// figure for exactly the races that were hardest to price at the time.
+    let references: [String: MarketReference]
     /// Why each unmatched race was refused, straight from the matcher. Kept
     /// because "no candidate market" and "runners didn't overlap" are different
     /// problems and only one of them is ours.
@@ -31,8 +39,12 @@ nonisolated struct MarketLoad: Equatable, Sendable {
 
     static func unavailable(_ failure: APIError?, at moment: Date) -> MarketLoad {
         MarketLoad(
-            snapshots: [:], refusals: [:], marketsSeen: 0,
+            snapshots: [:], references: [:], refusals: [:], marketsSeen: 0,
             fetchedAt: moment, failure: failure)
+    }
+
+    func reference(forRace raceID: String) -> MarketReference? {
+        references[raceID]
     }
 
     func snapshot(forRace raceID: String) -> MarketSnapshot? {
@@ -130,10 +142,14 @@ final class MarketLoader {
         let matches = report.matchesByRaceID
         guard !matches.isEmpty else {
             return MarketLoad(
-                snapshots: [:], refusals: report.refusals,
+                snapshots: [:], references: [:], refusals: report.refusals,
                 marketsSeen: catalogue.markets.count,
                 fetchedAt: catalogue.fetchedAt, failure: nil)
         }
+
+        // Built from the matches, before pricing, so a matched-but-unpriced race
+        // still gets its settlement coordinates.
+        let references = matches.mapValues { $0.reference() }
 
         // Only matched markets are priced. Asking for the whole catalogue would
         // cost a book call per forty markets to price races we cannot join.
@@ -159,6 +175,7 @@ final class MarketLoader {
 
         return MarketLoad(
             snapshots: snapshots,
+            references: references,
             refusals: report.refusals,
             marketsSeen: catalogue.markets.count,
             fetchedAt: catalogue.fetchedAt,
