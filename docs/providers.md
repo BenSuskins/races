@@ -129,6 +129,21 @@ key**, which is for placing bets and which this app does not need.
 - **Caveat:** interactive login can be challenged by 2FA or CAPTCHA, which an app
   cannot transparently satisfy. If that proves common, the fallback is certificate
   login at `identitysso-cert.betfair.com/api/certlogin`.
+- **Implemented by** `BetfairSession`. Note that a refusal arrives as **HTTP 200
+  with `status: "FAIL"`** and the reason in `error`, so a status-code check reads
+  it as a success with no token. `BetfairLoginFailure` keys off the body and
+  classifies the code three ways, because they need different handling and
+  different copy:
+
+  | Class | Codes | What the app does |
+  |---|---|---|
+  | Bad credentials | `INVALID_USERNAME_OR_PASSWORD`, `INVALID_USERNAME`, `INVALID_PASSWORD` | Maps to `.unauthorized`. Retryable — the user can fix it. |
+  | Needs a human | `SECURITY_QUESTION_REQUIRED`, `PENDING_AUTH`, `ACCOUNT_NOW_LOCKED`, `CHANGE_PASSWORD_REQUIRED`, … | Latched: not retried on every refresh, since that would look like a hang and could lock the account. |
+  | Needs a certificate | `CERT_AUTH_REQUIRED`, `SECURITY_RESTRICTED_LOCATION` | Latched, and **this is the answer that reshapes the design** — it means a client TLS identity and a `URLSessionDelegate`. |
+
+  The raw code is always preserved, so an unrecognised one is reported rather
+  than collapsed into a generic failure. **Whatever the spike returns, the app
+  will name it.**
 
 ```bash
 curl -s -X POST "https://identitysso.betfair.com/api/login" \
@@ -144,12 +159,20 @@ curl -s -X POST "https://identitysso.betfair.com/api/login" \
 > **Unverified:** the exact idle and absolute session lifetimes. Betfair's docs
 > host is unreachable from the build environment, so these were not confirmed
 > during design. Measure them in the M1 spike and record the answer here.
+>
+> The client does not depend on the answer. Rather than trusting a guessed
+> expiry it renews **reactively** — when the exchange itself reports
+> `INVALID_SESSION_INFORMATION`, the session is dropped and the call retried
+> once. `BetfairSessionToken.keepAliveAfter` (4h, conservative against the
+> commonly cited 12) only decides when a keep-alive is worth spending a request
+> on. Correcting it later changes one constant and nothing else.
 
 ### Betting — `/exchange/betting/rest/v1.0`
 
 All calls are `POST` with a JSON body.
 
 #### `listMarketCatalogue`
+- **Implemented by** `BetfairClient.markets(day:countries:)`.
 - **Usecase:** Today's GB win markets with per-runner metadata — a free second
   racecard, and the join target for our Racing API cards.
 - **Filter:** `eventTypeIds: ["7"]` (Horse Racing), `marketCountries: ["GB"]`,
@@ -164,11 +187,24 @@ All calls are `POST` with a JSON body.
 - **Usecase:** Current back/lay prices → implied probability, the model's anchor.
 - **Batching:** up to 40 market ids per call — respect this, it is a hard limit.
 - **Caching:** 5 minutes.
+- **Implemented by** `BetfairClient.prices(marketIDs:)`, which batches at 40 and
+  then **splits further on `TOO_MUCH_DATA`**. That code is an instruction rather
+  than a failure: the same markets come back when asked for in smaller groups,
+  so the batch is halved recursively. Surfacing it as an error would turn a
+  recoverable condition into a card with no prices.
+- **Faults arrive on a 200 as readily as on a 400.** Every betting call decodes
+  the `detail.APINGException.errorCode` envelope speculatively, because mapping
+  status codes alone lets an `INVALID_SESSION_INFORMATION` through as an empty
+  array — and an empty array is indistinguishable from "no racing today".
 
 #### Betfair SP
 - **Usecase:** Settled starting price → ROI to level stakes in the tracker.
 - **Source:** `listMarketBook` with `priceProjection.priceData` including `SP_TRADED`
   after the off, read once a market is settled.
+- **Implemented by** `BetfairClient.startingPrices(marketIDs:)`. An absent or
+  zero `actualSP` is **omitted rather than defaulted**: a zero would read as a
+  starting price and wreck the ROI figure, and a missing one just means the race
+  has not settled yet.
 
 ---
 
