@@ -23,7 +23,7 @@ final class APIErrorTests: XCTestCase {
             (.notFound, false),
             (.conflict, false),
             (.badRequest(serverMessage: nil), false),
-            (.decoding, false),
+            (.decoding(nil), false),
             (.tierUnavailable(feature: "Form history"), false),
             (.notConfigured(provider: "Betfair"), false),
         ]
@@ -79,7 +79,9 @@ final class APIErrorTests: XCTestCase {
         let errors: [APIError] = [
             .offline, .timedOut, .network(URLError(.unknown)), .unauthorized, .forbidden,
             .notFound, .conflict, .badRequest(serverMessage: nil), .rateLimited(retryAfter: nil),
-            .server(status: 500, serverMessage: nil), .decoding,
+            .server(status: 500, serverMessage: nil), .decoding(nil),
+            .decoding(HTTPResponseShape(
+                statusCode: 200, contentType: "text/html", body: Data("<html>".utf8))),
             .tierUnavailable(feature: "Form history"), .notConfigured(provider: "Betfair"),
         ]
         for error in errors {

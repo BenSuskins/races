@@ -30,7 +30,11 @@ public enum APIError: Error, LocalizedError, Equatable {
     /// 5xx and any other unexpected status. Carries status + server message.
     case server(status: Int, serverMessage: String?)
     /// The response body could not be decoded into the expected type.
-    case decoding
+    ///
+    /// Carries the shape of what arrived instead, when there was a response to
+    /// describe. Without it this case says only "something unexpected" — which
+    /// names nothing the reader can act on, and nothing they can report.
+    case decoding(HTTPResponseShape?)
     /// The endpoint exists but the user's subscription tier doesn't include it.
     ///
     /// Distinct from ``forbidden`` on purpose: this is a *normal, expected* state
@@ -99,8 +103,11 @@ public enum APIError: Error, LocalizedError, Equatable {
             return "Too many requests. Please wait a moment and try again."
         case .server(_, let serverMessage):
             return Self.cleaned(serverMessage) ?? "The provider had a problem. Please try again."
-        case .decoding:
-            return "We received an unexpected response. Please try again."
+        case .decoding(let shape):
+            guard let shape else {
+                return "We received an unexpected response. Please try again."
+            }
+            return "We couldn't read the reply — \(shape)"
         case .tierUnavailable(let feature):
             return "\(feature) isn't included in your subscription tier."
         case .notConfigured(let provider):
@@ -162,9 +169,10 @@ public enum APIError: Error, LocalizedError, Equatable {
              (.unauthorized, .unauthorized),
              (.forbidden, .forbidden),
              (.notFound, .notFound),
-             (.conflict, .conflict),
-             (.decoding, .decoding):
+             (.conflict, .conflict):
             return true
+        case let (.decoding(a), .decoding(b)):
+            return a == b
         case let (.network(a), .network(b)):
             return a.code == b.code
         case let (.badRequest(a), .badRequest(b)):

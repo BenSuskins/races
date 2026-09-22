@@ -62,11 +62,11 @@ public final class HTTPClient: @unchecked Sendable {
         authorization: HTTPAuthorization = .none,
         as type: T.Type = T.self
     ) async throws -> T {
-        let data = try await performValidated(
+        let (data, response) = try await performValidatedWithResponse(
             method: "GET", path: path, query: query, body: nil,
             contentType: nil, authorization: authorization
         )
-        return try decode(data, as: type)
+        return try decode(data, response: response, as: type)
     }
 
     public func post<T: Decodable>(
@@ -79,13 +79,15 @@ public final class HTTPClient: @unchecked Sendable {
         do {
             encoded = try JSONEncoder().encode(body)
         } catch {
-            throw APIError.decoding
+            // An encoding failure of our own request body, so there is no
+            // response to describe.
+            throw APIError.decoding(nil)
         }
-        let data = try await performValidated(
+        let (data, response) = try await performValidatedWithResponse(
             method: "POST", path: path, query: [], body: encoded,
             contentType: "application/json", authorization: authorization
         )
-        return try decode(data, as: type)
+        return try decode(data, response: response, as: type)
     }
 
     /// Form-encoded POST. Betfair's identity endpoints take
@@ -96,11 +98,11 @@ public final class HTTPClient: @unchecked Sendable {
         authorization: HTTPAuthorization = .none,
         as type: T.Type = T.self
     ) async throws -> T {
-        let data = try await performValidated(
+        let (data, response) = try await performValidatedWithResponse(
             method: "POST", path: path, query: [], body: Self.formBody(form),
             contentType: "application/x-www-form-urlencoded", authorization: authorization
         )
-        return try decode(data, as: type)
+        return try decode(data, response: response, as: type)
     }
 
     /// Form-encoded POST returning the body undecoded, with the response beside
@@ -132,21 +134,6 @@ public final class HTTPClient: @unchecked Sendable {
     }
 
     // MARK: - Pipeline
-
-    private func performValidated(
-        method: String,
-        path: String,
-        query: [URLQueryItem],
-        body: Data?,
-        contentType: String?,
-        authorization: HTTPAuthorization
-    ) async throws -> Data {
-        let (data, _) = try await performValidatedWithResponse(
-            method: method, path: path, query: query,
-            body: body, contentType: contentType, authorization: authorization
-        )
-        return data
-    }
 
     private func performValidatedWithResponse(
         method: String,
@@ -244,11 +231,25 @@ public final class HTTPClient: @unchecked Sendable {
         }
     }
 
-    private func decode<T: Decodable>(_ data: Data, as type: T.Type) throws -> T {
+    private func decode<T: Decodable>(
+        _ data: Data,
+        response: HTTPURLResponse,
+        as type: T.Type
+    ) throws -> T {
         do {
             return try decoder.decode(type, from: data)
         } catch {
-            throw APIError.decoding
+            // Carry what arrived instead. The status, the content type and the
+            // first line of the body are usually the entire diagnosis, and
+            // discarding them leaves the user with "try again" for a failure
+            // that trying again will not change.
+            throw APIError.decoding(
+                HTTPResponseShape(
+                    statusCode: response.statusCode,
+                    contentType: response.value(forHTTPHeaderField: "Content-Type"),
+                    body: data
+                )
+            )
         }
     }
 }

@@ -173,6 +173,7 @@ private struct BetfairTestResultRow: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .textSelection(.enabled)
         case .failed(let error):
             VStack(alignment: .leading, spacing: 4) {
                 Label(
@@ -185,6 +186,8 @@ private struct BetfairTestResultRow: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            // A diagnostic nobody can copy is a diagnostic nobody can report.
+            .textSelection(.enabled)
         }
     }
 }
@@ -215,6 +218,8 @@ private struct TestResultRow: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            // A diagnostic nobody can copy is a diagnostic nobody can report.
+            .textSelection(.enabled)
         }
     }
 }

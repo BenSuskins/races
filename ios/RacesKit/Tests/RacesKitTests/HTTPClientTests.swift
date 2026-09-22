@@ -169,15 +169,28 @@ final class HTTPClientTests: XCTestCase {
         }
     }
 
-    func test_malformedBody_throwsDecoding() async throws {
-        transport.enqueueJSON("not json at all")
+    func test_malformedBody_throwsDecodingCarryingWhatArrivedInstead() async throws {
+        transport.enqueueJSON(
+            "not json at all", headers: ["Content-Type": "application/json"])
         let client = makeClient()
 
         do {
             let _: Payload = try await client.get("/thing")
             XCTFail("Expected a decoding failure")
         } catch let error as APIError {
-            XCTAssertEqual(error, .decoding)
+            guard case .decoding(let shape) = error else {
+                return XCTFail("expected .decoding, got \(error)")
+            }
+            // Bare equality was the old assertion, and it passed while the error
+            // told the user nothing. What matters is that the reply is described.
+            let described = try XCTUnwrap(shape)
+            XCTAssertEqual(described.statusCode, 200)
+            XCTAssertEqual(described.contentType, "application/json")
+            XCTAssertTrue(described.snippet.contains("not json"), described.snippet)
+
+            let message = error.errorDescription ?? ""
+            XCTAssertTrue(message.contains("application/json"), message)
+            XCTAssertFalse(message.contains("Please try again"), message)
         }
     }
 

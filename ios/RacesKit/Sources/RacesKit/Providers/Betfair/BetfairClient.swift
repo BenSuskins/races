@@ -248,7 +248,7 @@ enum BetfairRawResponse<Value: Decodable>: Decodable {
         }
         let envelope = try BetfairFaultEnvelope(from: decoder)
         guard let code = envelope.errorCode else {
-            throw APIError.decoding
+            throw APIError.decoding(nil)
         }
         self = .fault(BetfairFault(
             code: BetfairErrorCode(rawValue: code),
