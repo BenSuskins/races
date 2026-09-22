@@ -33,7 +33,7 @@ boundary is invisible until a 403 arrives at runtime.
 
 ```
 ios/Races/Races/
-├── App/           # AppEnvironment, RacesStore, RacecardLoader, BackgroundRefresh
+├── App/           # AppEnvironment, RacesStore, RacecardLoader, MarketLoader, BackgroundRefresh
 ├── Components/    # StateContentView, ErrorStateView, RaceRow
 ├── Today/         # Today's and tomorrow's meetings
 ├── Tips/          # The model's selection per race
@@ -61,8 +61,20 @@ Three types carry the app's state, and each has one job:
 - **`RacecardLoader`** — reads a day's card through the disk cache, shared by
   Today and Tips so the two cannot disagree about what is running and opening
   both costs one request, not two.
+- **`MarketLoader`** — the fourth, and the only one that is a single long-lived
+  instance. It fetches Betfair's catalogue, runs `RaceMatcher`, prices **only
+  the markets that matched**, and returns `MarketLoad`: snapshots keyed by *our*
+  race id, plus the matcher's refusals and any failure. It never throws, because
+  no market is an ordinary state. Its provider is swapped in place by
+  `AppEnvironment.refresh()` rather than the loader being replaced — see the
+  gotcha below.
 
 Tabs are **Racing, Tips, Courses, Record, Settings**.
+
+**Prices are fetched before tips are recorded, never after.** Recording is what
+seals a tip, so `TipsViewModel` loads the market first and hands the snapshots to
+`assessAndRecord`. A tip sealed form-only and re-rated with prices afterwards
+would be a record of something the user was never shown.
 
 **Only `TipsViewModel` records tips, and it records the whole card.** Not the
 races the user happened to open: a ledger of races that looked interesting is a
@@ -291,6 +303,25 @@ told their credentials are wrong rather than that a field is blank.
   `StoreDocument`, `ResultsIngestion` and `CachedRacecards` live at file scope as
   `nonisolated` declarations for exactly this reason, not nested in `RacesStore`
   where they would read more naturally.
+- **A view model captures its dependencies when SwiftUI builds it, and `@State`
+  keeps it alive across a credential change.** So handing a screen a *new*
+  loader on `refresh()` does nothing: Tips would still hold the one with no
+  Betfair provider until the app was relaunched, which is the exact opposite of
+  what `AppEnvironment.refresh()` exists to do. `MarketLoader` is therefore one
+  long-lived object whose provider is replaced by `use(provider:)`, clearing its
+  caches — prices fetched under another app key are not ours to show.
+- **"Matched a market" and "has prices" are two different claims, and the Tips
+  coverage line makes the second one.** Betfair will return a book whose every
+  runner has no back, lay, last-traded or forecast price. The rater is already
+  safe from it — `Overround.impliedProbability` returns `nil` for such a runner,
+  coverage comes out at 0, and the assessment stays form-only — but counting
+  that race as priced would overstate the footer, which exists precisely to
+  show when the model is *not* anchored. So `MarketLoader` drops those books,
+  and the two numbers cannot disagree.
+- **`marketSource` is `MarketSnapshot.Source?`, so unwrap it before switching.**
+  `switch assessment.marketSource { case .none: … }` reads as three cases and is
+  really `Optional.none` competing with pattern promotion; `guard let source`
+  first and the three branches stay three branches.
 - **Don't hand `Optional.map` a main-actor closure.** `configuration.racingAPI.map(makeRacingProvider)`
   is the natural way to write `AppEnvironment.refresh()` and it fails: `map` wants
   a nonisolated closure, so passing an isolated one loses the global actor. An

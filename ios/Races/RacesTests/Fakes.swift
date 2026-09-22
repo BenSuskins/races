@@ -60,6 +60,57 @@ final class FakeRacingDataProvider: RacingDataProviding, @unchecked Sendable {
     }
 }
 
+/// Scripted exchange. Same shape and the same reasoning as
+/// `FakeRacingDataProvider`: a lock rather than an actor, so a test can assert
+/// call counts without awaiting.
+///
+/// The counters are the point of it — `MarketLoader` caches the catalogue and
+/// the books separately, and a cache that quietly refetches is indistinguishable
+/// from one that works unless the calls are counted.
+final class FakeMarketDataProvider: MarketDataProviding, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _marketCalls = 0
+    private var _priceCalls = 0
+    private var _lastPricedMarketIDs: [String] = []
+
+    var marketCalls: Int { lock.withLock { _marketCalls } }
+    var priceCalls: Int { lock.withLock { _priceCalls } }
+    var lastPricedMarketIDs: [String] { lock.withLock { _lastPricedMarketIDs } }
+
+    private let marketsResult: Result<[ExchangeMarket], Error>
+    private let pricesResult: Result<[ExchangeMarketPrices], Error>
+    private let startingPricesResult: Result<[String: [Int64: Double]], Error>
+
+    init(
+        markets: Result<[ExchangeMarket], Error> = .success([]),
+        prices: Result<[ExchangeMarketPrices], Error> = .success([]),
+        startingPrices: Result<[String: [Int64: Double]], Error> = .success([:])
+    ) {
+        self.marketsResult = markets
+        self.pricesResult = prices
+        self.startingPricesResult = startingPrices
+    }
+
+    func markets(day: RaceDay, countries: [String]) async throws -> [ExchangeMarket] {
+        lock.withLock { _marketCalls += 1 }
+        return try marketsResult.get()
+    }
+
+    func prices(marketIDs: [String]) async throws -> [ExchangeMarketPrices] {
+        lock.withLock {
+            _priceCalls += 1
+            _lastPricedMarketIDs = marketIDs.sorted()
+        }
+        // Only the books that were asked for, so a test cannot accidentally
+        // pass because the fake handed back a market the loader never wanted.
+        return try pricesResult.get().filter { marketIDs.contains($0.marketID) }
+    }
+
+    func startingPrices(marketIDs: [String]) async throws -> [String: [Int64: Double]] {
+        try startingPricesResult.get()
+    }
+}
+
 /// In-memory credentials, so `AppEnvironment` and `SettingsViewModel` are testable
 /// without a signed container. The real Keychain returns `errSecMissingEntitlement`
 /// in an unsigned test host.
@@ -245,5 +296,53 @@ extension RaceResult {
             .fixture(horseID: "also_1", position: 2),
             .fixture(horseID: loser, position: 5),
         ])
+    }
+}
+
+extension ExchangeMarket {
+    /// A win market whose runners are the exchange's view of the given cloth
+    /// numbers and names.
+    ///
+    /// `selectionID` is derived from the cloth number rather than passed in, so
+    /// a test can state the field once and still assert the join landed on the
+    /// right horse.
+    static func fixture(
+        id: String = "1.234",
+        venue: String = "Ascot",
+        startTime: Date,
+        runners: [(clothNumber: Int, name: String)]
+    ) -> ExchangeMarket {
+        ExchangeMarket(
+            id: id,
+            venue: venue,
+            startTime: startTime,
+            marketName: "WIN",
+            runners: runners.map {
+                ExchangeRunner(
+                    id: Int64(1_000 + $0.clothNumber),
+                    name: $0.name,
+                    clothNumber: $0.clothNumber)
+            })
+    }
+}
+
+extension ExchangeMarketPrices {
+    /// A book priced by cloth number, matching `ExchangeMarket.fixture`'s
+    /// selection ids.
+    static func fixture(
+        marketID: String = "1.234",
+        capturedAt: Date = Date(timeIntervalSince1970: 1_000_000),
+        backPricesByClothNumber: [Int: Double]
+    ) -> ExchangeMarketPrices {
+        var prices: [Int64: RunnerPrice] = [:]
+        for (clothNumber, backPrice) in backPricesByClothNumber {
+            prices[Int64(1_000 + clothNumber)] = RunnerPrice(backPrice: backPrice)
+        }
+        return ExchangeMarketPrices(
+            marketID: marketID,
+            status: "OPEN",
+            capturedAt: capturedAt,
+            isDelayed: true,
+            prices: prices)
     }
 }

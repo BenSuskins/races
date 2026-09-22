@@ -102,16 +102,11 @@ enum BetfairMapping {
         horseIDsBySelectionID: [Int64: String],
         source: MarketSnapshot.Source = .liveExchange
     ) -> MarketSnapshot {
-        var byHorse: [String: RunnerPrice] = [:]
-        for (selectionID, price) in prices.prices {
-            guard let horseID = horseIDsBySelectionID[selectionID] else { continue }
-            byHorse[horseID] = price
-        }
-        return MarketSnapshot(
-            marketID: prices.marketID,
-            source: source,
-            capturedAt: prices.capturedAt,
-            isDelayed: prices.isDelayed,
-            prices: byHorse)
+        // One implementation of the crossing, in the matching layer where it
+        // belongs — it is not Betfair-specific, and two copies could drift.
+        MarketSnapshot(
+            joining: prices,
+            horseIDsBySelectionID: horseIDsBySelectionID,
+            source: source)
     }
 }

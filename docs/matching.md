@@ -142,6 +142,24 @@ mean different things:
 `matchRate` is the figure to watch. A drop means the join has regressed, and
 `noOverlap` climbing is the specific shape of that regression.
 
+## What a match is for: the join
+
+A match on its own is just two identifiers. The point of it is
+`RaceMarketMatch.snapshot(from:)`, which turns exchange-keyed prices into a
+`MarketSnapshot` keyed by *our* horse ids — the only form the rater accepts.
+
+It reads `runners.pairings` from the match it came from, so the join cannot
+disagree with the match that produced it, and it **drops** prices for selections
+that did not pair rather than filling them in. That asymmetry is deliberate: a
+runner with no price is reported honestly through `MarketSnapshot.coverage(of:)`,
+and the rater discards a book below `minimumMarketCoverage` wholesale. A price
+attached to the wrong horse, by contrast, looks entirely normal in the output
+and cannot be detected from it.
+
+This lives in `Matching/MarketSnapshotJoin.swift` rather than in the Betfair
+client, because it is not Betfair-specific — `BetfairMapping.snapshot` delegates
+to it so there is one implementation to be right.
+
 ## Known limitations
 
 - **One market per race.** Whichever race claims a market keeps it; a second race

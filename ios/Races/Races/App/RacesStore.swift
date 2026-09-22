@@ -98,27 +98,45 @@ actor RacesStore {
 
     // MARK: - Rating
 
-    /// Rate a race using whatever the archive currently knows.
+    /// Rate a race using whatever the archive currently knows, anchored to the
+    /// market if one was matched.
     ///
-    /// `market: nil` until Betfair exists. The rater is built for that: it swaps
-    /// to `formInfluenceNoMarket` and flags the result `isFormOnly`, so the UI can
-    /// say so rather than implying a market-anchored number.
-    func assess(_ race: Race, now: Date = Date()) -> RaceAssessment {
-        rater.rate(race, market: nil, strikeRates: archive, now: now)
+    /// `market` is optional and stays optional. No Betfair credentials, a race
+    /// the matcher refused, or a book with no usable prices all arrive here the
+    /// same way — as `nil` — and the rater is built for it: it swaps to
+    /// `formInfluenceNoMarket` and flags the result `isFormOnly`, so the UI says
+    /// so rather than implying a market-anchored number.
+    ///
+    /// The store deliberately does no fetching and no matching. It is handed the
+    /// snapshot, which is what keeps it testable with no provider at all.
+    func assess(
+        _ race: Race,
+        market: MarketSnapshot? = nil,
+        now: Date = Date()
+    ) -> RaceAssessment {
+        rater.rate(race, market: market, strikeRates: archive, now: now)
     }
 
     /// Assess a day's races and record a tip for each, persisting once.
+    ///
+    /// `markets` is keyed by race id, so a race with no entry is rated on form
+    /// alone. A partially priced card is normal — some races match, some do not —
+    /// and each tip records which it was.
     ///
     /// One save at the end rather than one per race: a 40-race card would
     /// otherwise rewrite the ledger forty times, and the whole point of the
     /// sealing rule is that the *last* write before the off is the one that counts.
     @discardableResult
-    func assessAndRecord(_ races: [Race], now: Date = Date()) async -> [String: RaceAssessment] {
+    func assessAndRecord(
+        _ races: [Race],
+        markets: [String: MarketSnapshot] = [:],
+        now: Date = Date()
+    ) async -> [String: RaceAssessment] {
         var assessments: [String: RaceAssessment] = [:]
         var stored = false
 
         for race in races {
-            let assessment = assess(race, now: now)
+            let assessment = assess(race, market: markets[race.id], now: now)
             assessments[race.id] = assessment
             if ledger.record(assessment, race: race, now: now).didStore {
                 stored = true

@@ -56,6 +56,18 @@ public enum RaceDates {
         }
     }
 
+    /// Which of the two days a provider can be asked for, if either.
+    ///
+    /// The market endpoints take a `RaceDay`, not a date, so a screen holding a
+    /// single `Race` needs this to know what to ask for. `nil` means the race is
+    /// outside the window both providers cover, and the correct answer there is
+    /// no market rather than a guess at the nearest day.
+    public static func day(matching dayString: String, now: Date = Date()) -> RaceDay? {
+        if dayString == self.dayString(for: .today, now: now) { return .today }
+        if dayString == self.dayString(for: .tomorrow, now: now) { return .tomorrow }
+        return nil
+    }
+
     /// Parse a provider timestamp. Both providers send ISO-8601, but not always
     /// with the same precision, and the Racing API sometimes omits the zone —
     /// in which case London is the right assumption, since these are British

@@ -26,21 +26,42 @@ final class TipsViewModel {
         var selection: RunnerAssessment? { assessment.selection }
     }
 
+    /// How much of the card the exchange actually priced.
+    ///
+    /// Shown whether or not it flatters. A card where two races in twenty
+    /// matched is a card where eighteen tips are form-only, and a screen that
+    /// only reported the good case would make the model look better anchored
+    /// than it is.
+    nonisolated struct MarketCoverage: Equatable, Sendable {
+        let pricedRaces: Int
+        let totalRaces: Int
+        /// Why there are no prices at all, when that is the situation. Absent
+        /// when Betfair answered and the races simply did not match.
+        let failure: APIError?
+
+        var isComplete: Bool { totalRaces > 0 && pricedRaces == totalRaces }
+        var hasAny: Bool { pricedRaces > 0 }
+    }
+
     private(set) var state: ViewState<[Selection]> = .idle
     private(set) var archivedRaceCount = 0
+    private(set) var marketCoverage: MarketCoverage?
 
     private let loader: RacecardLoader?
+    private let markets: MarketLoader?
     private let store: RacesStore?
     private let unavailable: APIError?
     private let now: () -> Date
 
     init(
         loader: RacecardLoader?,
+        markets: MarketLoader?,
         store: RacesStore?,
         unavailable: APIError?,
         now: @escaping () -> Date = Date.init
     ) {
         self.loader = loader
+        self.markets = markets
         self.store = store
         self.unavailable = unavailable
         self.now = now
@@ -49,6 +70,7 @@ final class TipsViewModel {
     convenience init(environment: AppEnvironment) {
         self.init(
             loader: environment.makeRacecardLoader(),
+            markets: environment.marketLoader,
             store: environment.store,
             unavailable: environment.credentialsFailure)
     }
@@ -76,7 +98,17 @@ final class TipsViewModel {
             await store.loadIfNeeded()
 
             let upcoming = load.races.filter { !Self.hasStarted($0, by: moment) }
-            let assessments = await store.assessAndRecord(upcoming, now: moment)
+
+            // Prices first, then one assess-and-record pass over the whole card.
+            // Recording is what seals a tip, so the market has to be in hand
+            // before it happens — a tip sealed form-only and re-rated with
+            // prices afterwards would be a record of something we never showed.
+            let market = await markets?.load(
+                races: upcoming, day: .today, forceRefresh: forceRefresh, now: moment)
+            let snapshots = market?.snapshots ?? [:]
+
+            let assessments = await store.assessAndRecord(
+                upcoming, markets: snapshots, now: moment)
 
             var selections: [Selection] = []
             for race in upcoming.sorted(by: Self.byOffTime) {
@@ -89,6 +121,10 @@ final class TipsViewModel {
 
             state = .loaded(selections)
             archivedRaceCount = await store.archivedRaceCount
+            marketCoverage = MarketCoverage(
+                pricedRaces: snapshots.count,
+                totalRaces: upcoming.count,
+                failure: market?.failure)
         } catch {
             state = .failed(.from(error))
         }

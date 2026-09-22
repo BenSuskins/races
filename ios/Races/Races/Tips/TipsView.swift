@@ -28,6 +28,9 @@ struct TipsView: View {
                         }
 
                         Section {
+                            if let coverage = model.marketCoverage {
+                                MarketCoverageRow(coverage: coverage)
+                            }
                             DisclaimerFooter(archivedRaceCount: model.archivedRaceCount)
                         }
                     }
@@ -100,6 +103,41 @@ struct ProbabilityBadge: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(.tint.opacity(0.15), in: .capsule)
+    }
+}
+
+/// How much of the card the exchange priced.
+///
+/// On screen whether or not it flatters. The model is market-anchored by design,
+/// so a card that mostly failed to match is a card of weaker tips — and the one
+/// place that is visible is here.
+private struct MarketCoverageRow: View {
+    let coverage: TipsViewModel.MarketCoverage
+
+    var body: some View {
+        Label(line, systemImage: icon)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+    }
+
+    private var icon: String {
+        coverage.hasAny ? "sterlingsign.circle" : "info.circle"
+    }
+
+    private var line: String {
+        if let failure = coverage.failure {
+            if case .notConfigured = failure {
+                return "Betfair isn't connected, so every tip is form-only. Add it in Settings to anchor them to the market."
+            }
+            return failure.errorDescription ?? "No market prices this time, so every tip is form-only."
+        }
+        if coverage.isComplete {
+            return "Every race matched a market."
+        }
+        if coverage.hasAny {
+            return "\(coverage.pricedRaces) of \(coverage.totalRaces) races matched a market. The rest are form-only."
+        }
+        return "No race matched a market, so every tip is form-only."
     }
 }
 
