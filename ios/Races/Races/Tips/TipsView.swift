@@ -28,6 +28,9 @@ struct TipsView: View {
                         }
 
                         Section {
+                            if let note = RaceTime.timeZoneNote() {
+                                TimeZoneNote(note: note)
+                            }
                             if let coverage = model.marketCoverage {
                                 MarketCoverageRow(coverage: coverage)
                             }
@@ -50,7 +53,7 @@ private struct TipRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(selection.race.offTime)
+                Text(RaceTime.display(selection.race))
                     .font(.subheadline.weight(.semibold))
                     .monospacedDigit()
                 Text(selection.race.courseName)

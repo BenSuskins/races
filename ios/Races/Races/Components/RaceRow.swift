@@ -11,7 +11,7 @@ struct RaceRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(race.offTime)
+                Text(RaceTime.display(race))
                     .font(.headline)
                     .monospacedDigit()
                     .foregroundStyle(race.hasStarted ? .secondary : .primary)

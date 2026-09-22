@@ -307,6 +307,19 @@ told their credentials are wrong rather than that a field is blank.
   produced nothing: eight tests failed at once with no obvious cause. Compare
   `offDateTime` against the injected instant instead, and keep `hasStarted` for
   display, where the real clock is the right one.
+- **`race.offTime` is a *UK* string and must never be displayed raw.** The
+  Racing API prints the off in Europe/London — "13:30" — and for the app's first
+  weeks every view echoed that string directly. On a device in the UK it is
+  right and free; anywhere else it is silently two or three hours out with
+  nothing on screen saying so. It was reported from Greece as a Record-tab bug:
+  the card showed "13:30" against a phone clock reading 15:14, so three races
+  that had not yet run read as finished and unsettled, and the accuracy tracker
+  looked broken when it was correct. `RaceTime.display(_:)` formats
+  `race.offDateTime` — a real instant — and is the only thing that should appear
+  where an off time goes. `RaceTime.timeZoneNote()` returns the one-line notice,
+  and returns `nil` where none is needed: it compares the **current UTC offset**
+  rather than the zone identifier, so Europe/Dublin is not nagged for a zone that
+  keeps London's clock all year.
 - **`RaceResult.didRun(horseID:)` returns `nil` below three finishers**, and that
   is deliberate: a truncated payload would otherwise settle every runner as a
   non-runner and wipe a day's tips in one pass. The consequence for tests is that
