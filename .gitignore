@@ -30,3 +30,10 @@ Config.plist
 # Python bytecode from scripts/
 __pycache__/
 *.pyc
+
+# Captured provider payloads. The corpus grows daily and is for the back-test,
+# not the repo; committed fixtures are a chosen handful under the kit's tests.
+capture/
+
+# Capture credentials, read by scripts/capture-fixtures.py
+scripts/.capture-env

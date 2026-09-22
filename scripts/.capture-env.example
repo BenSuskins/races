@@ -1,0 +1,15 @@
+# Copy to `.capture-env` and fill in. That file is gitignored.
+#
+#   cp scripts/.capture-env.example scripts/.capture-env
+#   chmod 600 scripts/.capture-env
+#
+# The environment wins over this file, so an explicit export still overrides.
+# Nothing here is ever written into a capture: the redactor scans for these
+# values literally and refuses to write a file that still contains one.
+
+RACING_USER=
+RACING_PASS=
+
+BF_APP_KEY=
+BF_USER=
+BF_PASS=

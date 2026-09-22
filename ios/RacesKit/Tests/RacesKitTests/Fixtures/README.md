@@ -25,19 +25,45 @@ credentials and cannot be run from a Claude session — both providers sit outsi
 that environment's network policy.
 
 ```bash
-export RACING_USER=...  RACING_PASS=...
-export BF_APP_KEY=...   BF_USER=...  BF_PASS=...
+cp scripts/.capture-env.example scripts/.capture-env   # then fill it in
+chmod 600 scripts/.capture-env
 
-python3 scripts/capture-fixtures.py --self-test   # no credentials needed
-python3 scripts/capture-fixtures.py --dry-run     # fetch, redact, write nothing
-python3 scripts/capture-fixtures.py
+python3 scripts/capture-fixtures.py --self-test         # no credentials needed
+python3 scripts/capture-fixtures.py --dry-run           # fetch, redact, write nothing
+python3 scripts/capture-fixtures.py --fixtures          # write a committed fixture here
 ```
 
-Captured files carry a `-YYYYMMDD` suffix and arrive with a
-`capture-manifest-YYYYMMDD.json` recording when they were taken. **The pairing is
-the point**: the card and the catalogue come from the same London day, minutes
-apart, which is the only way `RaceMatcher` can be tested against two real views
-of the same races rather than against races invented to pass it.
+**`--fixtures` is what writes into this directory**, with a `-YYYYMMDD` suffix.
+Without it a run goes to the corpus at `capture/YYYY-MM-DD/` instead — see below.
+
+**The pairing is the point**: the card and the catalogue come from the same
+London day, minutes apart, which is the only way `RaceMatcher` can be tested
+against two real views of the same races rather than against races invented to
+pass it.
+
+## The corpus, and why it is not here
+
+A back-test needs a hundred-odd race days. Those do **not** belong here: this
+directory is copied wholesale into the test bundle by `.copy("Fixtures")`, so an
+archive would be loaded by every `swift test`. Daily runs therefore write to
+`capture/` at the repo root, which is gitignored.
+
+`scripts/install-capture-schedule.sh` installs a launchd agent that runs the
+capture **twice a day**, because one run cannot do both jobs:
+
+| Run | London | Gets |
+|---|---|---|
+| afternoon | 15:00 | the catalogue, populated, with live prices |
+| late | 22:30 | results, and settled starting prices |
+
+The free results endpoint is **today-only** — a day missed is a day gone, which
+is the argument for a scheduler rather than a reminder. Times are given in
+London and converted to the machine's local time, so re-run the installer after
+changing timezone or when the clocks change.
+
+Corpus files are timestamped within their London day, so the two runs never
+overwrite each other. Empty payloads — an evening catalogue after racing has
+finished — are reported and skipped rather than stored.
 
 The hand-built files below are **not** superseded by a capture. They carry the
 awkward cases deliberately — numbers as strings and as numbers, blank strings,

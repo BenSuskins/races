@@ -66,7 +66,18 @@ BETFAIR_BOOK_BATCH = 40
 MIN_SCANNABLE_SECRET = 8
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_OUT = REPO_ROOT / "ios/RacesKit/Tests/RacesKitTests/Fixtures"
+FIXTURES_DIR = REPO_ROOT / "ios/RacesKit/Tests/RacesKitTests/Fixtures"
+
+# Daily captures accumulate into a corpus, not into the test bundle. A month of
+# race days under `Fixtures/` would be copied into the test target by
+# `.copy("Fixtures")` and bloat every `swift test` run; and committed fixtures
+# are meant to be a handful of chosen payloads, not an archive.
+DEFAULT_CORPUS = REPO_ROOT / "capture"
+
+# `KEY=value` lines, so a daily run needs no exports. Gitignored.
+CREDENTIALS_FILE = Path(__file__).resolve().parent / ".capture-env"
+
+CREDENTIAL_NAMES = ("RACING_USER", "RACING_PASS", "BF_APP_KEY", "BF_USER", "BF_PASS")
 
 # Keys whose values are secret wherever they appear, at any depth.
 SECRET_KEYS = {
@@ -86,6 +97,52 @@ _NORMALISED_SECRET_KEYS = {k.replace("_", "").replace("-", "") for k in SECRET_K
 
 class CaptureError(RuntimeError):
     pass
+
+
+# --------------------------------------------------------------------------
+# Credentials
+# --------------------------------------------------------------------------
+
+
+def parse_env_file(text: str) -> dict[str, str]:
+    """Parse `KEY=value` lines. Blank lines and `#` comments ignored.
+
+    Deliberately not `source`-ing a shell file: this runs unattended from a
+    scheduler, and a credentials file that can execute arbitrary code is a
+    different risk from one that cannot.
+    """
+    values: dict[str, str] = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip()
+        # Tolerate quoting, since people will write it either way.
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        if key:
+            values[key] = value
+    return values
+
+
+def load_credentials(path: Path = CREDENTIALS_FILE) -> None:
+    """Fill missing credentials from the file. The environment always wins."""
+    if not path.exists():
+        return
+
+    mode = path.stat().st_mode & 0o077
+    if mode:
+        print(
+            f"Warning: {path} is readable by others (mode {oct(path.stat().st_mode & 0o777)}). "
+            f"Run: chmod 600 {path}",
+            file=sys.stderr,
+        )
+
+    for key, value in parse_env_file(path.read_text()).items():
+        if key in CREDENTIAL_NAMES and not os.environ.get(key):
+            os.environ[key] = value
 
 
 # --------------------------------------------------------------------------
@@ -275,8 +332,53 @@ class Betfair:
 
 
 # --------------------------------------------------------------------------
-# Capture
+# Output
 # --------------------------------------------------------------------------
+
+
+# After this London hour the day's racing is over and starting prices have
+# settled. Before it, markets are live and SP_TRADED has nothing to say.
+SETTLED_AFTER_LONDON_HOUR = 20
+
+
+def wants_settled_prices(london: dt.datetime, override: bool | None = None) -> bool:
+    """Whether to ask Betfair for SP_TRADED.
+
+    Decided from the clock rather than passed in, because `launchd` uses one
+    argument list for every fire time — so a single agent could not ask for it
+    on the late run and not on the afternoon one. The decision is printed.
+    """
+    if override is not None:
+        return override
+    return london.hour >= SETTLED_AFTER_LONDON_HOUR
+
+
+def is_empty_payload(payload: Any) -> bool:
+    """Whether there is nothing in here worth keeping.
+
+    An evening catalogue after racing has finished is an empty list — a correct
+    answer, and noise in a corpus. The count is still reported; only the file is
+    skipped.
+    """
+    if isinstance(payload, list):
+        return len(payload) == 0
+    if isinstance(payload, dict):
+        return len(payload) == 0
+    return payload is None
+
+
+def output_path(name: str, day: str, stamp: str, root: Path, as_fixture: bool) -> Path:
+    """Where a captured payload goes.
+
+    A fixture is dated and lands flat, matching the existing naming. A corpus
+    entry is filed under its London day and carries the time, because a day
+    needs **two** runs to be complete — one during racing for live prices and a
+    full catalogue, one after it for results and settled SP — and neither may
+    overwrite the other.
+    """
+    if as_fixture:
+        return root / f"{name}-{day.replace('-', '')}.json"
+    return root / day / f"{name}-{stamp}.json"
 
 
 def london_day_bounds(when: dt.datetime) -> tuple[str, str]:
@@ -289,13 +391,15 @@ def london_day_bounds(when: dt.datetime) -> tuple[str, str]:
 
 
 def capture(args: argparse.Namespace) -> int:
-    missing = [
-        name
-        for name in ("RACING_USER", "RACING_PASS", "BF_APP_KEY", "BF_USER", "BF_PASS")
-        if not os.environ.get(name)
-    ]
+    load_credentials()
+
+    missing = [name for name in CREDENTIAL_NAMES if not os.environ.get(name)]
     if missing and not args.racing_only:
-        print(f"Missing environment variables: {', '.join(missing)}", file=sys.stderr)
+        print(
+            f"Missing credentials: {', '.join(missing)}\n"
+            f"Export them, or put KEY=value lines in {CREDENTIALS_FILE} (chmod 600).",
+            file=sys.stderr,
+        )
         return 2
     if args.racing_only and not os.environ.get("RACING_USER"):
         print("Missing RACING_USER / RACING_PASS", file=sys.stderr)
@@ -325,8 +429,13 @@ def capture(args: argparse.Namespace) -> int:
         )
 
     now = dt.datetime.now(dt.timezone.utc)
-    day = now.astimezone(LONDON).strftime("%Y%m%d")
+    london = now.astimezone(LONDON)
+    day = london.strftime("%Y-%m-%d")
+    stamp = london.strftime("%H%M%S")
     captures: dict[str, Any] = {}
+
+    root = Path(args.out) if args.out else (FIXTURES_DIR if args.fixtures else DEFAULT_CORPUS)
+    print(f"London day {day}, {stamp} — writing to {root}")
 
     # ---- Racing API -----------------------------------------------------
     racing = RacingAPI(os.environ["RACING_USER"], os.environ["RACING_PASS"])
@@ -355,6 +464,11 @@ def capture(args: argparse.Namespace) -> int:
         # the redaction list the moment it exists.
         secrets.append(betfair.log_in())
 
+        settled = wants_settled_prices(london, args.settled)
+        print(
+            f"Betfair: {'asking for settled SP' if settled else 'live prices only'} "
+            f"({london:%H:%M} London)"
+        )
         start, end = london_day_bounds(now)
         print(f"Betfair: catalogue for {start} → {end}…")
         catalogue = betfair.betting(
@@ -386,7 +500,7 @@ def capture(args: argparse.Namespace) -> int:
                     "marketIds": market_ids,
                     "priceProjection": {
                         "priceData": ["EX_BEST_OFFERS", "EX_TRADED", "SP_AVAILABLE"]
-                        + (["SP_TRADED"] if args.settled else []),
+                        + (["SP_TRADED"] if settled else []),
                         "virtualise": True,
                     },
                 },
@@ -395,53 +509,71 @@ def capture(args: argparse.Namespace) -> int:
             print("  (no markets in the window — nothing to price)")
 
     # ---- Redact, verify, write -----------------------------------------
-    cleaned = {}
+    cleaned: dict[str, Any] = {}
+    skipped: list[str] = []
     for name, payload in captures.items():
+        if is_empty_payload(payload):
+            # A correct answer, and noise in a corpus. Reported, not stored.
+            skipped.append(name)
+            continue
         scrubbed = redact(payload, secrets)
         verify_clean(scrubbed, secrets, name, allow_opaque=args.allow_opaque)
         cleaned[name] = scrubbed
 
-    manifest = {
-        "capturedAt": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "londonDay": now.astimezone(LONDON).strftime("%Y-%m-%d"),
-        "files": sorted(cleaned),
-        "note": (
-            "Paired capture: the Racing API card and the Betfair catalogue were "
-            "taken minutes apart on the same London day, so RaceMatcher can be "
-            "tested against two real views of the same races."
-        ),
-    }
-    cleaned[f"capture-manifest-{day}.json"] = manifest
+    for name in skipped:
+        print(f"  (empty, not written: {name})")
 
-    out = Path(args.out)
-    if args.dry_run:
-        print("\n--dry-run: nothing written. Would have written:")
-        for name, payload in sorted(cleaned.items()):
-            size = len(json.dumps(payload))
-            count = len(payload) if isinstance(payload, list) else "-"
-            print(f"  {out / name}  ({size:,} bytes, {count} top-level items)")
+    if not cleaned:
+        print("\nNothing to write. Every payload was empty.")
         return 0
 
-    out.mkdir(parents=True, exist_ok=True)
-    for name, payload in sorted(cleaned.items()):
-        path = out / name
-        path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    cleaned["capture-manifest"] = {
+        "capturedAt": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "londonDay": day,
+        "londonTime": london.strftime("%H:%M:%S"),
+        "files": sorted(cleaned),
+        "emptyAndSkipped": sorted(skipped),
+        "note": (
+            "A London day needs two runs to be complete: one during racing for "
+            "live prices and a full catalogue, one after it for results and "
+            "settled SP. Neither overwrites the other."
+        ),
+    }
+
+    paths = {
+        name: output_path(name, day, stamp, root, as_fixture=args.fixtures)
+        for name in cleaned
+    }
+
+    if args.dry_run:
+        print("\n--dry-run: nothing written. Would have written:")
+        for name in sorted(cleaned):
+            size = len(json.dumps(cleaned[name]))
+            count = len(cleaned[name]) if isinstance(cleaned[name], list) else "-"
+            print(f"  {paths[name]}  ({size:,} bytes, {count} top-level items)")
+        return 0
+
+    for name in sorted(cleaned):
+        path = paths[name]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(cleaned[name], indent=2, sort_keys=True) + "\n")
         print(f"  wrote {path}")
 
-    print(
-        "\nRead at least one file before committing. The redactor is careful and "
-        "is not a substitute for looking."
-    )
+    if args.fixtures:
+        print(
+            "\nRead at least one file before committing. The redactor is careful "
+            "and is not a substitute for looking."
+        )
     return 0
 
 
 def self_test() -> int:
-    """Exercise the redactor with no credentials and no network.
+    """Exercise the pure logic with no credentials and no network.
 
     The redactor is the only part of this script that can do real harm — a
-    missed token is committed to a repository — and it is also the only part
-    that can be checked without live credentials. So it is checked here, and
-    anyone can run it: `python3 scripts/capture-fixtures.py --self-test`.
+    missed token committed to a repository — and it is also the only part
+    checkable without live credentials. So it is checked here, and anyone can
+    run it: `python3 scripts/capture-fixtures.py --self-test`.
     """
     failures: list[str] = []
 
@@ -453,6 +585,7 @@ def self_test() -> int:
     secret = "sup3rsecretpassword123"
     token = "AbCdEf0123456789" * 4  # 64 chars, shaped like a real session token
 
+    # --- redaction ---
     nested = {"a": {"b": [{"sessionToken": token, "X-Authentication": token,
                            "app_key": "k", "horse": "Frankel"}]}}
     inner = redact(nested, [])["a"]["b"][0]
@@ -482,8 +615,6 @@ def self_test() -> int:
     except CaptureError:
         check("--allow-opaque lets it through", False)
 
-    # Realistic catalogue data must not trip the opaque check, or the escape
-    # hatch becomes mandatory and stops being a signal.
     realistic = {"marketId": "1.245678901", "runners": [{
         "selectionId": 12345678, "runnerName": "Kyprios (IRE)",
         "metadata": {"CLOTH_NUMBER": "3", "COLOURS_FILENAME": "c20240601abc.jpg",
@@ -494,12 +625,10 @@ def self_test() -> int:
     except CaptureError as error:
         check("realistic catalogue data does not trip the opaque check", False, str(error)[:120])
 
-    # The collision hazard: a short username scanned as a literal would rewrite
-    # every jockey whose name contains it, and then block the capture forever
-    # because the "secret" really is in the data.
     check("a short name survives scrubbing",
           redact({"jockey": "Benoit Le Moine"}, [])["jockey"] == "Benoit Le Moine")
 
+    # --- London day bounds ---
     summer_start, summer_end = london_day_bounds(
         dt.datetime(2026, 7, 15, 12, 0, tzinfo=dt.timezone.utc))
     winter_start, _ = london_day_bounds(
@@ -509,6 +638,48 @@ def self_test() -> int:
     check("a BST day ends at 23:00Z", summer_end == "2026-07-15T23:00:00Z", summer_end)
     check("a GMT day starts at 00:00Z",
           winter_start == "2026-12-15T00:00:00Z", winter_start)
+
+    # --- credentials file ---
+    parsed = parse_env_file(
+        "# a comment\n\nRACING_USER=ben\n"
+        'BF_PASS="quoted value"\n'
+        "BF_APP_KEY = spaced \n"
+        "NOT_A_PAIR\n")
+    check("env file skips comments and blanks", "NOT_A_PAIR" not in parsed)
+    check("env file reads a plain value", parsed.get("RACING_USER") == "ben", parsed)
+    check("env file strips quotes", parsed.get("BF_PASS") == "quoted value", parsed)
+    check("env file strips whitespace", parsed.get("BF_APP_KEY") == "spaced", parsed)
+
+    # --- what is worth keeping ---
+    check("an empty catalogue is not written", is_empty_payload([]))
+    check("an empty object is not written", is_empty_payload({}))
+    check("a populated list is written", not is_empty_payload([{"marketId": "1.1"}]))
+    check("a zero-length string list is still a list", not is_empty_payload([""]))
+
+    # --- when to ask for settled prices ---
+    def at(hour):
+        return dt.datetime(2026, 9, 22, hour, 0, tzinfo=LONDON)
+    check("an afternoon run asks for live prices", not wants_settled_prices(at(15)))
+    check("a late run asks for settled SP", wants_settled_prices(at(22)))
+    check("the boundary hour counts as late", wants_settled_prices(at(20)))
+    check("--settled forces it on early", wants_settled_prices(at(9), override=True))
+    check("--no-settled forces it off late", not wants_settled_prices(at(23), override=False))
+
+    # --- output paths ---
+    corpus = output_path("racingapi-racecards-free", "2026-09-22", "134501",
+                         Path("/tmp/c"), as_fixture=False)
+    fixture = output_path("racingapi-racecards-free", "2026-09-22", "134501",
+                          Path("/tmp/f"), as_fixture=True)
+    check("a corpus entry is filed under its London day",
+          str(corpus) == "/tmp/c/2026-09-22/racingapi-racecards-free-134501.json", str(corpus))
+    check("a fixture keeps the flat dated name",
+          str(fixture) == "/tmp/f/racingapi-racecards-free-20260922.json", str(fixture))
+    # The whole point of the timestamp: two runs a day, neither overwriting the
+    # other, because one gets prices and the other gets results.
+    afternoon = output_path("x", "2026-09-22", "134501", Path("/tmp/c"), as_fixture=False)
+    evening = output_path("x", "2026-09-22", "210233", Path("/tmp/c"), as_fixture=False)
+    check("two runs on one day do not collide", afternoon != evening)
+    check("both land in the same day folder", afternoon.parent == evening.parent)
 
     print()
     print("FAILED: " + ", ".join(failures) if failures else "all checks passed")
@@ -522,8 +693,14 @@ def main() -> int:
     )
     parser.add_argument(
         "--out",
-        default=str(DEFAULT_OUT),
-        help="where to write fixtures (default: the kit's Fixtures directory)",
+        default=None,
+        help=f"explicit output directory (default: {DEFAULT_CORPUS})",
+    )
+    parser.add_argument(
+        "--fixtures",
+        action="store_true",
+        help="write a dated committed fixture into the kit's Fixtures directory "
+             "instead of into the corpus",
     )
     parser.add_argument(
         "--self-test",
@@ -538,13 +715,24 @@ def main() -> int:
     parser.add_argument(
         "--racing-only",
         action="store_true",
-        help="skip Betfair — useful while the login is still unresolved",
+        help="skip Betfair, for a Racing-API-only capture",
     )
-    parser.add_argument(
+    settled = parser.add_mutually_exclusive_group()
+    settled.add_argument(
         "--settled",
-        action="store_true",
-        help="also ask for SP_TRADED; only meaningful after racing has finished",
+        dest="settled",
+        action="store_const",
+        const=True,
+        help=f"force asking for SP_TRADED (default: after {SETTLED_AFTER_LONDON_HOUR}:00 London)",
     )
+    settled.add_argument(
+        "--no-settled",
+        dest="settled",
+        action="store_const",
+        const=False,
+        help="force live prices only",
+    )
+    parser.set_defaults(settled=None)
     parser.add_argument(
         "--allow-opaque",
         action="store_true",
