@@ -1,0 +1,161 @@
+name: Races app
+
+# The expensive half. This repository is private, so every runner minute is
+# billed and **macOS bills at 10x** — on 2026-09-22 roughly 112 minutes of Xcode
+# wall time billed at about 1,125 minutes, over half a 2,000-minute monthly
+# allowance in a single day, and Actions stopped scheduling jobs entirely.
+#
+# So the paths below are deliberately narrower than `ios/**`, and deliberately
+# wider than `ios/Races/**`:
+#
+#   ios/Races/**              the app and the hand-written pbxproj
+#   ios/RacesKit/Sources/**   the app compiles against the kit, so a public API
+#                             change here can break the app target even though
+#                             no app file changed
+#   ios/RacesKit/Package.swift  target settings, isolation, platform version
+#
+# What that excludes is exactly what cannot affect the app build: the kit's own
+# tests and fixtures, and everything under docs/. Excluding kit *sources* would
+# save more and would lose real coverage, so it is not done.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ios/Races/**'
+      - 'ios/RacesKit/Sources/**'
+      - 'ios/RacesKit/Package.swift'
+      - '.github/workflows/app.yml'
+  pull_request:
+    paths:
+      - 'ios/Races/**'
+      - 'ios/RacesKit/Sources/**'
+      - 'ios/RacesKit/Package.swift'
+      - '.github/workflows/app.yml'
+
+permissions:
+  contents: read
+
+# See the note in kit.yml: superseding is right for a pull request and wrong for
+# main, where a cancelled run is a lost answer rather than a saved minute.
+concurrency:
+  group: app-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  XCODE_VERSION: '26.1'
+  PROJECT_PATH: ios/Races/Races.xcodeproj
+  SCHEME: Races
+
+jobs:
+  # This job is what validates `Races.xcodeproj` at all. The project file was
+  # written by hand rather than by Xcode, so "does it open and build" is a claim
+  # that needs checking on every change, not an assumption.
+  app:
+    name: Races (Xcode)
+    runs-on: macos-15
+
+    # The most valuable line in this file.
+    #
+    # Observed at 7–14 minutes. Without a timeout a stuck job runs to GitHub's
+    # 6-hour default, which on macOS bills at 3,600 minutes — 1.8x the whole
+    # monthly allowance, from one hang. And a hang is not hypothetical: on
+    # 2026-09-21 eleven synchronous @MainActor tests deadlocked and the test
+    # phase ran 12.8 minutes before finishing at all.
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode ${{ env.XCODE_VERSION }}
+        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+
+      # The project resolves RacesKit as a local package, so SwiftPM's cache
+      # applies here too. Keyed on the pbxproj as well as the package: a project
+      # change can alter which products get resolved.
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/org.swift.swiftpm
+          key: spm-${{ runner.os }}-${{ env.XCODE_VERSION }}-${{ hashFiles('ios/RacesKit/Package.swift', 'ios/Races/Races.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            spm-${{ runner.os }}-${{ env.XCODE_VERSION }}-
+
+      # Resolve the simulator at run time instead of naming a model.
+      #
+      # `name=iPhone 16,OS=latest` reads like a sensible pin and is actually a
+      # pin on the runner image's installed device list. It broke exactly that
+      # way: the run on main after #5 merged landed on an image with no iPhone 16
+      # installed, and xcodebuild could offer only its two placeholder
+      # destinations. Picking the newest installed iOS runtime's first iPhone
+      # survives the device list changing underneath us.
+      #
+      # The diagnostics matter as much as the fix. When there genuinely is no
+      # simulator, the original failure said only that one device was missing;
+      # this says so plainly and prints what the runner does have.
+      - name: Pick a simulator
+        id: simulator
+        run: |
+          devices=$(xcrun simctl list devices available -j)
+
+          # Runtime keys look like com.apple.CoreSimulator.SimRuntime.iOS-26-1,
+          # so reverse identifier order is newest-first in practice.
+          udid=$(printf '%s' "$devices" | jq -r '
+            .devices
+            | to_entries
+            | map(select(.key | test("iOS")))
+            | sort_by(.key)
+            | reverse
+            | (.[0].value // [])
+            | map(select(.name | startswith("iPhone")))
+            | (.[0].udid // empty)
+          ')
+
+          if [ -z "$udid" ]; then
+            echo "::error::No iOS simulator is installed on this runner."
+            xcrun simctl list runtimes
+            xcrun simctl list devices
+            exit 1
+          fi
+
+          name=$(printf '%s' "$devices" | jq -r --arg udid "$udid" '
+            [.devices[][] | select(.udid == $udid)] | (.[0].name // "unknown")')
+          echo "Testing on $name ($udid)"
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+
+      # `CODE_SIGNING_ALLOWED=NO` throughout: signing needs the team's
+      # certificates, which CI has no business holding. It also means the app
+      # bundle has no keychain-access entitlement, which is exactly why
+      # KeychainCredentialsStore is tested through a seam rather than against
+      # the real Keychain — the real one returns errSecMissingEntitlement here.
+      - name: Test
+        run: |
+          xcodebuild test \
+            -project ${{ env.PROJECT_PATH }} \
+            -scheme ${{ env.SCHEME }} \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
+            -resultBundlePath ios-test-results \
+            CODE_SIGNING_ALLOWED=NO
+
+      # `failure()` rather than `always()`: the bundle is tens of megabytes and
+      # is only ever opened when something went wrong. Uploading it on a green
+      # run spends storage and a minute of runner time to produce an artefact
+      # nobody downloads.
+      #
+      # Both paths because xcodebuild is inconsistent about the extension: the
+      # failing run on 2026-09-21 logged "Writing result bundle at path:
+      # .../ios-test-results" while the upload looked for
+      # ios-test-results.xcresult and found nothing.
+      - name: Upload result bundle
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-results
+          path: |
+            ios-test-results
+            ios-test-results.xcresult
+          retention-days: 7
+          if-no-files-found: warn
+
+# Still to land, each alongside the code it covers:
+#   * back-test  — a floor on strike rate and ROI over real past races
+#   * CodeQL     — Swift analysis on macOS (mind the 10x billing)
