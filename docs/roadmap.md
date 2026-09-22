@@ -67,7 +67,7 @@ are outside this environment's network policy.
 
 ### 2. Back-test harness and CI job
 
-**Owner: Claude. Depends on item 1 to mean anything.**
+**Owner: Claude. Depends on item 1 for the model arm, item 4 for the control arm.**
 
 Runs the rater over past races with known results and reports strike rate, ROI,
 the favourite baseline and log loss for the model and for the market. Pure and
@@ -89,6 +89,12 @@ about the model. Roughly 150 real races is enough for regression testing and
 nowhere near enough for statistical inference; say so whenever quoting a number
 from it.
 
+The two sides of that inequality arrive separately, which is why item 4 exists.
+Item 4 gives the **market** side real prices and real outcomes at a scale worth
+quoting. Item 1 gives the **model** side its cards. A harness with only the first
+can still say what backing the favourite returns, which is not nothing — it is the
+number the whole app is measured against.
+
 ### 3. Real app icon
 
 **Owner: Claude, or Ben if you have artwork.**
@@ -98,6 +104,34 @@ from it.
 Store Connect rejects the marketing icon.
 
 Small, self-contained, and the only item here that Xcode Cloud verifies today.
+
+### 4. A market corpus from Betfair's free BSP files
+
+**Owner: Claude writes the script, Ben runs it.**
+
+Betfair publishes settled starting prices as plain CSV, no app key and no session
+token, at `promo.betfair.com/betfairsp/prices/`. A script that pulls a range of
+days and writes a committed corpus would give item 2 the half of its assertion
+that our own archive cannot supply for months yet:
+
+```
+logLoss(model) ≤ logLoss(market) + 0.005
+```
+
+`SELECTION_ID` in those files is the same id space `MarketReference` already
+freezes onto every tip, so this is not a third feed to be matched — it is the one
+we already use, settled. It is an offline batch job, so it touches no runtime
+path, needs no credential slot and cannot mis-price a live card.
+
+**What it cannot do, which is the part worth reading twice.** The files carry no
+stall draw, no official rating and no form. So this builds the **control** arm —
+the favourite baseline, market log loss, ROI at BSP — and not the model arm, which
+needs historical racecards that no free tier sells. It also cannot produce the
+draw-bias table `DrawFactor` is waiting on; `docs/data-sources.md` has the one
+free route to that and its caveats.
+
+Cannot be run from a Claude session: `promo.betfair.com` is outside this
+environment's network policy, the same constraint as item 1.
 
 ---
 
@@ -173,6 +207,8 @@ Race days. The archive starts empty, so:
 - ROI stays hidden below 50 settled tips, and says why
 - the favourite baseline — the number that decides whether any of this is worth
   keeping — needs a sample before it means anything
+- the draw-bias table `DrawFactor` needs is a course × distance × going ×
+  field-size interaction, and every card the app sees is a row of it
 
 Every item above is speculative until there is evidence the model does something.
 A week of real cards produces more information about what to build next than any

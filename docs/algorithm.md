@@ -85,7 +85,7 @@ place, `Codable` so the back-test can sweep them.
 | Age | `age` + `age_band` | 0.04 | **Weak** |
 | Weight carried | `lbs` | 0.02 | **Dubious** |
 | Draw | `draw` | **0.00** | **Dubious — off** |
-| Headgear change | `headgear` + archive | 0.05 | **Dubious** |
+| Headgear change | `headgear` + archive | **0.00** | **Dubious — off, needs `headgear_run`** |
 | Trainer / jockey strike rate | own archive | **0.00** | **Off until n ≥ 30** |
 
 Runners missing a value get `z = 0` — race-neutral. **Never impute a guess**; a

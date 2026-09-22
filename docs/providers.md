@@ -110,6 +110,10 @@ When a paid endpoint is reachable, `ProviderCapability` widens and the extra rat
 factors activate. Until then `formHistory(horseID:)` throws
 `APIError.tierUnavailable`, which the rater treats as normal.
 
+For sources outside these two providers — evaluated, and in every case so far not
+adopted — see [`docs/data-sources.md`](data-sources.md). That file holds verdicts;
+this one holds call sites. A source crosses over only when a call site exists.
+
 ---
 
 ## Betfair Exchange — `https://api.betfair.com/exchange/betting/rest/v1.0`
