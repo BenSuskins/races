@@ -155,6 +155,29 @@ final class AppEnvironment {
     /// calls per render.
     private(set) var hasAnyStoredCredential = false
 
+    /// Settled Betfair starting prices for the tips that still need one.
+    ///
+    /// The one number the free Racing API tier cannot supply at all — its
+    /// results endpoint carries no starting price — so without this the Record
+    /// tab has a strike rate and no ROI, for ever.
+    ///
+    /// Never throws and never blocks the ingest. A failure here costs the ROI
+    /// figure for those tips and nothing else: `ResultReconciler` settles them
+    /// on the result alone, and an absent price is omitted rather than
+    /// defaulted, because a zero would read as a starting price of evens and
+    /// wreck the figure it was meant to inform.
+    private func betfairStartingPrices(now: Date) async -> [String: [Int64: Double]] {
+        guard let marketProvider else { return [:] }
+        let marketIDs = await store.marketIDsAwaitingStartingPrice(now: now)
+        guard !marketIDs.isEmpty else { return [:] }
+
+        do {
+            return try await marketProvider.startingPrices(marketIDs: marketIDs)
+        } catch {
+            return [:]
+        }
+    }
+
     /// Application Support, falling back to memory.
     ///
     /// If the directory cannot be created there is nothing the user can do, and
@@ -192,7 +215,9 @@ final class AppEnvironment {
 
         do {
             let results = try await provider.results(day: .today)
-            return await store.ingest(results: results, now: now)
+            let startingPrices = await betfairStartingPrices(now: now)
+            return await store.ingest(
+                results: results, startingPrices: startingPrices, now: now)
         } catch {
             // Never surfaced as an error: a provider that cannot give results
             // right now is not a fault the user can act on, and the tips it would

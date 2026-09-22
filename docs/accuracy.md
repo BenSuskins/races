@@ -40,6 +40,29 @@ while still counting toward strike rate, and the count is reported as
 `settledWithoutPrice`. Blending the two denominators is how tipping records
 quietly overstate themselves.
 
+### Where the starting price comes from
+
+**Betfair SP, and nothing else.** The free Racing API results endpoint carries no
+starting price at all, so a tip's price exists only if its race matched a Betfair
+market. Three consequences worth stating plainly:
+
+- **ROI is a subset of strike rate, structurally**, not by accident. Every
+  unmatched race and every race run without Betfair configured has a strike-rate
+  outcome and no price.
+- **That subset is not random.** A race fails to match when its field is unusual,
+  its market is thin, or two meetings share a course — so the priced subset is
+  mildly biased toward ordinary, liquid races. `settledWithoutPrice` is on screen
+  so the gap is visible rather than inferred.
+- **The favourite baseline is priced from the same `MarketReference`** as the tip.
+  If the tip could be priced and the baseline could not, every ROI comparison
+  would flatter the model by construction — so the reference stores the whole
+  field's selection ids, not just the selection's.
+
+The mapping from Betfair's selection ids to ours is **frozen onto the tip** when
+the match is made, because by the time a race settles the catalogue that produced
+the match may be gone, and re-matching a race that has already run is guesswork
+dressed as data.
+
 ROI is **not displayed below 50 settled tips**. Level-stakes ROI over twenty bets
 is noise, and showing it would invite exactly the wrong conclusion.
 

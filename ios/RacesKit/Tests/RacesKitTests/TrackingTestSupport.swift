@@ -11,6 +11,7 @@ extension TipRecord {
         marketFavouriteHorseID: String? = "hrs_1",
         agreedWithFavourite: Bool? = true,
         createdAt: Date = Date(timeIntervalSince1970: 1_799_990_000),
+        marketReference: MarketReference? = nil,
         sealedAt: Date? = nil,
         outcome: TipOutcome? = nil,
         favouriteOutcome: FavouriteOutcome? = nil
@@ -35,6 +36,7 @@ extension TipRecord {
             modelVersion: RaceRater.modelVersion,
             weightsID: "v1",
             contributions: [],
+            marketReference: marketReference,
             createdAt: createdAt,
             sealedAt: sealedAt,
             outcome: outcome,
@@ -73,4 +75,21 @@ enum TestResult {
             }
         )
     }
+}
+
+extension MarketReference {
+    /// A reference whose selection ids are derived from the horse ids, so a test
+    /// can state the field once and still assert the join landed correctly.
+    static func make(
+        marketID: String = "1.100",
+        horses: [String] = ["hrs_1", "hrs_2", "hrs_3"]
+    ) -> MarketReference {
+        var selectionIDs: [String: Int64] = [:]
+        for (index, horseID) in horses.enumerated() {
+            selectionIDs[horseID] = Int64(10_001 + index)
+        }
+        return MarketReference(marketID: marketID, selectionIDsByHorseID: selectionIDs)
+    }
+
+    static func selectionID(at index: Int) -> Int64 { Int64(10_001 + index) }
 }

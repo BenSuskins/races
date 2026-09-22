@@ -108,7 +108,13 @@ final class TipsViewModel {
             let snapshots = market?.snapshots ?? [:]
 
             let assessments = await store.assessAndRecord(
-                upcoming, markets: snapshots, now: moment)
+                upcoming,
+                markets: snapshots,
+                // Wider than `snapshots`: a race that matched but had nothing
+                // priced yet still settles with a Betfair SP later, and that is
+                // the ROI figure.
+                references: market?.references ?? [:],
+                now: moment)
 
             var selections: [Selection] = []
             for race in upcoming.sorted(by: Self.byOffTime) {

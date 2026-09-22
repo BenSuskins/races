@@ -88,6 +88,15 @@ actor RacesStore {
         archive.raceCount > 0
     }
 
+    /// Betfair market ids for tips still waiting on a starting price.
+    ///
+    /// Read by `AppEnvironment.refreshResults()` so the exchange is only asked
+    /// about races that actually need it — a settled BSP never changes, so a tip
+    /// that already has one is not re-requested.
+    func marketIDsAwaitingStartingPrice(now: Date = Date()) -> [String] {
+        ledger.marketIDsAwaitingStartingPrice(now: now)
+    }
+
     func report(commission: Double = AccuracyCalculator.defaultCommission) -> AccuracyReport {
         AccuracyCalculator.report(for: ledger.tips, commission: commission)
     }
@@ -130,6 +139,7 @@ actor RacesStore {
     func assessAndRecord(
         _ races: [Race],
         markets: [String: MarketSnapshot] = [:],
+        references: [String: MarketReference] = [:],
         now: Date = Date()
     ) async -> [String: RaceAssessment] {
         var assessments: [String: RaceAssessment] = [:]
@@ -138,7 +148,15 @@ actor RacesStore {
         for race in races {
             let assessment = assess(race, market: markets[race.id], now: now)
             assessments[race.id] = assessment
-            if ledger.record(assessment, race: race, now: now).didStore {
+            // The reference is frozen with the tip, not looked up at settlement:
+            // by the time a race settles, the catalogue that produced the match
+            // may be gone, and re-matching a run race is guesswork.
+            if ledger.record(
+                assessment,
+                race: race,
+                marketReference: references[race.id],
+                now: now
+            ).didStore {
                 stored = true
             }
         }
@@ -155,7 +173,11 @@ actor RacesStore {
     /// this runs repeatedly through an afternoon — counting a race twice would
     /// inflate every strike rate derived from it.
     @discardableResult
-    func ingest(results: [RaceResult], now: Date = Date()) async -> ResultsIngestion {
+    func ingest(
+        results: [RaceResult],
+        startingPrices: [String: [Int64: Double]] = [:],
+        now: Date = Date()
+    ) async -> ResultsIngestion {
         var ingestion = ResultsIngestion()
 
         ingestion.newRacesArchived = archive.ingest(results)
@@ -166,9 +188,16 @@ actor RacesStore {
         // `awaitingReconciliation` only returns tips with no final outcome, so
         // `replace` cannot un-settle a settled race here.
         for tip in ledger.awaitingReconciliation(now: now) {
+            // Betfair's reply is keyed by its own selection ids; the reference
+            // frozen with the tip is what turns it back into our horse ids, and
+            // drops anything it cannot place rather than guessing.
+            let betfairSPs = tip.marketReference?
+                .startingPrices(from: startingPrices) ?? [:]
+
             let settled = ResultReconciler.settle(
                 tip: tip,
                 result: resultsByRaceID[tip.raceID],
+                betfairStartingPrices: betfairSPs,
                 now: now)
             guard settled != tip else { continue }
             ledger.replace(settled)

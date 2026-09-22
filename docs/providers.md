@@ -207,13 +207,28 @@ All calls are `POST` with a JSON body.
   array — and an empty array is indistinguishable from "no racing today".
 
 #### Betfair SP
-- **Usecase:** Settled starting price → ROI to level stakes in the tracker.
+- **Usecase:** Settled starting price → ROI to level stakes in the tracker. The
+  **only** source of one: `/v1/results/today/free` carries no starting price, so
+  without this call the Record tab has a strike rate and no ROI, permanently.
 - **Source:** `listMarketBook` with `priceProjection.priceData` including `SP_TRADED`
   after the off, read once a market is settled.
 - **Implemented by** `BetfairClient.startingPrices(marketIDs:)`. An absent or
   zero `actualSP` is **omitted rather than defaulted**: a zero would read as a
   starting price and wreck the ROI figure, and a missing one just means the race
   has not settled yet.
+- **Called by** `AppEnvironment.refreshResults()`, in the same pass as the Racing
+  API results, for the market ids of tips still awaiting an outcome
+  (`TipLedger.marketIDsAwaitingStartingPrice`). A settled BSP never changes, so a
+  tip that has one is never re-requested, and a race that never matched a market
+  is never asked about.
+- **Not cached.** The two calls are independent: a failure here costs the ROI
+  figure for those tips and nothing else, because the results pass settles them
+  on the result alone. Losing the strike rate as well would be the bug, and the
+  results endpoint is today-only so there is no second chance at it.
+- **Keyed by selection id**, so `MarketReference` — frozen onto the tip when the
+  match was made — is what turns the reply back into our horse ids. The catalogue
+  that produced the match may be gone by the time a race settles, which is why
+  the mapping is stored rather than re-derived.
 
 ---
 

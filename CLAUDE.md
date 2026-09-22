@@ -132,6 +132,17 @@ which is the thing the matching layer is for. `BetfairMapping.snapshot(from:hors
 is the one place that crossing happens, and it **drops** unmatched selections
 rather than guessing.
 
+**`MarketReference` is the one exception, and it is deliberate.** Settlement is a
+different job from rating: Betfair returns starting prices keyed by its own
+selection ids, and by the time a race settles the catalogue that would let us
+re-derive the mapping may be gone. So `RaceMarketMatch.reference()` freezes
+`marketID` plus the whole field's `horseID → selectionID` map onto the `TipRecord`
+at the moment the match was made and believed. It stores the **whole field**, not
+just the selection, because the favourite baseline needs a price too — priced tip
+against priceless benchmark is the most flattering possible asymmetry. Keyed our
+id → theirs so the stored ledger is a readable JSON object rather than a flat
+alternating array.
+
 **Tier degradation is a feature** — `formHistory(horseID:)` throws
 `APIError.tierUnavailable` on the free tier. The rater catches it and drops those
 factors. `APIError.isExpectedLimitation` is what the UI keys off to show plain
@@ -344,6 +355,19 @@ told their credentials are wrong rather than that a field is blank.
   copy, if `RatingWeights.v1` omits one, or if the set of deliberate zeros
   changes. The failure mode it guards is silent: a weight on screen with nothing
   explaining it looks like a finished row.
+- **A matched market is worth recording even when nothing was priced.**
+  `MarketLoad.references` is deliberately a wider set than `MarketLoad.snapshots`:
+  an early book with no money in it yields no snapshot, so the tip is form-only —
+  but that race still settles with a Betfair SP hours later, and that is the ROI
+  figure. Gating the reference on live prices would lose ROI for exactly the races
+  that were hardest to price at the time.
+- **The results pass makes two independent calls, and the second must not be able
+  to cost the first.** `refreshResults()` fetches the Racing API results and then
+  Betfair's settled starting prices; `betfairStartingPrices(now:)` swallows every
+  failure and returns `[:]`. A failure there costs the ROI figure for those tips
+  and nothing else — `ResultReconciler` settles them on the result alone. Losing
+  the strike rate as well would be the real bug, and the free results endpoint is
+  today-only, so there is no second attempt at it.
 - **Don't hand `Optional.map` a main-actor closure.** `configuration.racingAPI.map(makeRacingProvider)`
   is the natural way to write `AppEnvironment.refresh()` and it fails: `map` wants
   a nonisolated closure, so passing an isolated one loses the global actor. An
