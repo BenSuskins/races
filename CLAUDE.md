@@ -6,6 +6,15 @@ recommendation for each race, and track how well those recommendations actually 
 Native SwiftUI app plus a Foundation-only Swift package. **No backend** — the app
 talks to two third-party providers directly and keeps its own history on device.
 
+## What is left
+
+`docs/roadmap.md` is the current backlog: what remains, who owns each item (some
+need a device, real credentials or a billing decision rather than a commit), and
+the dependencies between them — two items look ready to build and are not. It also
+records the live blockers, which are not work items: the Actions quota, and the
+fact that `RacesKitTests` is absent from `Races.xcscheme` so the kit's tests are
+covered only by the Linux job.
+
 ## Provider Reference
 
 `docs/providers.md` is the canonical list of every third-party endpoint we call
