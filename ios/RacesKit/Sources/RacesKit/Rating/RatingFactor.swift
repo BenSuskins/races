@@ -32,6 +32,64 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
         case .trainerStrikeRate: return "Trainer strike rate"
         }
     }
+
+    /// One sentence on what this factor reads, in the terms a racegoer uses.
+    ///
+    /// Kept here beside `label` rather than in the app, so the Model screen and
+    /// the weights it describes cannot drift apart, and so the Linux job covers
+    /// the pairing.
+    public var summary: String {
+        switch self {
+        case .officialRating:
+            return "The handicapper's number. The strongest thing the free tier gives us."
+        case .handicapBandPosition:
+            return "Where the rating sits inside the race's own band — well in at the top, struggling at the bottom."
+        case .recentForm:
+            return "The form string, read right to left and weighted toward the most recent run."
+        case .wonLastTime:
+            return "Whether the last completed run was a win."
+        case .completionRate:
+            return "How often the horse finishes at all. It means far more over fences than on the Flat."
+        case .daysSinceLastRun:
+            return "Time off, scored as a bell rather than a line — a fortnight is better than three days or three months."
+        case .age:
+            return "Age against the race's own age band."
+        case .weightCarried:
+            return "Pounds carried, negated so less is better."
+        case .draw:
+            return "Stall number."
+        case .headgear:
+            return "Blinkers, a visor, a hood, cheekpieces."
+        case .jockeyStrikeRate:
+            return "The jockey's win rate in the app's own archive, shrunk toward the field average."
+        case .trainerStrikeRate:
+            return "The trainer's win rate in the app's own archive, shrunk toward the field average."
+        }
+    }
+
+    /// Why this factor carries the weight it does — and, for the four that ship
+    /// at zero, why the code is present and switched off.
+    ///
+    /// Shipping a factor at zero weight with its reasoning attached is a
+    /// deliberate choice: inventing a draw-bias table we cannot substantiate
+    /// would produce confident nonsense, and deleting the factor would lose the
+    /// work. This is the text that makes the zero legible rather than looking
+    /// like a bug.
+    public var rationale: String? {
+        switch self {
+        case .draw:
+            return "Draw bias is real, but it is a course × distance × going × field-size interaction. Without a bias table it is noise, so the code ships switched off."
+        case .headgear:
+            return "The signal is *first-time* headgear, and the free tier has no headgear history to detect it with."
+        case .jockeyStrikeRate, .trainerStrikeRate:
+            return "Legitimate, but derived from an archive that starts empty. It switches on once enough race days have been collected."
+        case .weightCarried:
+            return "Near zero on purpose: in a handicap, weight is the handicapper's equaliser, so it substantially double-counts the official rating."
+        case .officialRating, .handicapBandPosition, .recentForm, .wonLastTime,
+             .completionRate, .daysSinceLastRun, .age:
+            return nil
+        }
+    }
 }
 
 /// Why a factor produced no value. The distinction matters in the UI: "we don't

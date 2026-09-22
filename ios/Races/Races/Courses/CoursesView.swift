@@ -1,53 +1,59 @@
 import SwiftUI
 import RacesKit
 
-/// Every course, searchable, with today's card attached where there is one.
+/// Where the Racing tab pushes to reach the full course directory.
+///
+/// A route value rather than a `Bool` binding, so it lives in the same
+/// navigation stack as the card and a race opened from a course drills down
+/// normally. `nonisolated` because `NavigationLink(value:)` needs a plain
+/// `Hashable`, which an app-side type does not get by default — see CLAUDE.md.
+nonisolated struct CourseDirectoryRoute: Hashable, Sendable {}
+
+/// Every GB and Irish course, searchable, with today's card attached where there
+/// is one.
+///
+/// No longer a tab: iOS collapses a sixth tab into a "More" list, and burying
+/// Settings — where credentials are entered — to surface a reference list was the
+/// wrong trade. It is pushed from Racing instead, which is also where someone
+/// looking for a course actually starts. Racing's own search covers today's
+/// meetings; this covers the ones with no fixture, which is the only thing the
+/// card cannot tell you.
 struct CoursesView: View {
-    private let environment: AppEnvironment
     @State private var model: CoursesViewModel
     @State private var query = ""
 
     init(environment: AppEnvironment) {
-        self.environment = environment
         _model = State(initialValue: CoursesViewModel(environment: environment))
     }
 
     var body: some View {
-        NavigationStack {
-            StateContentView(state: model.state, retry: { await model.load() }) { listings in
-                List {
-                    if let cardUnavailable = model.cardUnavailable {
-                        Section {
-                            Label(
-                                cardUnavailable.errorDescription ?? "Today's card is unavailable.",
-                                systemImage: "info.circle")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
+        StateContentView(state: model.state, retry: { await model.load() }) { listings in
+            List {
+                if let cardUnavailable = model.cardUnavailable {
+                    Section {
+                        Label(
+                            cardUnavailable.errorDescription ?? "Today's card is unavailable.",
+                            systemImage: "info.circle")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
+                }
 
-                    ForEach(filtered(listings)) { listing in
-                        NavigationLink(value: listing) {
-                            CourseRow(listing: listing)
-                        }
+                ForEach(filtered(listings)) { listing in
+                    NavigationLink(value: listing) {
+                        CourseRow(listing: listing)
                     }
                 }
-                .searchable(text: $query, prompt: "Course name")
-                .overlay {
-                    if filtered(listings).isEmpty && !query.isEmpty {
-                        ContentUnavailableView.search(text: query)
-                    }
+            }
+            .searchable(text: $query, prompt: "Course name")
+            .overlay {
+                if filtered(listings).isEmpty && !query.isEmpty {
+                    ContentUnavailableView.search(text: query)
                 }
-                .refreshable { await model.load() }
             }
-            .navigationTitle("Courses")
-            .navigationDestination(for: CoursesViewModel.CourseListing.self) { listing in
-                CourseView(listing: listing)
-            }
-            .navigationDestination(for: Race.self) {
-                RaceView(race: $0, environment: environment)
-            }
+            .refreshable { await model.load() }
         }
+        .navigationTitle("All courses")
         .task { await model.loadIfNeeded() }
     }
 
@@ -82,8 +88,8 @@ private struct CourseRow: View {
     }
 }
 
-/// One course's card for today. Reached from the Courses tab.
-private struct CourseView: View {
+/// One course's card for today.
+struct CourseView: View {
     let listing: CoursesViewModel.CourseListing
 
     var body: some View {

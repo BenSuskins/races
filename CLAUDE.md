@@ -37,7 +37,8 @@ ios/Races/Races/
 ├── Components/    # StateContentView, ErrorStateView, RaceRow
 ├── Today/         # Today's and tomorrow's meetings
 ├── Tips/          # The model's selection per race
-├── Courses/       # Every course, searchable, with today's card attached
+├── Courses/       # Every course, searchable — pushed from Racing, not a tab
+├── Model/         # The algorithm on screen: weights, factors, guardrails
 ├── Race/          # Race card, runner detail, the factor breakdown
 ├── Record/        # Strike rate, favourite baseline, coverage
 ├── Settings/      # Credential entry, connection test, disclaimer
@@ -69,7 +70,21 @@ Three types carry the app's state, and each has one job:
   `AppEnvironment.refresh()` rather than the loader being replaced — see the
   gotcha below.
 
-Tabs are **Racing, Tips, Courses, Record, Settings**.
+Tabs are **Racing, Tips, Model, Record, Settings** — and five is the ceiling.
+iOS collapses a sixth into a "More" list, which would bury Settings, where
+credentials are entered. So the course directory is **pushed from Racing** rather
+than holding a tab: Racing's own search covers the meetings on today's card, and
+the directory covers the courses with no fixture, which is the only thing the
+card cannot tell you.
+
+**The Model tab is read-only, and that is a constraint rather than an omission.**
+`weightsID` is stamped onto every stored tip, so editing a weight without
+changing the id silently invalidates the accuracy history — and changing the id
+splits the record into two populations the Record tab would have to keep apart.
+Tuning belongs behind the back-test, which can say whether a changed weight is
+better or merely different. What the screen does show is everything: all twelve
+factors including the four at zero, α and β, the clip, the coverage floor and the
+form-scoring table.
 
 **Prices are fetched before tips are recorded, never after.** Recording is what
 seals a tip, so `TipsViewModel` loads the market first and hands the snapshots to
@@ -322,6 +337,13 @@ told their credentials are wrong rather than that a field is blank.
   `switch assessment.marketSource { case .none: … }` reads as three cases and is
   really `Optional.none` competing with pattern promotion; `guard let source`
   first and the three branches stay three branches.
+- **A factor shipped at zero weight needs its reason in the kit, not the view.**
+  `FactorID.summary` and `FactorID.rationale` sit beside `label` so the Model
+  screen and the weights it describes cannot drift, and so the Linux job covers
+  the pairing — `FactorDescriptionTests` fails if a new factor arrives without
+  copy, if `RatingWeights.v1` omits one, or if the set of deliberate zeros
+  changes. The failure mode it guards is silent: a weight on screen with nothing
+  explaining it looks like a finished row.
 - **Don't hand `Optional.map` a main-actor closure.** `configuration.racingAPI.map(makeRacingProvider)`
   is the natural way to write `AppEnvironment.refresh()` and it fails: `map` wants
   a nonisolated closure, so passing an isolated one loses the global actor. An
