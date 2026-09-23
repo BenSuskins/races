@@ -21,11 +21,11 @@ nonisolated struct CachedRacecards: Codable, Hashable, Sendable {
     let races: [Race]
 }
 
-/// Persistent state for the on-device learner. Training samples are frozen at tip
-/// time and only receive a winner after a result has settled, so the learner cannot
-/// accidentally train on information that was unavailable when the prediction was made.
+/// Persistent state for the on-device learner. Training inputs are frozen at tip
+/// time and only receive a winner after a result has settled.
 nonisolated struct OnDeviceTrainingState: Codable, Hashable, Sendable {
     var samples: [TrainingRace]
+    var pendingSnapshots: [String: TrainingRaceSnapshot]
     var activeWeights: RatingWeights
     var lastTrainingSampleCount: Int
     var configuration: WeightTrainingConfiguration
@@ -35,6 +35,7 @@ nonisolated struct OnDeviceTrainingState: Codable, Hashable, Sendable {
         configuration: WeightTrainingConfiguration = .init()
     ) {
         self.samples = []
+        self.pendingSnapshots = [:]
         self.activeWeights = activeWeights
         self.lastTrainingSampleCount = 0
         self.configuration = configuration
@@ -44,6 +45,7 @@ nonisolated struct OnDeviceTrainingState: Codable, Hashable, Sendable {
         guard !samples.contains(where: { $0.snapshot.raceID == snapshot.raceID }),
               snapshot.runnerIDs.contains(winnerID) else { return }
         samples.append(TrainingRace(snapshot: snapshot, winnerID: winnerID))
+        pendingSnapshots.removeValue(forKey: snapshot.raceID)
     }
 
     var settledCount: Int { samples.count }
@@ -53,7 +55,6 @@ actor RacesStore {
 
     private let documents: any DocumentStoring
     private var rater: RaceRater
-
     private var ledger = TipLedger()
     private var archive = ResultsArchive()
     private var training = OnDeviceTrainingState()
@@ -82,6 +83,8 @@ actor RacesStore {
     var tips: [TipRecord] { ledger.tips }
     var archivedRaceCount: Int { archive.raceCount }
     var hasArchive: Bool { archive.raceCount > 0 }
+    var activeWeights: RatingWeights { training.activeWeights }
+    var trainingRaceCount: Int { training.settledCount }
 
     func marketIDsAwaitingStartingPrice(now: Date = Date()) -> [String] {
         ledger.marketIDsAwaitingStartingPrice(now: now)
@@ -92,11 +95,6 @@ actor RacesStore {
     }
 
     func tip(forRace raceID: String) -> TipRecord? { ledger.tip(forRace: raceID) }
-
-    /// The currently active weights. Useful for the Model screen without exposing
-    /// the store's persistence implementation.
-    var activeWeights: RatingWeights { training.activeWeights }
-    var trainingRaceCount: Int { training.settledCount }
 
     func assess(
         _ race: Race,
@@ -115,10 +113,15 @@ actor RacesStore {
     ) async -> [String: RaceAssessment] {
         var assessments: [String: RaceAssessment] = [:]
         var stored = false
+        var trainingChanged = false
 
         for race in races {
             let assessment = assess(race, market: markets[race.id], now: now)
             assessments[race.id] = assessment
+            if let snapshot = assessment.trainingSnapshot {
+                training.pendingSnapshots[race.id] = snapshot
+                trainingChanged = true
+            }
             if ledger.record(
                 assessment,
                 race: race,
@@ -130,6 +133,7 @@ actor RacesStore {
         }
 
         if stored { await persistLedger() }
+        if trainingChanged { await persistTraining() }
         return assessments
     }
 
@@ -158,12 +162,10 @@ actor RacesStore {
                 ingestion.tipsSettled += 1
             }
 
-            // Only a complete, settled result can enter training. A void/non-runner
-            // does not tell us who won, so it cannot provide a learning target.
             if settled.outcome?.isSettled == true,
                let result = resultsByRaceID[tip.raceID],
                let winner = result.winner,
-               let snapshot = tipTrainingSnapshot(for: settled, original: tip) {
+               let snapshot = training.pendingSnapshots[tip.raceID] {
                 training.add(snapshot: snapshot, winnerID: winner.horseID)
             }
         }
@@ -186,6 +188,8 @@ actor RacesStore {
                 ingestion.modelRetrained = true
             }
             await persistTraining()
+        } else if ingestion.tipsSettled > 0 {
+            await persistTraining()
         }
 
         return ingestion
@@ -195,10 +199,6 @@ actor RacesStore {
         let threshold = training.configuration.minimumRaces
         guard training.settledCount >= threshold else { return false }
         return training.settledCount - training.lastTrainingSampleCount >= threshold
-    }
-
-    private func tipTrainingSnapshot(for settled: TipRecord, original: TipRecord) -> TrainingRaceSnapshot? {
-        settled.trainingSnapshot ?? original.trainingSnapshot
     }
 
     func cachedRacecards(day: String) async -> CachedRacecards? {
