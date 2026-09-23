@@ -83,9 +83,18 @@ public struct RunnerAssessment: Hashable, Sendable, Identifiable {
 
     /// How far the available price is from our fair price. Positive means we think
     /// the runner is bigger than it should be. Nil without a market.
+    ///
+    /// This is expected value per unit staked: `p(model) × odds - 1`.
     public var valueEdge: Double? {
         guard let marketBackPrice, marketBackPrice > 1 else { return nil }
         return winProbability * marketBackPrice - 1
+    }
+
+    /// Difference between the model's probability and the de-vigged market view.
+    /// Positive means the model is more bullish than the market.
+    public var probabilityEdge: Double? {
+        guard let marketProbability else { return nil }
+        return winProbability - marketProbability
     }
 
     public init(
@@ -123,8 +132,38 @@ public struct RaceAssessment: Hashable, Sendable {
     /// Runners in rank order, most fancied first.
     public let runners: [RunnerAssessment]
     public let confidence: AssessmentConfidence
+    /// Minimum positive expected value required before the model is allowed to
+    /// replace the market/favourite-led selection.
+    public let minimumValueEdge: Double
+    /// A probability floor that prevents tiny-probability longshots from winning
+    /// selection purely because their odds make the expected-value number large.
+    public let minimumValueProbability: Double
 
-    public var selection: RunnerAssessment? { runners.first }
+    /// The primary selection.
+    ///
+    /// With no usable market this remains the highest-probability runner. When a
+    /// usable price exists, however, the model first looks for a runner with a
+    /// meaningful positive expected value. This is deliberately a selection layer,
+    /// not a change to the calibrated probability ranking: the probabilities remain
+    /// useful for accuracy and log-loss measurement while the tip asks a different
+    /// question — "is there a price worth taking?"
+    public var selection: RunnerAssessment? {
+        guard !runners.isEmpty else { return nil }
+        guard !isFormOnly else { return runners.first }
+
+        let candidates = runners.filter { runner in
+            guard let edge = runner.valueEdge else { return false }
+            return edge >= minimumValueEdge
+                && runner.winProbability >= minimumValueProbability
+        }
+
+        return candidates.max { lhs, rhs in
+            if lhs.valueEdge != rhs.valueEdge {
+                return (lhs.valueEdge ?? -.infinity) < (rhs.valueEdge ?? -.infinity)
+            }
+            return lhs.winProbability < rhs.winProbability
+        } ?? runners.first
+    }
 
     /// True when no market anchored this race, so the rating rests on form alone.
     /// The UI says so rather than presenting a thinner assessment as an equal one.
@@ -155,7 +194,9 @@ public struct RaceAssessment: Hashable, Sendable {
         marketCoverage: Double,
         isMarketDelayed: Bool,
         runners: [RunnerAssessment],
-        confidence: AssessmentConfidence
+        confidence: AssessmentConfidence,
+        minimumValueEdge: Double = 0.05,
+        minimumValueProbability: Double = 0.08
     ) {
         self.raceID = raceID
         self.generatedAt = generatedAt
@@ -166,5 +207,7 @@ public struct RaceAssessment: Hashable, Sendable {
         self.isMarketDelayed = isMarketDelayed
         self.runners = runners
         self.confidence = confidence
+        self.minimumValueEdge = minimumValueEdge
+        self.minimumValueProbability = minimumValueProbability
     }
 }
