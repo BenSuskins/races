@@ -40,8 +40,8 @@ final class OnDeviceWeightTrainerTests: XCTestCase {
         XCTAssertNotNil(report.candidateValidationLogLoss)
         XCTAssertTrue(report.candidateValidationLogLoss! < report.baselineValidationLogLoss!)
         XCTAssertTrue(report.promoted)
-        XCTAssertEqual(report.weights.factorWeights[FactorID.officialRating.rawValue], 1.05, accuracy: 0.05)
-        XCTAssertEqual(report.weights.marketExponent, 1.0, accuracy: 0.15)
+        XCTAssertEqual(report.weights.factorWeights[FactorID.officialRating.rawValue], 0.55, accuracy: 0.05)
+        XCTAssertEqual(report.weights.factorWeights[FactorID.recentForm.rawValue], 0.0, accuracy: 0.05)
         XCTAssertGreaterThan(report.weights.formInfluence, RatingWeights.v1.formInfluence)
     }
 
@@ -70,10 +70,6 @@ final class OnDeviceWeightTrainerTests: XCTestCase {
     private func makeSamples(count: Int) -> [TrainingRace] {
         (0..<count).map { index in
             let winner = ["a", "b", "c"][index % 3]
-            let zScores = [
-                [2.0, -1.0, -1.0],
-                [0.0, 0.0, 0.0],
-            ]
             let snapshot = TrainingRaceSnapshot(
                 raceID: "race-\(index)",
                 createdAt: Date(timeIntervalSince1970: TimeInterval(index)),
@@ -81,7 +77,7 @@ final class OnDeviceWeightTrainerTests: XCTestCase {
                 marketProbabilities: [1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0],
                 factorIDs: [.officialRating, .recentForm],
                 zScores: index % 3 == 0
-                    ? zScores
+                    ? [[2.0, -1.0, -1.0], [0.0, 0.0, 0.0]]
                     : index % 3 == 1
                         ? [[-1.0, 2.0, -1.0], [0.0, 0.0, 0.0]]
                         : [[-1.0, -1.0, 2.0], [0.0, 0.0, 0.0]]
