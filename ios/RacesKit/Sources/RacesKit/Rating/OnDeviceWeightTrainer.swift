@@ -103,28 +103,12 @@ public enum OnDeviceWeightTrainer {
             .suffix(configuration.trainingWindow)
 
         guard eligible.count >= configuration.minimumRaces else {
-            return WeightTrainingReport(
-                trained: false,
-                settledRaceCount: eligible.count,
-                trainingLogLoss: nil,
-                baselineValidationLogLoss: nil,
-                candidateValidationLogLoss: nil,
-                promoted: false,
-                weights: current
-            )
+            return WeightTrainingReport(trained: false, settledRaceCount: eligible.count, trainingLogLoss: nil, baselineValidationLogLoss: nil, candidateValidationLogLoss: nil, promoted: false, weights: current)
         }
 
         let validationCount = min(configuration.validationRaces, max(1, eligible.count / 5))
         guard eligible.count - validationCount >= 100 else {
-            return WeightTrainingReport(
-                trained: false,
-                settledRaceCount: eligible.count,
-                trainingLogLoss: nil,
-                baselineValidationLogLoss: nil,
-                candidateValidationLogLoss: nil,
-                promoted: false,
-                weights: current
-            )
+            return WeightTrainingReport(trained: false, settledRaceCount: eligible.count, trainingLogLoss: nil, baselineValidationLogLoss: nil, candidateValidationLogLoss: nil, promoted: false, weights: current)
         }
 
         let split = eligible.count - validationCount
@@ -132,20 +116,17 @@ public enum OnDeviceWeightTrainer {
         let validation = Array(eligible.suffix(validationCount))
         let base = Parameters(from: current, factorIDs: commonFactorIDs(in: training))
         let fitted = fit(training, starting: base, configuration: configuration)
+        let candidate = fitted.makeWeights(from: current)
 
-        let candidate = fitted.makeWeights(from: current, factorIDs: base.factorIDs)
         let baselineLoss = logLoss(validation, parameters: base)
         let candidateLoss = logLoss(validation, parameters: fitted)
         let promoted = candidateLoss + configuration.minimumImprovement < baselineLoss
 
-        let promotedWeights: RatingWeights
+        var promotedWeights = current
         if promoted {
-            let version = "learned-\(Int(Date().timeIntervalSince1970))"
-            var promotedCandidate = candidate
-            promotedCandidate.id = version
-            promotedWeights = promotedCandidate
-        } else {
-            promotedWeights = current
+            var value = candidate
+            value.id = "learned-\(Int(Date().timeIntervalSince1970))"
+            promotedWeights = value
         }
 
         return WeightTrainingReport(
@@ -174,7 +155,7 @@ public enum OnDeviceWeightTrainer {
             self.formInfluence = weights.formInfluence
         }
 
-        func makeWeights(from original: RatingWeights, factorIDs: [FactorID]) -> RatingWeights {
+        func makeWeights(from original: RatingWeights) -> RatingWeights {
             var result = original
             let originalTotal = factorIDs.reduce(0) { $0 + max(0, original.weight(for: $1)) }
             let total = weights.reduce(0, +)
@@ -190,16 +171,10 @@ public enum OnDeviceWeightTrainer {
 
     private static func commonFactorIDs(in samples: [TrainingRace]) -> [FactorID] {
         guard let first = samples.first else { return [] }
-        return first.snapshot.factorIDs.filter { factor in
-            samples.allSatisfy { $0.snapshot.factorIDs.contains(factor) }
-        }
+        return first.snapshot.factorIDs.filter { factor in samples.allSatisfy { $0.snapshot.factorIDs.contains(factor) } }
     }
 
-    private static func fit(
-        _ samples: [TrainingRace],
-        starting: Parameters,
-        configuration: WeightTrainingConfiguration
-    ) -> Parameters {
+    private static func fit(_ samples: [TrainingRace], starting: Parameters, configuration: WeightTrainingConfiguration) -> Parameters {
         var p = starting
         guard !p.factorIDs.isEmpty else { return p }
 
@@ -211,21 +186,20 @@ public enum OnDeviceWeightTrainer {
             for sample in samples {
                 let result = probabilities(sample, parameters: p)
                 guard let winner = sample.snapshot.runnerIDs.firstIndex(of: sample.winnerID) else { continue }
-                let expected = result.enumerated().map { $0.element }
 
                 for factorIndex in p.weights.indices {
                     let z = zRow(sample, factorIndex: factorIndex, parameters: p)
-                    let mean = zip(z, expected).reduce(0) { $0 + $1.0 * $1.1 }
+                    let mean = zip(z, result).reduce(0) { $0 + $1.0 * $1.1 }
                     gradientWeights[factorIndex] += -p.formInfluence * (z[winner] - mean)
                 }
 
                 let marketLog = sample.snapshot.marketProbabilities.map { log(max($0, 1e-12)) }
-                let marketMean = zip(marketLog, expected).reduce(0) { $0 + $1.0 * $1.1 }
+                let marketMean = zip(marketLog, result).reduce(0) { $0 + $1.0 * $1.1 }
                 gradientAlpha += -(marketLog[winner] - marketMean)
 
-                let formScores = formScores(sample, parameters: p)
-                let formMean = zip(formScores, expected).reduce(0) { $0 + $1.0 * $1.1 }
-                gradientBeta += -(formScores[winner] - formMean)
+                let form = formScores(sample, parameters: p)
+                let formMean = zip(form, result).reduce(0) { $0 + $1.0 * $1.1 }
+                gradientBeta += -(form[winner] - formMean)
             }
 
             let n = Double(samples.count)
@@ -239,8 +213,8 @@ public enum OnDeviceWeightTrainer {
             gradientBeta = gradientBeta / n + configuration.regularisation * 2 * (p.formInfluence - starting.formInfluence)
             p.marketExponent -= configuration.learningRate * gradientAlpha
             p.formInfluence -= configuration.learningRate * gradientBeta
-            p.marketExponent = min(1.5, max(0.5, p.marketExponent))
-            p.formInfluence = min(0.90, max(0.05, p.formInfluence))
+            p.marketExponent = min(configuration.marketExponentRange.upperBound, max(configuration.marketExponentRange.lowerBound, p.marketExponent))
+            p.formInfluence = min(configuration.formInfluenceRange.upperBound, max(configuration.formInfluenceRange.lowerBound, p.formInfluence))
         }
         return p
     }
@@ -258,23 +232,16 @@ public enum OnDeviceWeightTrainer {
 
     private static func formScores(_ sample: TrainingRace, parameters: Parameters) -> [Double] {
         (0..<sample.snapshot.runnerIDs.count).map { runnerIndex in
-            parameters.factorIDs.enumerated().reduce(0) { total, pair in
-                let z = sample.snapshot.factorIDs.firstIndex(of: pair.element).flatMap { factorIndex in
-                    sample.snapshot.zScores.indices.contains(factorIndex) && sample.snapshot.zScores[factorIndex].indices.contains(runnerIndex)
-                        ? sample.snapshot.zScores[factorIndex][runnerIndex] : nil
-                } ?? 0
-                return total + pairIndexValue(pair) * z
+            parameters.weights.enumerated().reduce(0) { total, pair in
+                total + pair.element * zRow(sample, factorIndex: pair.offset, parameters: parameters)[runnerIndex]
             }
         }
     }
 
-    private static func pairIndexValue(_ pair: (offset: Int, element: FactorID)) -> Double {
-        // Kept as a helper so the reduction above remains explicit and easy to inspect.
-        return 0
-    }
-
     private static func zRow(_ sample: TrainingRace, factorIndex: Int, parameters: Parameters) -> [Double] {
-        guard let sourceIndex = sample.snapshot.factorIDs.firstIndex(of: parameters.factorIDs[factorIndex]) else {
+        guard parameters.factorIDs.indices.contains(factorIndex),
+              let sourceIndex = sample.snapshot.factorIDs.firstIndex(of: parameters.factorIDs[factorIndex]),
+              sample.snapshot.zScores.indices.contains(sourceIndex) else {
             return Array(repeating: 0, count: sample.snapshot.runnerIDs.count)
         }
         return sample.snapshot.zScores[sourceIndex]
