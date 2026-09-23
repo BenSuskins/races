@@ -103,6 +103,62 @@ between predicted and actual are reported alongside.
   wipe a day of tips, so a field of fewer than three is treated as "still looking"
   rather than as evidence.
 
+## Readings
+
+### 2026-09-22 — the first real one, form-only
+
+One racing day, recorded before the Betfair login was working. Kept here because
+the numbers are about to be cleared, and a day of real racing is not free.
+
+| | |
+|---|---|
+| Settled | 34 |
+| Won | 7 |
+| Strike rate | 20.6% |
+| 95% CI (Wilson) | **10.3% – 36.8%** |
+| Predicted strike rate | 23.9% |
+| Calibration gap | +3.3 pp overconfident (0.48 standard errors) |
+| Brier score | 0.154 |
+| Favourite baseline | **none** |
+| Agree / disagree | 0/0 |
+| ROI | none — no tip carried a `MarketReference` |
+
+**Every tip was form-only, so there is no benchmark and there never can be.**
+`agreesWithMarket` returns `nil` without a market favourite, and
+`favouriteOutcome` needs `marketFavouriteHorseID`, which is frozen onto the tip
+at sealing. No later Betfair connection can fill it in. The sealing rule is
+working exactly as designed, and the cost of that is a day whose strike rate can
+never be judged against anything.
+
+So **20.6% means very little on its own.** The interval spans poor to excellent.
+Quoted here as a record, not as a result.
+
+The one figure with any signal in it is the Brier score:
+
+| Forecast | Brier |
+|---|---|
+| The model | **0.1540** |
+| Best possible constant (0.206 every time) | 0.1635 |
+| What it actually said on average (0.239) | 0.1646 |
+
+A skill of **+0.0095** over the best constant forecast — the model did put higher
+probabilities on winners than on losers. It is a whisper at n = 34, and it is the
+first evidence the algorithm does anything at all.
+
+For scale on what a real answer costs: separating 20.6% from a 33% favourite
+baseline at 95% confidence needs roughly **96 settled tips per arm**; from 30%,
+roughly **162**.
+
+### A note for whoever reads the next one
+
+These 34 tips are about to be cleared rather than carried forward, and that is
+deliberate. Form-only and market-anchored are not the same algorithm — at
+κ > 0 the market is the anchor and form is the adjustment — so averaging them
+produces a number describing neither. Carrying them would also have left the
+model's strike rate computed over *these plus* the priced races while the
+favourite's was computed over the priced races alone, which is precisely the
+flattering asymmetry the three figures above exist to prevent.
+
 ## What "good" would look like
 
 Beating the favourite on strike rate over a few hundred settled tips, with
