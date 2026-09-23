@@ -31,7 +31,7 @@ public struct RaceRater: Sendable {
     public let weights: RatingWeights
     public let factors: [any RatingFactor]
 
-    public init(weights: RatingWeights = .v1, factors: [any RatingFactor]? = nil) {
+    public init(weights: RatingWeights = .v2, factors: [any RatingFactor]? = nil) {
         self.weights = weights
         self.factors = factors ?? RaceRater.defaultFactors(for: weights)
     }
