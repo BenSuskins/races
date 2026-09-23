@@ -13,25 +13,25 @@ import Foundation
 /// Probabilities stay in (0,1) and sum to 1 by construction, and each factor is a
 /// clean multiplicative nudge.
 ///
-/// But the property that actually matters is this: **at `β = 0` the output is the
-/// market exactly.** The model therefore cannot be accidentally worse than its own
-/// anchor without that being visible, and the only question worth asking — *is any
-/// of this doing anything?* — becomes a measurement rather than an opinion. There
-/// is a test asserting it, and the back-test enforces it.
+/// The probability model remains market-anchored. Selection is a separate layer:
+/// when a usable price exists, it prefers a runner with meaningful positive EV
+/// rather than automatically returning the highest-probability favourite. This
+/// preserves calibration metrics while making the actual tip answer the price
+/// question as well as the winner question.
 ///
 /// ## Purity
 ///
 /// Plain structs in, plain structs out. No network, no disk, no clock beyond an
 /// injectable timestamp. That is what lets the whole thing — and the back-test —
-/// run on Linux in seconds, and it is a rule worth defending.
+/// run on Linux in seconds, and is a rule worth defending.
 public struct RaceRater: Sendable {
 
-    public static let modelVersion = "market-anchored-1"
+    public static let modelVersion = "market-anchored-2"
 
     public let weights: RatingWeights
     public let factors: [any RatingFactor]
 
-    public init(weights: RatingWeights = .v1, factors: [any RatingFactor]? = nil) {
+    public init(weights: RatingWeights = .v2, factors: [any RatingFactor]? = nil) {
         self.weights = weights
         self.factors = factors ?? RaceRater.defaultFactors(for: weights)
     }
@@ -66,7 +66,9 @@ public struct RaceRater: Sendable {
             return RaceAssessment(
                 raceID: race.id, generatedAt: now, modelVersion: Self.modelVersion,
                 weightsID: weights.id, marketSource: nil, marketCoverage: 0,
-                isMarketDelayed: false, runners: [], confidence: .low
+                isMarketDelayed: false, runners: [], confidence: .low,
+                minimumValueEdge: weights.minimumValueEdge,
+                minimumValueProbability: weights.minimumValueProbability
             )
         }
 
@@ -139,7 +141,9 @@ public struct RaceRater: Sendable {
             marketCoverage: anchor.coverage,
             isMarketDelayed: market?.isDelayed ?? false,
             runners: assessments,
-            confidence: Self.confidence(of: assessments.map(\.winProbability), coverage: anchor.coverage)
+            confidence: Self.confidence(of: assessments.map(\.winProbability), coverage: anchor.coverage),
+            minimumValueEdge: weights.minimumValueEdge,
+            minimumValueProbability: weights.minimumValueProbability
         )
     }
 

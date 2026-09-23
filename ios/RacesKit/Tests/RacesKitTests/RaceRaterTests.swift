@@ -20,6 +20,43 @@ final class RaceRaterTests: XCTestCase {
     /// sum to exactly 1.00 would make the value-edge assertions knife-edge.
     private let fullMarket = TestRace.market(["a": 1.7, "b": 3.4, "c": 8.5, "d": 19.0])
 
+    private func assessedRunner(
+        _ id: String,
+        probability: Double,
+        odds: Double
+    ) -> RunnerAssessment {
+        RunnerAssessment(
+            horseID: id,
+            horseName: id,
+            clothNumber: nil,
+            marketProbability: 1 / odds,
+            marketBackPrice: odds,
+            formScore: 0,
+            winProbability: probability,
+            contributions: []
+        )
+    }
+
+    private func syntheticMarketAssessment(
+        runners: [RunnerAssessment],
+        minimumValueEdge: Double = 0.05,
+        minimumValueProbability: Double = 0.08
+    ) -> RaceAssessment {
+        RaceAssessment(
+            raceID: "synthetic",
+            generatedAt: Date(timeIntervalSince1970: 0),
+            modelVersion: RaceRater.modelVersion,
+            weightsID: "v2",
+            marketSource: .liveExchange,
+            marketCoverage: 1,
+            isMarketDelayed: false,
+            runners: runners,
+            confidence: .medium,
+            minimumValueEdge: minimumValueEdge,
+            minimumValueProbability: minimumValueProbability
+        )
+    }
+
     // MARK: - The property the whole design rests on
 
     /// **At β = 0 the model reproduces the market exactly.**
@@ -79,6 +116,67 @@ final class RaceRaterTests: XCTestCase {
         let market = try XCTUnwrap(favourite.marketProbability)
 
         XCTAssertEqual(favourite.winProbability, market, accuracy: 0.25)
+    }
+
+    // MARK: - Value-aware selection
+
+    func test_selectionPrefersMeaningfulPositiveValueOverTheFavourite() {
+        let assessment = syntheticMarketAssessment(runners: [
+            assessedRunner("favourite", probability: 0.40, odds: 2.20),
+            assessedRunner("value", probability: 0.30, odds: 4.50),
+            assessedRunner("longshot", probability: 0.09, odds: 15.0),
+        ])
+
+        XCTAssertEqual(assessment.selection?.horseID, "value")
+        XCTAssertGreaterThan(assessment.selection?.valueEdge ?? 0, 0.05)
+        XCTAssertNotEqual(assessment.selection?.horseID, assessment.marketFavourite?.horseID)
+    }
+
+    func test_selectionDoesNotChaseTinyProbabilityLongshots() {
+        let assessment = syntheticMarketAssessment(runners: [
+            assessedRunner("favourite", probability: 0.45, odds: 2.20),
+            assessedRunner("solid", probability: 0.15, odds: 7.0),
+            assessedRunner("longshot", probability: 0.04, odds: 30.0),
+        ])
+
+        XCTAssertEqual(assessment.selection?.horseID, "solid")
+    }
+
+    func test_selectionFallsBackToHighestProbabilityWhenNoRunnerClearsValueThreshold() {
+        let assessment = syntheticMarketAssessment(runners: [
+            assessedRunner("favourite", probability: 0.40, odds: 2.20),
+            assessedRunner("second", probability: 0.30, odds: 3.20),
+            assessedRunner("third", probability: 0.20, odds: 5.0),
+        ])
+
+        XCTAssertTrue(assessment.runners.allSatisfy { ($0.valueEdge ?? 0) < 0.05 })
+        XCTAssertEqual(assessment.selection?.horseID, "favourite")
+    }
+
+    func test_formOnlySelectionRemainsHighestProbabilityRunner() {
+        let runners = [
+            assessedRunner("a", probability: 0.45, odds: 2.0),
+            assessedRunner("b", probability: 0.35, odds: 4.0),
+        ]
+        let assessment = RaceAssessment(
+            raceID: "synthetic",
+            generatedAt: Date(timeIntervalSince1970: 0),
+            modelVersion: RaceRater.modelVersion,
+            weightsID: "v2",
+            marketSource: nil,
+            marketCoverage: 0,
+            isMarketDelayed: false,
+            runners: runners,
+            confidence: .medium
+        )
+
+        XCTAssertEqual(assessment.selection?.horseID, "a")
+    }
+
+    func test_probabilityEdgeIsTheModelDisagreementWithTheMarket() throws {
+        let runner = assessedRunner("value", probability: 0.30, odds: 4.0)
+        XCTAssertEqual(try XCTUnwrap(runner.probabilityEdge), 0.05, accuracy: 0.000001)
+        XCTAssertEqual(try XCTUnwrap(runner.valueEdge), 0.20, accuracy: 0.000001)
     }
 
     // MARK: - No market
@@ -182,11 +280,13 @@ final class RaceRaterTests: XCTestCase {
     // MARK: - Provenance
 
     func test_theAssessmentStampsItsOwnIdentity() {
-        let assessment = RaceRater(weights: .v1).rate(fourRunnerHandicap(), market: fullMarket)
+        let assessment = RaceRater(weights: .v2).rate(fourRunnerHandicap(), market: fullMarket)
 
         XCTAssertEqual(assessment.modelVersion, RaceRater.modelVersion)
-        XCTAssertEqual(assessment.weightsID, "v1")
+        XCTAssertEqual(assessment.weightsID, "v2")
         XCTAssertEqual(assessment.raceID, "rac_test")
+        XCTAssertEqual(assessment.minimumValueEdge, 0.05, accuracy: 0.000001)
+        XCTAssertEqual(assessment.minimumValueProbability, 0.08, accuracy: 0.000001)
     }
 
     func test_theMarketFavouriteIsIdentifiedSeparatelyFromTheSelection() throws {
