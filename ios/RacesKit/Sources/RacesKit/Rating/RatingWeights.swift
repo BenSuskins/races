@@ -53,6 +53,14 @@ public struct RatingWeights: Codable, Hashable, Sendable {
     /// runs for a given jockey or trainer.
     public var minimumStrikeRateSample: Int
 
+    /// Minimum model expected value required to prefer a priced runner over the
+    /// ordinary highest-probability selection.
+    public var minimumValueEdge: Double
+
+    /// Minimum model win probability for a value selection. This prevents a very
+    /// large price from winning selection on a tiny model probability alone.
+    public var minimumValueProbability: Double
+
     public init(
         id: String,
         marketExponent: Double = 1.0,
@@ -67,7 +75,9 @@ public struct RatingWeights: Codable, Hashable, Sendable {
         formSeasonBreakPenalty: Double = 0.80,
         formLongBreakPenalty: Double = 0.50,
         formMaxRuns: Int = 6,
-        minimumStrikeRateSample: Int = 30
+        minimumStrikeRateSample: Int = 30,
+        minimumValueEdge: Double = 0.05,
+        minimumValueProbability: Double = 0.08
     ) {
         self.id = id
         self.marketExponent = marketExponent
@@ -83,6 +93,8 @@ public struct RatingWeights: Codable, Hashable, Sendable {
         self.formLongBreakPenalty = formLongBreakPenalty
         self.formMaxRuns = formMaxRuns
         self.minimumStrikeRateSample = minimumStrikeRateSample
+        self.minimumValueEdge = minimumValueEdge
+        self.minimumValueProbability = minimumValueProbability
     }
 
     public func weight(for id: FactorID) -> Double {
@@ -115,7 +127,7 @@ public struct RatingWeights: Codable, Hashable, Sendable {
     /// *is* the handicapper's equaliser, so it substantially double-counts the
     /// official rating. It is left as a placeholder for the back-test to settle.
     public static let v1 = RatingWeights(
-        id: "v1",
+        id: "v2",
         factorWeights: [
             FactorID.officialRating.rawValue: 0.30,
             FactorID.handicapBandPosition.rawValue: 0.20,
@@ -129,7 +141,9 @@ public struct RatingWeights: Codable, Hashable, Sendable {
             FactorID.headgear.rawValue: 0.00,
             FactorID.jockeyStrikeRate.rawValue: 0.00,
             FactorID.trainerStrikeRate.rawValue: 0.00,
-        ]
+        ],
+        minimumValueEdge: 0.05,
+        minimumValueProbability: 0.08
     )
 
     /// The market, unmodified. Not a real configuration — it is the control the
