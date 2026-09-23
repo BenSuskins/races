@@ -71,13 +71,77 @@ struct BetfairMarketCatalogue: Decodable {
         let timezone: String?
     }
 
+    /// Betfair documents metadata as string values, but the live feed can
+    /// contain numeric/null values. The app consumes metadata as strings, so
+    /// coerce scalar values instead of letting one odd field invalidate a
+    /// whole catalogue.
+    private enum MetadataValue: Decodable {
+        case string(String)
+        case int(Int64)
+        case double(Double)
+        case bool(Bool)
+        case null
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            if container.decodeNil() {
+                self = .null
+            } else if let value = try? container.decode(String.self) {
+                self = .string(value)
+            } else if let value = try? container.decode(Int64.self) {
+                self = .int(value)
+            } else if let value = try? container.decode(Double.self) {
+                self = .double(value)
+            } else if let value = try? container.decode(Bool.self) {
+                self = .bool(value)
+            } else {
+                throw DecodingError.typeMismatch(
+                    MetadataValue.self,
+                    DecodingError.Context(
+                        codingPath: decoder.codingPath,
+                        debugDescription: "Expected a scalar Betfair metadata value"))
+            }
+        }
+
+        var stringValue: String? {
+            switch self {
+            case .string(let value): return value
+            case .int(let value): return String(value)
+            case .double(let value): return String(value)
+            case .bool(let value): return String(value)
+            case .null: return nil
+            }
+        }
+    }
+
     struct RunnerCatalog: Decodable {
         let selectionId: Int64
         let runnerName: String?
         let status: String?
-        /// `CLOTH_NUMBER`, `FORM`, `JOCKEY_NAME` and friends. Every value
-        /// arrives as a string, including the numeric ones.
+        /// `CLOTH_NUMBER`, `FORM`, `JOCKEY_NAME` and friends. Values are
+        /// normally strings, but the decoder tolerates numeric/null values.
         let metadata: [String: String]?
+
+        private enum CodingKeys: String, CodingKey {
+            case selectionId
+            case runnerName
+            case status
+            case metadata
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            selectionId = try container.decode(Int64.self, forKey: .selectionId)
+            runnerName = try container.decodeIfPresent(String.self, forKey: .runnerName)
+            status = try container.decodeIfPresent(String.self, forKey: .status)
+
+            guard let raw = try container.decodeIfPresent(
+                [String: MetadataValue].self, forKey: .metadata) else {
+                metadata = nil
+                return
+            }
+            metadata = raw.compactMapValues(\.stringValue)
+        }
     }
 
     let marketId: String
