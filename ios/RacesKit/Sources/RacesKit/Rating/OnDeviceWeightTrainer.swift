@@ -29,9 +29,6 @@ public struct TrainingRaceSnapshot: Codable, Hashable, Sendable {
     }
 }
 
-/// A settled, market-anchored race used for learning. Only races for which the
-/// complete field and a winner are known are admitted, so a truncated result cannot
-/// teach the model that every omitted runner lost.
 public struct TrainingRace: Codable, Hashable, Sendable {
     public let snapshot: TrainingRaceSnapshot
     public let winnerID: String
@@ -86,10 +83,10 @@ public struct WeightTrainingReport: Hashable, Sendable {
 
 /// Small, deterministic optimiser intended to run on an iPhone, not a server.
 ///
-/// It learns the factor weights plus the market/form blend from settled races. The
+/// It learns factor weights plus the market/form blend from settled races. The
 /// objective is multiclass log loss, with L2 regularisation toward the current
-/// weights. Training is walk-forward: the newest validation races are never used to
-/// fit the candidate that is evaluated on them.
+/// weights. The newest validation races are never used to fit the candidate that is
+/// evaluated on them.
 public enum OnDeviceWeightTrainer {
 
     public static func train(
@@ -125,7 +122,8 @@ public enum OnDeviceWeightTrainer {
         var promotedWeights = current
         if promoted {
             var value = candidate
-            value.id = "learned-\(Int(Date().timeIntervalSince1970))"
+            let stamp = eligible.last?.snapshot.createdAt.timeIntervalSince1970 ?? 0
+            value.id = "learned-\(Int(stamp))-\(eligible.count)"
             promotedWeights = value
         }
 
@@ -269,7 +267,6 @@ public enum OnDeviceWeightTrainer {
             sample.snapshot.runnerIDs.contains(sample.winnerID)
     }
 
-    /// Euclidean projection onto the non-negative unit simplex.
     private static func projectSimplex(_ values: inout [Double]) {
         guard !values.isEmpty else { return }
         let sorted = values.sorted(by: >)
