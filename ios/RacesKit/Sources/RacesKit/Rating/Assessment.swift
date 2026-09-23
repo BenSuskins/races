@@ -4,15 +4,9 @@ import Foundation
 public struct FactorContribution: Codable, Hashable, Sendable, Identifiable {
     public let factor: FactorID
     public let label: String
-    /// What the factor read, e.g. "OR 82".
     public let detail: String
-    /// The runner's standing within this race on this factor, or nil when the
-    /// factor had nothing to say.
     public let zScore: Double?
     public let weight: Double
-    /// Effect on the win chance, computed leave-one-out: the difference between
-    /// this runner's probability and what it would have been with this factor
-    /// neutralised.
     public let probabilityDelta: Double
     public let availability: FactorAvailability
 
@@ -47,8 +41,6 @@ public struct FactorContribution: Codable, Hashable, Sendable, Identifiable {
     }
 }
 
-/// How much to trust a race's assessment. Not a claim about the horse — a claim
-/// about how much the model actually had to work with.
 public enum AssessmentConfidence: String, Codable, Hashable, Sendable, CaseIterable {
     case low, medium, high
 
@@ -65,33 +57,25 @@ public struct RunnerAssessment: Hashable, Sendable, Identifiable {
     public let horseID: String
     public let horseName: String
     public let clothNumber: Int?
-    /// The market's own view, de-vigged. Nil when there was no usable market.
     public let marketProbability: Double?
     public let marketBackPrice: Double?
-    /// The weighted sum of standardised factors. Zero is "exactly average for this
-    /// race", which is also what a runner we know nothing about scores.
     public let formScore: Double
     public let winProbability: Double
     public let contributions: [FactorContribution]
 
     public var id: String { horseID }
 
-    /// The price at which this chance would be a break-even bet.
     public var fairOdds: Double {
         winProbability > 0 ? 1 / winProbability : .infinity
     }
 
-    /// How far the available price is from our fair price. Positive means we think
-    /// the runner is bigger than it should be. Nil without a market.
-    ///
-    /// This is expected value per unit staked: `p(model) × odds - 1`.
+    /// Expected value per unit staked: `p(model) × odds - 1`.
     public var valueEdge: Double? {
         guard let marketBackPrice, marketBackPrice > 1 else { return nil }
         return winProbability * marketBackPrice - 1
     }
 
     /// Difference between the model's probability and the de-vigged market view.
-    /// Positive means the model is more bullish than the market.
     public var probabilityEdge: Double? {
         guard let marketProbability else { return nil }
         return winProbability - marketProbability
@@ -118,35 +102,26 @@ public struct RunnerAssessment: Hashable, Sendable, Identifiable {
     }
 }
 
-/// A whole race, rated.
 public struct RaceAssessment: Hashable, Sendable {
     public let raceID: String
     public let generatedAt: Date
-    /// The algorithm's identity, stamped onto every tip so that changing the model
-    /// cannot silently invalidate the accuracy history.
     public let modelVersion: String
     public let weightsID: String
     public let marketSource: MarketSnapshot.Source?
     public let marketCoverage: Double
     public let isMarketDelayed: Bool
-    /// Runners in rank order, most fancied first.
     public let runners: [RunnerAssessment]
     public let confidence: AssessmentConfidence
+
+    /// The snapshot of model inputs available at tip time. The outcome is deliberately
+    /// absent and is attached only after the race settles.
+    public let trainingSnapshot: TrainingRaceSnapshot?
+
     /// Minimum positive expected value required before the model is allowed to
-    /// replace the market/favourite-led selection.
+    /// replace the ordinary highest-probability selection.
     public let minimumValueEdge: Double
-    /// A probability floor that prevents tiny-probability longshots from winning
-    /// selection purely because their odds make the expected-value number large.
     public let minimumValueProbability: Double
 
-    /// The primary selection.
-    ///
-    /// With no usable market this remains the highest-probability runner. When a
-    /// usable price exists, however, the model first looks for a runner with a
-    /// meaningful positive expected value. This is deliberately a selection layer,
-    /// not a change to the calibrated probability ranking: the probabilities remain
-    /// useful for accuracy and log-loss measurement while the tip asks a different
-    /// question — "is there a price worth taking?"
     public var selection: RunnerAssessment? {
         guard !runners.isEmpty else { return nil }
         guard !isFormOnly else { return runners.first }
@@ -165,21 +140,14 @@ public struct RaceAssessment: Hashable, Sendable {
         } ?? runners.first
     }
 
-    /// True when no market anchored this race, so the rating rests on form alone.
-    /// The UI says so rather than presenting a thinner assessment as an equal one.
     public var isFormOnly: Bool { marketSource == nil }
 
-    /// The market's own favourite, for the comparison that matters most: if the
-    /// model cannot beat simply backing this, it is not doing anything.
     public var marketFavourite: RunnerAssessment? {
         runners
             .filter { $0.marketProbability != nil }
             .max { ($0.marketProbability ?? 0) < ($1.marketProbability ?? 0) }
     }
 
-    /// Whether the model's selection is just the favourite. When it is, the model
-    /// contributed nothing to this race — which is worth tracking separately,
-    /// because all of its actual information is in the races where it disagreed.
     public var agreesWithMarket: Bool? {
         guard let selection, let favourite = marketFavourite else { return nil }
         return selection.horseID == favourite.horseID
@@ -195,6 +163,7 @@ public struct RaceAssessment: Hashable, Sendable {
         isMarketDelayed: Bool,
         runners: [RunnerAssessment],
         confidence: AssessmentConfidence,
+        trainingSnapshot: TrainingRaceSnapshot? = nil,
         minimumValueEdge: Double = 0.05,
         minimumValueProbability: Double = 0.08
     ) {
@@ -207,6 +176,7 @@ public struct RaceAssessment: Hashable, Sendable {
         self.isMarketDelayed = isMarketDelayed
         self.runners = runners
         self.confidence = confidence
+        self.trainingSnapshot = trainingSnapshot
         self.minimumValueEdge = minimumValueEdge
         self.minimumValueProbability = minimumValueProbability
     }
