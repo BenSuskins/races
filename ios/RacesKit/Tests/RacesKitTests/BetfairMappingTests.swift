@@ -35,6 +35,36 @@ final class BetfairMappingTests: XCTestCase {
 
     // MARK: - Markets
 
+    func test_runnerMetadataAcceptsNumericAndNullValues() throws {
+        let data = Data(#"""
+        [{
+          "marketId": "1.1",
+          "marketName": "Test",
+          "marketStartTime": "2026-09-22T13:45:00.000Z",
+          "event": { "venue": "Ascot" },
+          "runners": [{
+            "selectionId": 123,
+            "runnerName": "1. Horse",
+            "status": "ACTIVE",
+            "metadata": {
+              "CLOTH_NUMBER": 7,
+              "OFFICIAL_RATING": 118,
+              "JOCKEY_NAME": "A Jockey",
+              "SOME_NULL_FIELD": null
+            }
+          }]
+        }]
+        """#.utf8)
+
+        let catalogue = try JSONDecoder().decode([BetfairMarketCatalogue].self, from: data)
+        let metadata = try XCTUnwrap(catalogue[0].runners?[0].metadata)
+
+        XCTAssertEqual(metadata["CLOTH_NUMBER"], "7")
+        XCTAssertEqual(metadata["OFFICIAL_RATING"], "118")
+        XCTAssertEqual(metadata["JOCKEY_NAME"], "A Jockey")
+        XCTAssertNil(metadata["SOME_NULL_FIELD"])
+    }
+
     func test_runnerNamesKeepTheirDecorationForTheNormaliserToStrip() throws {
         let market = try XCTUnwrap(BetfairMapping.exchangeMarket(from: try catalogues()[0]))
 
