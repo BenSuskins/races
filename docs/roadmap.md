@@ -7,7 +7,66 @@ work that is actually left, with the dependencies between the items made explici
 Each item says **who owns it**, since several need a device, real credentials or a
 billing decision rather than a commit.
 
-Updated 2026-09-22.
+Updated 2026-09-24, when the Go server replaced the on-device pipeline.
+
+---
+
+## The server — deploy and follow-ups
+
+The Go server (`server/`) now owns the providers, rating, sealing, settlement,
+retraining and back-tests; the app reads from it. What is left to make that real:
+
+### Deploy it
+
+**Owner: Ben. Needs the vault and the homelab.**
+
+1. Add to `~/.ansible/vault.yml`: `RACES_API_TOKEN` (any long random string —
+   `openssl rand -hex 32`), `RACING_API_USERNAME`, `RACING_API_PASSWORD`, and
+   optionally `BETFAIR_APP_KEY`, `BETFAIR_USERNAME`, `BETFAIR_PASSWORD`.
+2. Merge the homelab PR and let `update.yml` deploy `races-server` to the
+   `docker` host. The image comes from this repo's `server.yml`, which needs
+   Actions minutes to run on `main` (see the live blocker below).
+3. Check `https://races-api.suskins.co.uk/healthz` from home and over Tailscale.
+4. On each phone: Settings → server token → **Test connection**, then **Upload
+   history**. The Record tab should show the same figures it did before, now
+   labelled as uploaded.
+
+### Back up `races.db`
+
+**Owner: Claude, once asked. The top open risk.**
+
+The database is the only copy of every result the free tier cannot re-fetch.
+There is no backup, by choice at the time. `store.Backup` already does an online
+`VACUUM INTO`; the homelab's `wedding-db-backup` task (nightly, 14 days,
+stale-backup alert) is the pattern to copy, ideally with a copy off the host.
+
+### Delete the Swift rater and provider clients
+
+**Owner: Claude. Depends on `ServerParityTests` having passed once.**
+
+The app no longer calls `Providers/`, `Matching/` (bar `CourseNameNormaliser`),
+the rater or `OnDeviceWeightTrainer`. They stay only so `ServerParityTests` can
+prove the Go port produces the same numbers. Once that test has run green —
+on the Linux job or locally — they can go, with their tests.
+
+### RacesKit's trainer tests cannot pass
+
+**Owner: Claude. Found during the port.**
+
+`OnDeviceWeightTrainer` refuses to fit below 100 training races whatever the
+configuration says, and its tests use 40. The Go port keeps the guard and tests
+at 150. The Swift tests need the same change (or the guard a configuration
+knob), or they will be red the next time the kit job runs.
+
+### Forecast prices need `SP_PROJECTED`
+
+**Owner: Claude, after the Betfair spike.**
+
+The price join reads `sp.nearPrice` as the forecast anchor for tomorrow's thin
+markets, but `listMarketBook` is only asked for `EX_BEST_OFFERS`, and Betfair
+returns `nearPrice` only for `SP_PROJECTED`. The port kept the request identical
+to the Swift client on purpose; adding the projection is a one-line change to
+`betfair.Client.Prices` and `docs/providers.md` together.
 
 ---
 
@@ -67,7 +126,10 @@ are outside this environment's network policy.
 
 ### 2. Back-test harness and CI job
 
-**Owner: Claude. Depends on item 1 for the model arm, item 4 for the control arm.**
+**Owner: Claude. Partly built: `POST /v1/backtests` on the server re-rates every
+sealed race from its stored card and seal-time prices, and scores every frozen
+snapshot, against the market. What is left is the CI assertion over real
+history, which depends on item 1 for fixtures and item 4 for the control arm.**
 
 Runs the rater over past races with known results and reports strike rate, ROI,
 the favourite baseline and log loss for the model and for the market. Pure and

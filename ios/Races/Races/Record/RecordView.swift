@@ -9,7 +9,6 @@ import RacesKit
 /// good, so a record built from a partial sample cannot pass as a full one.
 struct RecordView: View {
     @State private var model: RecordViewModel
-    @State private var isConfirmingClear = false
 
     init(environment: AppEnvironment) {
         _model = State(initialValue: RecordViewModel(environment: environment))
@@ -22,7 +21,7 @@ struct RecordView: View {
                     ContentUnavailableView(
                         "No tips yet",
                         systemImage: "chart.line.uptrend.xyaxis",
-                        description: Text("Open the Tips tab on a race day and the model's selections start being recorded here. Come back after racing to fill in the results."))
+                        description: Text("The server records a tip for every race five minutes before the off and settles it after racing. History from before the server can be uploaded in Settings."))
                 } else {
                     List {
                         headline(report)
@@ -30,7 +29,7 @@ struct RecordView: View {
                         split(report)
                         calibration(report)
                         coverage(report)
-                        maintenance
+                        footer
                     }
                     .refreshable { await model.refresh() }
                 }
@@ -63,8 +62,10 @@ struct RecordView: View {
         } header: {
             Text("The model")
         } footer: {
-            if let ingestion = model.lastIngestion, ingestion.changedAnything {
-                Text("Last fetch: \(ingestion.newRacesArchived) races archived, \(ingestion.tipsSettled) tips settled.")
+            if let staleSince = model.staleSince {
+                Text("Couldn't reach the server — showing the record saved \(staleSince.formatted(date: .omitted, time: .shortened)).")
+            } else if model.uploadedTipCount > 0 {
+                Text("Includes \(model.uploadedTipCount) tips uploaded from this phone's history before the server existed.")
             }
         }
     }
@@ -163,28 +164,16 @@ struct RecordView: View {
         } header: {
             Text("Coverage")
         } footer: {
-            Text("Free results cover today only, so a race day the app never sees is a result lost for good. Those tips expire and are counted here rather than dropped — otherwise the record would quietly become a flattering subsample.")
+            Text("Free results cover today only. The server polls them all evening, but a day it misses is a result lost for good. Those tips expire and are counted here rather than dropped — otherwise the record would quietly become a flattering subsample.")
         }
     }
 
     @ViewBuilder
-    private var maintenance: some View {
+    private var footer: some View {
         Section {
-            Button("Clear history", role: .destructive) { isConfirmingClear = true }
+            EmptyView()
         } footer: {
-            Text("For information only. Not betting advice.")
-        }
-        .confirmationDialog(
-            "Clear the whole record?",
-            isPresented: $isConfirmingClear,
-            titleVisibility: .visible
-        ) {
-            Button("Clear history", role: .destructive) {
-                Task { await model.clearHistory() }
-            }
-            Button("Keep it", role: .cancel) {}
-        } message: {
-            Text("Every tip and archived result is deleted. Free results are today-only, so this cannot be rebuilt — it starts again from the next race day. Your credentials are not affected.")
+            Text("For information only. Not betting advice. The record lives on the server; nothing here can delete it.")
         }
     }
 

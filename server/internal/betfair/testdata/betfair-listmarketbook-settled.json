@@ -1,0 +1,13 @@
+[
+  {
+    "marketId": "1.245678901",
+    "status": "CLOSED",
+    "isMarketDataDelayed": true,
+    "runners": [
+      { "selectionId": 12345678, "status": "WINNER", "sp": { "actualSP": 2.64 } },
+      { "selectionId": 22345678, "status": "LOSER", "sp": { "actualSP": 5.2 } },
+      { "selectionId": 32345678, "status": "REMOVED", "sp": { "actualSP": 0 } },
+      { "selectionId": 42345678, "status": "LOSER", "sp": {} }
+    ]
+  }
+]

@@ -1,17 +1,13 @@
 import Foundation
 import RacesKit
 
-/// Today's selections, one per race.
+/// The model's selection for every race still to run today.
 ///
-/// Assessing and recording happen together and on every refresh, which is what
-/// the sealing rule needs: a tip is a draft that keeps being revised until five
-/// minutes before the off, and then the last draft becomes the record. A screen
-/// that only assessed on first open would seal whatever the card looked like that
-/// morning.
-///
-/// Races that have already run are dropped rather than rated. `TipLedger` would
-/// refuse to record them anyway, and showing a selection for a finished race
-/// invites reading it as a tip that was never given.
+/// The server rates the whole card and seals each tip five minutes before the
+/// off whether or not a phone is looking, so this screen only reads. It used to
+/// record — and had to fetch prices first, and had to record the whole card
+/// rather than the races that looked interesting — and all of that now happens
+/// in one place, on the server, on a clock.
 @Observable
 @MainActor
 final class TipsViewModel {
@@ -19,25 +15,17 @@ final class TipsViewModel {
     nonisolated struct Selection: Identifiable, Hashable, Sendable {
         let race: Race
         let assessment: RaceAssessment
-        /// Whether this one is now immutable.
         let isSealed: Bool
 
         var id: String { race.id }
         var selection: RunnerAssessment? { assessment.selection }
     }
 
-    /// How much of the card the exchange actually priced.
-    ///
-    /// Shown whether or not it flatters. A card where two races in twenty
-    /// matched is a card where eighteen tips are form-only, and a screen that
-    /// only reported the good case would make the model look better anchored
-    /// than it is.
+    /// How much of the card is anchored to the market. "Matched a market" and
+    /// "has prices" are different claims; this counts the second.
     nonisolated struct MarketCoverage: Equatable, Sendable {
         let pricedRaces: Int
         let totalRaces: Int
-        /// Why there are no prices at all, when that is the situation. Absent
-        /// when Betfair answered and the races simply did not match.
-        let failure: APIError?
 
         var isComplete: Bool { totalRaces > 0 && pricedRaces == totalRaces }
         var hasAny: Bool { pricedRaces > 0 }
@@ -46,33 +34,19 @@ final class TipsViewModel {
     private(set) var state: ViewState<[Selection]> = .idle
     private(set) var archivedRaceCount = 0
     private(set) var marketCoverage: MarketCoverage?
+    /// Non-nil when the card on screen came from disk after a failed refresh.
+    private(set) var staleSince: Date?
 
-    private let loader: RacecardLoader?
-    private let markets: MarketLoader?
-    private let store: RacesStore?
-    private let unavailable: APIError?
+    private let loader: RacecardLoader
     private let now: () -> Date
 
-    init(
-        loader: RacecardLoader?,
-        markets: MarketLoader?,
-        store: RacesStore?,
-        unavailable: APIError?,
-        now: @escaping () -> Date = Date.init
-    ) {
+    init(loader: RacecardLoader, now: @escaping () -> Date = Date.init) {
         self.loader = loader
-        self.markets = markets
-        self.store = store
-        self.unavailable = unavailable
         self.now = now
     }
 
     convenience init(environment: AppEnvironment) {
-        self.init(
-            loader: environment.makeRacecardLoader(),
-            markets: environment.marketLoader,
-            store: environment.store,
-            unavailable: environment.credentialsFailure)
+        self.init(loader: environment.racecards)
     }
 
     func loadIfNeeded() async {
@@ -81,58 +55,35 @@ final class TipsViewModel {
     }
 
     func load(forceRefresh: Bool = false) async {
-        if let unavailable {
-            state = .failed(unavailable)
-            return
-        }
-        guard let loader, let store else {
-            state = .failed(.notConfigured(provider: "The Racing API"))
-            return
-        }
-
         if state.value == nil { state = .loading }
+        // Compare against the injected instant, never `Race.hasStarted`, which
+        // reads the real clock and would make every 1970 fixture look run.
         let moment = now()
-
         do {
             let load = try await loader.load(day: .today, forceRefresh: forceRefresh, now: moment)
-            await store.loadIfNeeded()
-
-            let upcoming = load.races.filter { !Self.hasStarted($0, by: moment) }
-
-            // Prices first, then one assess-and-record pass over the whole card.
-            // Recording is what seals a tip, so the market has to be in hand
-            // before it happens — a tip sealed form-only and re-rated with
-            // prices afterwards would be a record of something we never showed.
-            let market = await markets?.load(
-                races: upcoming, day: .today, forceRefresh: forceRefresh, now: moment)
-            let snapshots = market?.snapshots ?? [:]
-
-            let assessments = await store.assessAndRecord(
-                upcoming,
-                markets: snapshots,
-                // Wider than `snapshots`: a race that matched but had nothing
-                // priced yet still settles with a Betfair SP later, and that is
-                // the ROI figure.
-                references: market?.references ?? [:],
-                now: moment)
+            let upcoming = load.races
+                .filter { !Self.hasStarted($0, by: moment) }
+                .sorted(by: Self.byOffTime)
 
             var selections: [Selection] = []
-            for race in upcoming.sorted(by: Self.byOffTime) {
-                guard let assessment = assessments[race.id],
+            var priced = 0
+            for race in upcoming {
+                guard let assessment = load.card.assessments[race.id],
                       assessment.selection != nil else { continue }
-                let sealed = await store.tip(forRace: race.id)?.isSealed ?? false
-                selections.append(
-                    Selection(race: race, assessment: assessment, isSealed: sealed))
+                if !assessment.isFormOnly { priced += 1 }
+                selections.append(Selection(
+                    race: race,
+                    assessment: assessment,
+                    isSealed: load.card.tips[race.id]?.isSealed ?? false))
             }
 
             state = .loaded(selections)
-            archivedRaceCount = await store.archivedRaceCount
-            marketCoverage = MarketCoverage(
-                pricedRaces: snapshots.count,
-                totalRaces: upcoming.count,
-                failure: market?.failure)
+            archivedRaceCount = load.card.archivedRaces
+            marketCoverage = MarketCoverage(pricedRaces: priced, totalRaces: upcoming.count)
+            staleSince = load.servedStaleAfterFailure ? load.fetchedAt : nil
         } catch {
             state = .failed(.from(error))
+            staleSince = nil
         }
     }
 
@@ -140,16 +91,6 @@ final class TipsViewModel {
         (lhs.offDateTime ?? .distantFuture) < (rhs.offDateTime ?? .distantFuture)
     }
 
-    /// Deliberately not `Race.hasStarted`, which reads the real `Date()`.
-    ///
-    /// This screen decides what to rate and what to record, and both must be
-    /// judged against the same instant the tip is stamped with — otherwise the
-    /// filter and the sealing rule can disagree. It also made the view model
-    /// untestable: it accepted an injected clock and then ignored it for the one
-    /// decision that mattered, so every fixture race read as already run.
-    ///
-    /// A race with no known off time is treated as still to come, matching the
-    /// kit, and `TipLedger` seals it on first write.
     private static func hasStarted(_ race: Race, by moment: Date) -> Bool {
         guard let offDateTime = race.offDateTime else { return false }
         return offDateTime < moment

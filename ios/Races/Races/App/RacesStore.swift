@@ -1,234 +1,113 @@
 import Foundation
 import RacesKit
 
+/// Document names. At file scope and `nonisolated`, not nested in the actor:
+/// a nested type picks up the app target's MainActor default, and the actor's
+/// own methods could not read it.
 nonisolated enum StoreDocument {
-    static let tips = "tips.json"
-    static let archive = "archive.json"
-    static let training = "training.json"
-    static func racecards(day: String) -> String { "racecards-\(day).json" }
-    static let racecardFreshness: TimeInterval = 15 * 60
+    static func racecard(day: String) -> String { "racecard-\(day).json" }
+    static let record = "record.json"
 }
 
-nonisolated struct ResultsIngestion: Hashable, Sendable {
-    var newRacesArchived: Int = 0
-    var tipsSettled: Int = 0
-    var modelRetrained: Bool = false
-    var changedAnything: Bool { newRacesArchived > 0 || tipsSettled > 0 || modelRetrained }
-}
-
-nonisolated struct CachedRacecards: Codable, Hashable, Sendable {
-    let fetchedAt: Date
-    let races: [Race]
-}
-
-/// Persistent state for the on-device learner. Training inputs are frozen at tip
-/// time and only receive a winner after a result has settled.
-nonisolated struct OnDeviceTrainingState: Codable, Hashable, Sendable {
-    var samples: [TrainingRace]
-    var pendingSnapshots: [String: TrainingRaceSnapshot]
-    var activeWeights: RatingWeights
-    var lastTrainingSampleCount: Int
-    var configuration: WeightTrainingConfiguration
-
-    init(
-        activeWeights: RatingWeights = .v2,
-        configuration: WeightTrainingConfiguration = .init()
-    ) {
-        self.samples = []
-        self.pendingSnapshots = [:]
-        self.activeWeights = activeWeights
-        self.lastTrainingSampleCount = 0
-        self.configuration = configuration
-    }
-
-    mutating func add(snapshot: TrainingRaceSnapshot, winnerID: String) {
-        guard !samples.contains(where: { $0.snapshot.raceID == snapshot.raceID }),
-              snapshot.runnerIDs.contains(winnerID) else { return }
-        samples.append(TrainingRace(snapshot: snapshot, winnerID: winnerID))
-        pendingSnapshots.removeValue(forKey: snapshot.raceID)
-    }
-
-    var settledCount: Int { samples.count }
-}
-
+/// The last responses the server gave, on disk.
+///
+/// The server holds the history now; this is only so a phone with no signal
+/// still opens on the card it last saw, clearly marked as such, rather than on
+/// an error. Nothing here is authoritative and nothing is ever written back.
+///
+/// An `actor` because persistence is async; one actor so two screens saving at
+/// once cannot interleave.
 actor RacesStore {
 
     private let documents: any DocumentStoring
-    private var rater: RaceRater
-    private var ledger = TipLedger()
-    private var archive = ResultsArchive()
-    private var training = OnDeviceTrainingState()
-    private var hasLoaded = false
 
-    init(documents: any DocumentStoring, rater: RaceRater = RaceRater()) {
+    init(documents: any DocumentStoring) {
         self.documents = documents
-        self.rater = rater
-        self.training = OnDeviceTrainingState(activeWeights: rater.weights)
     }
 
-    func loadIfNeeded() async {
-        guard !hasLoaded else { return }
-        hasLoaded = true
-        ledger = await load(TipLedger.self, from: StoreDocument.tips) ?? TipLedger()
-        archive = await load(ResultsArchive.self, from: StoreDocument.archive) ?? ResultsArchive()
-        training = await load(OnDeviceTrainingState.self, from: StoreDocument.training)
-            ?? OnDeviceTrainingState(activeWeights: rater.weights)
-        rater = RaceRater(weights: training.activeWeights)
+    func cachedRacecard(day: String) async -> ServerRacecard? {
+        try? await documents.load(ServerRacecard.self, from: StoreDocument.racecard(day: day))
     }
 
-    private func load<T: Codable & Sendable>(_ type: T.Type, from name: String) async -> T? {
-        do { return try await documents.load(type, from: name) } catch { return nil }
+    func saveRacecard(_ card: ServerRacecard, day: String) async {
+        try? await documents.save(card, to: StoreDocument.racecard(day: day))
     }
 
-    var tips: [TipRecord] { ledger.tips }
-    var archivedRaceCount: Int { archive.raceCount }
-    var hasArchive: Bool { archive.raceCount > 0 }
-    var activeWeights: RatingWeights { training.activeWeights }
-    var trainingRaceCount: Int { training.settledCount }
-
-    func marketIDsAwaitingStartingPrice(now: Date = Date()) -> [String] {
-        ledger.marketIDsAwaitingStartingPrice(now: now)
+    func cachedRecord() async -> ServerRecord? {
+        try? await documents.load(ServerRecord.self, from: StoreDocument.record)
     }
 
-    func report(commission: Double = AccuracyCalculator.defaultCommission) -> AccuracyReport {
-        AccuracyCalculator.report(for: ledger.tips, commission: commission)
+    func saveRecord(_ record: ServerRecord) async {
+        try? await documents.save(record, to: StoreDocument.record)
+    }
+}
+
+/// The history a phone collected before the server existed.
+///
+/// Before the server, `RacesStore` kept the tip ledger, the results archive
+/// and the on-device training state as JSON documents in Application Support.
+/// Those are the only copies of every race day this phone saw, and the free
+/// results endpoint cannot rebuild them. Settings uploads them once; the files
+/// are read, never modified, and a marker records the upload so the button
+/// does not keep offering itself.
+nonisolated struct LegacyHistory: Sendable {
+    static let tips = "tips.json"
+    static let archive = "archive.json"
+    static let training = "training.json"
+    static let uploadedMarker = "uploaded-to-server.json"
+
+    /// Where the documents live, or nil if Application Support is unreachable.
+    let directory: URL?
+
+    init(directory: URL?) {
+        self.directory = directory
     }
 
-    func tip(forRace raceID: String) -> TipRecord? { ledger.tip(forRace: raceID) }
-
-    func assess(
-        _ race: Race,
-        market: MarketSnapshot? = nil,
-        now: Date = Date()
-    ) -> RaceAssessment {
-        rater.rate(race, market: market, strikeRates: archive, now: now)
+    /// `Application Support/Races`, where `JSONFileStore.applicationSupport()`
+    /// wrote them.
+    static func applicationSupport(fileManager: FileManager = .default) -> LegacyHistory {
+        let base = try? fileManager.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: false)
+        return LegacyHistory(directory: base?.appendingPathComponent("Races"))
     }
 
-    @discardableResult
-    func assessAndRecord(
-        _ races: [Race],
-        markets: [String: MarketSnapshot] = [:],
-        references: [String: MarketReference] = [:],
-        now: Date = Date()
-    ) async -> [String: RaceAssessment] {
-        var assessments: [String: RaceAssessment] = [:]
-        var stored = false
-        var trainingChanged = false
-
-        for race in races {
-            let assessment = assess(race, market: markets[race.id], now: now)
-            assessments[race.id] = assessment
-            if let snapshot = assessment.trainingSnapshot {
-                training.pendingSnapshots[race.id] = snapshot
-                trainingChanged = true
-            }
-            if ledger.record(
-                assessment,
-                race: race,
-                marketReference: references[race.id],
-                now: now
-            ).didStore {
-                stored = true
-            }
-        }
-
-        if stored { await persistLedger() }
-        if trainingChanged { await persistTraining() }
-        return assessments
+    private func read(_ name: String) -> Data? {
+        guard let directory else { return nil }
+        return try? Data(contentsOf: directory.appendingPathComponent(name))
     }
 
-    @discardableResult
-    func ingest(
-        results: [RaceResult],
-        startingPrices: [String: [Int64: Double]] = [:],
-        now: Date = Date()
-    ) async -> ResultsIngestion {
-        var ingestion = ResultsIngestion()
-        ingestion.newRacesArchived = archive.ingest(results)
-
-        let resultsByRaceID = Dictionary(
-            results.map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest })
-
-        for tip in ledger.awaitingReconciliation(now: now) {
-            let betfairSPs = tip.marketReference?.startingPrices(from: startingPrices) ?? [:]
-            let settled = ResultReconciler.settle(
-                tip: tip,
-                result: resultsByRaceID[tip.raceID],
-                betfairStartingPrices: betfairSPs,
-                now: now)
-            guard settled != tip else { continue }
-            ledger.replace(settled)
-            if settled.outcome?.isSettled == true || settled.outcome?.isVoid == true {
-                ingestion.tipsSettled += 1
-            }
-
-            if settled.outcome?.isSettled == true,
-               let result = resultsByRaceID[tip.raceID],
-               let winner = result.winner,
-               let snapshot = training.pendingSnapshots[tip.raceID] {
-                training.add(snapshot: snapshot, winnerID: winner.horseID)
-            }
-        }
-
-        if ingestion.newRacesArchived > 0 { await persistArchive() }
-        if ingestion.tipsSettled > 0 || !ledger.awaitingReconciliation(now: now).isEmpty {
-            await persistLedger()
-        }
-
-        if shouldRetrain {
-            let report = OnDeviceWeightTrainer.train(
-                samples: training.samples,
-                current: training.activeWeights,
-                configuration: training.configuration
-            )
-            training.lastTrainingSampleCount = training.settledCount
-            if report.promoted {
-                training.activeWeights = report.weights
-                rater = RaceRater(weights: report.weights)
-                ingestion.modelRetrained = true
-            }
-            await persistTraining()
-        } else if ingestion.tipsSettled > 0 {
-            await persistTraining()
-        }
-
-        return ingestion
+    /// The documents, as the upload carries them.
+    func upload(device: String) -> ServerHistoryUpload {
+        ServerHistoryUpload(
+            device: device,
+            tips: read(Self.tips),
+            archive: read(Self.archive),
+            training: read(Self.training))
     }
 
-    private var shouldRetrain: Bool {
-        let threshold = training.configuration.minimumRaces
-        guard training.settledCount >= threshold else { return false }
-        return training.settledCount - training.lastTrainingSampleCount >= threshold
+    /// Whether there is anything to upload at all.
+    var exists: Bool { !upload(device: "").isEmpty }
+
+    /// When the history was uploaded, if it has been.
+    var uploadedAt: Date? {
+        guard let data = read(Self.uploadedMarker) else { return nil }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try? decoder.decode(Marker.self, from: data).uploadedAt
     }
 
-    func cachedRacecards(day: String) async -> CachedRacecards? {
-        await load(CachedRacecards.self, from: StoreDocument.racecards(day: day))
+    func markUploaded(at date: Date = Date()) throws {
+        guard let directory else { return }
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(Marker(uploadedAt: date))
+        try data.write(to: directory.appendingPathComponent(Self.uploadedMarker), options: .atomic)
     }
 
-    func saveRacecards(_ races: [Race], day: String, fetchedAt: Date = Date()) async {
-        let cached = CachedRacecards(fetchedAt: fetchedAt, races: races)
-        try? await documents.save(cached, to: StoreDocument.racecards(day: day))
-    }
-
-    private func persistLedger() async {
-        try? await documents.save(ledger, to: StoreDocument.tips)
-    }
-
-    private func persistArchive() async {
-        try? await documents.save(archive, to: StoreDocument.archive)
-    }
-
-    private func persistTraining() async {
-        try? await documents.save(training, to: StoreDocument.training)
-    }
-
-    func clearHistory() async {
-        ledger = TipLedger()
-        archive = ResultsArchive()
-        training = OnDeviceTrainingState(activeWeights: .v2)
-        rater = RaceRater(weights: .v2)
-        try? await documents.delete(StoreDocument.tips)
-        try? await documents.delete(StoreDocument.archive)
-        try? await documents.delete(StoreDocument.training)
+    private nonisolated struct Marker: Codable {
+        let uploadedAt: Date
     }
 }

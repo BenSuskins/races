@@ -1,0 +1,926 @@
+{
+  "race": {
+    "id": "rac_1001",
+    "courseName": "Ascot",
+    "name": "Sky Bet Handicap",
+    "offTime": "2:30",
+    "offDateTime": "2026-09-20T13:30:00Z",
+    "date": "2026-09-20",
+    "distance": {
+      "furlongs": 8
+    },
+    "going": "goodToFirm",
+    "surface": "turf",
+    "type": "flat",
+    "raceClass": 3,
+    "ageBand": "3yo+",
+    "ratingBand": [
+      0,
+      95
+    ],
+    "prize": "£12,450",
+    "fieldSize": 4,
+    "regionCode": "gb",
+    "status": "Declared",
+    "runners": [
+      {
+        "id": "hrs_1",
+        "name": "Kyprios",
+        "clothNumber": 1,
+        "draw": 3,
+        "age": 5,
+        "sex": "gelding",
+        "regionCode": "IRE",
+        "officialRating": 95,
+        "weightPounds": 133,
+        "headgear": "b",
+        "form": "1-3241",
+        "daysSinceLastRun": 21,
+        "jockeyID": "jky_1",
+        "jockeyName": "R Moore",
+        "trainerID": "trn_1",
+        "trainerName": "A O'Brien",
+        "ownerName": "Coolmore",
+        "sireName": "Galileo",
+        "damName": "Polished Gem"
+      },
+      {
+        "id": "hrs_2",
+        "name": "Stradivarius",
+        "clothNumber": 2,
+        "draw": 1,
+        "age": 6,
+        "sex": "gelding",
+        "regionCode": "GB",
+        "officialRating": 92,
+        "weightPounds": 130,
+        "form": "21-113",
+        "daysSinceLastRun": 14,
+        "jockeyID": "jky_2",
+        "jockeyName": "F Dettori",
+        "trainerID": "trn_2",
+        "trainerName": "J Gosden",
+        "ownerName": "B Nielsen",
+        "sireName": "Sea The Stars",
+        "damName": "Private Life"
+      },
+      {
+        "id": "hrs_3",
+        "name": "Unraced Newcomer",
+        "clothNumber": 3,
+        "draw": 4,
+        "age": 3,
+        "sex": "filly",
+        "regionCode": "GB",
+        "weightPounds": 126,
+        "jockeyID": "jky_3",
+        "jockeyName": "T Marquand",
+        "trainerID": "trn_3",
+        "trainerName": "W Haggas",
+        "ownerName": "Godolphin",
+        "sireName": "Dubawi",
+        "damName": "Zarkava"
+      },
+      {
+        "id": "hrs_4",
+        "name": "Numeric Types",
+        "clothNumber": 4,
+        "draw": 2,
+        "age": 4,
+        "sex": "colt",
+        "regionCode": "FR",
+        "officialRating": 88,
+        "weightPounds": 128,
+        "headgear": "p",
+        "form": "0-P42",
+        "daysSinceLastRun": 35,
+        "jockeyID": "jky_4",
+        "jockeyName": "O Murphy",
+        "trainerID": "trn_4",
+        "trainerName": "R Varian",
+        "ownerName": "Qatar Racing",
+        "sireName": "Frankel",
+        "damName": "Kind"
+      }
+    ]
+  },
+  "assessment": {
+    "raceID": "rac_1001",
+    "generatedAt": "2026-09-20T09:00:00Z",
+    "modelVersion": "market-anchored-3",
+    "weightsID": "v2",
+    "marketCoverage": 0,
+    "isMarketDelayed": false,
+    "runners": [
+      {
+        "horseID": "hrs_1",
+        "horseName": "Kyprios",
+        "clothNumber": 1,
+        "formScore": 0.8512298691484959,
+        "winProbability": 0.45688903401942443,
+        "contributions": [
+          {
+            "factor": "officialRating",
+            "label": "Official rating",
+            "detail": "OR 95",
+            "zScore": 1.1624763874381911,
+            "weight": 0.3,
+            "probabilityDelta": 0.0878803919115102,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "handicapBandPosition",
+            "label": "Position in the handicap",
+            "detail": "100% up the 0-95 band",
+            "zScore": 1.1624763874381963,
+            "weight": 0.2,
+            "probabilityDelta": 0.058705487338918394,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "recentForm",
+            "label": "Recent form",
+            "detail": "1-3241",
+            "zScore": 0.4702896554538385,
+            "weight": 0.25,
+            "probabilityDelta": 0.019301600134709773,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "wonLastTime",
+            "label": "Won last time out",
+            "detail": "Won last time",
+            "zScore": 1.4142135623730951,
+            "weight": 0.1,
+            "probabilityDelta": 0.04101040559059699,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "completionRate",
+            "label": "Completion record",
+            "detail": "—",
+            "weight": 0.08,
+            "probabilityDelta": 0,
+            "availability": {
+              "notApplicable": {
+                "_0": "only meaningful over obstacles"
+              }
+            }
+          },
+          {
+            "factor": "daysSinceLastRun",
+            "label": "Days since last run",
+            "detail": "21 days",
+            "zScore": 0,
+            "weight": 0.06,
+            "probabilityDelta": 0,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "age",
+            "label": "Age",
+            "detail": "5yo",
+            "zScore": 1,
+            "weight": 0.04,
+            "probabilityDelta": 0.015085855043963092,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "weightCarried",
+            "label": "Weight carried",
+            "detail": "9-07",
+            "zScore": -1.4501047335684953,
+            "weight": 0.02,
+            "probabilityDelta": -0.008383714853182511,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "draw",
+            "label": "Draw",
+            "detail": "Stall 3",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "notApplicable": {
+                "_0": "no draw-bias data for this course yet"
+              }
+            }
+          },
+          {
+            "factor": "headgear",
+            "label": "Headgear",
+            "detail": "Wearing b",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "requiresPaidTier": {
+                "_0": "first-time headgear needs a headgear history"
+              }
+            }
+          },
+          {
+            "factor": "jockeyStrikeRate",
+            "label": "Jockey strike rate",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "only 2 runs recorded so far"
+              }
+            }
+          },
+          {
+            "factor": "trainerStrikeRate",
+            "label": "Trainer strike rate",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "only 2 runs recorded so far"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "horseID": "hrs_2",
+        "horseName": "Stradivarius",
+        "clothNumber": 2,
+        "formScore": 0.17158687558881983,
+        "winProbability": 0.24783466569199805,
+        "contributions": [
+          {
+            "factor": "officialRating",
+            "label": "Official rating",
+            "detail": "OR 92",
+            "zScore": 0.11624763874381763,
+            "weight": 0.3,
+            "probabilityDelta": -0.017667535677112295,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "handicapBandPosition",
+            "label": "Position in the handicap",
+            "detail": "97% up the 0-95 band",
+            "zScore": 0.11624763874382331,
+            "weight": 0.2,
+            "probabilityDelta": -0.012913628544846817,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "recentForm",
+            "label": "Recent form",
+            "detail": "21-113",
+            "zScore": 0.9198966130793544,
+            "weight": 0.25,
+            "probabilityDelta": 0.03330752185846597,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "wonLastTime",
+            "label": "Won last time out",
+            "detail": "Did not win last time",
+            "zScore": -0.7071067811865475,
+            "weight": 0.1,
+            "probabilityDelta": -0.02520950945602632,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "completionRate",
+            "label": "Completion record",
+            "detail": "—",
+            "weight": 0.08,
+            "probabilityDelta": 0,
+            "availability": {
+              "notApplicable": {
+                "_0": "only meaningful over obstacles"
+              }
+            }
+          },
+          {
+            "factor": "daysSinceLastRun",
+            "label": "Days since last run",
+            "detail": "14 days",
+            "zScore": 0,
+            "weight": 0.06,
+            "probabilityDelta": 0,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "age",
+            "label": "Age",
+            "detail": "6yo",
+            "zScore": -1,
+            "weight": 0.04,
+            "probabilityDelta": -0.009708101440496636,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "weightCarried",
+            "label": "Weight carried",
+            "detail": "9-04",
+            "zScore": -0.29002094671369905,
+            "weight": 0.02,
+            "probabilityDelta": 0.000667822284166536,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "draw",
+            "label": "Draw",
+            "detail": "Stall 1",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "notApplicable": {
+                "_0": "no draw-bias data for this course yet"
+              }
+            }
+          },
+          {
+            "factor": "headgear",
+            "label": "Headgear",
+            "detail": "No headgear",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "requiresPaidTier": {
+                "_0": "first-time headgear needs a headgear history"
+              }
+            }
+          },
+          {
+            "factor": "jockeyStrikeRate",
+            "label": "Jockey strike rate",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in the archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerStrikeRate",
+            "label": "Trainer strike rate",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in the archive yet"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "horseID": "hrs_3",
+        "horseName": "Unraced Newcomer",
+        "clothNumber": 3,
+        "formScore": -0.014864851284812752,
+        "winProbability": 0.20954851737344599,
+        "contributions": [
+          {
+            "factor": "officialRating",
+            "label": "Official rating",
+            "detail": "Unrated",
+            "weight": 0.3,
+            "probabilityDelta": -0.022095883358977553,
+            "availability": {
+              "missingData": {
+                "_0": "no official rating"
+              }
+            }
+          },
+          {
+            "factor": "handicapBandPosition",
+            "label": "Position in the handicap",
+            "detail": "Unrated",
+            "weight": 0.2,
+            "probabilityDelta": -0.015580482996901485,
+            "availability": {
+              "missingData": {
+                "_0": "no official rating"
+              }
+            }
+          },
+          {
+            "factor": "recentForm",
+            "label": "Recent form",
+            "detail": "Unraced",
+            "weight": 0.25,
+            "probabilityDelta": -0.013548438974005872,
+            "availability": {
+              "missingData": {
+                "_0": "no recorded form"
+              }
+            }
+          },
+          {
+            "factor": "wonLastTime",
+            "label": "Won last time out",
+            "detail": "Unraced",
+            "weight": 0.1,
+            "probabilityDelta": -0.007080746562238616,
+            "availability": {
+              "missingData": {
+                "_0": "no recorded form"
+              }
+            }
+          },
+          {
+            "factor": "completionRate",
+            "label": "Completion record",
+            "detail": "—",
+            "weight": 0.08,
+            "probabilityDelta": 0,
+            "availability": {
+              "notApplicable": {
+                "_0": "only meaningful over obstacles"
+              }
+            }
+          },
+          {
+            "factor": "daysSinceLastRun",
+            "label": "Days since last run",
+            "detail": "First run",
+            "weight": 0.06,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no recorded previous run"
+              }
+            }
+          },
+          {
+            "factor": "age",
+            "label": "Age",
+            "detail": "3yo",
+            "zScore": -1,
+            "weight": 0.04,
+            "probabilityDelta": -0.008208368501181645,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "weightCarried",
+            "label": "Weight carried",
+            "detail": "9-00",
+            "zScore": 1.2567574357593625,
+            "weight": 0.02,
+            "probabilityDelta": 0.006302933037482694,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "draw",
+            "label": "Draw",
+            "detail": "Stall 4",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "notApplicable": {
+                "_0": "no draw-bias data for this course yet"
+              }
+            }
+          },
+          {
+            "factor": "headgear",
+            "label": "Headgear",
+            "detail": "No headgear",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "requiresPaidTier": {
+                "_0": "first-time headgear needs a headgear history"
+              }
+            }
+          },
+          {
+            "factor": "jockeyStrikeRate",
+            "label": "Jockey strike rate",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in the archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerStrikeRate",
+            "label": "Trainer strike rate",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in the archive yet"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "horseID": "hrs_4",
+        "horseName": "Numeric Types",
+        "clothNumber": 4,
+        "formScore": -1.0079518934525022,
+        "winProbability": 0.08572778291513135,
+        "contributions": [
+          {
+            "factor": "officialRating",
+            "label": "Official rating",
+            "detail": "OR 88",
+            "zScore": -1.2787240261820139,
+            "weight": 0.3,
+            "probabilityDelta": -0.04811697287542059,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "handicapBandPosition",
+            "label": "Position in the handicap",
+            "detail": "93% up the 0-95 band",
+            "zScore": -1.2787240261820085,
+            "weight": 0.2,
+            "probabilityDelta": -0.03021137579717026,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "recentForm",
+            "label": "Recent form",
+            "detail": "0-P42",
+            "zScore": -1.390186268533193,
+            "weight": 0.25,
+            "probabilityDelta": -0.039060683019170137,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "wonLastTime",
+            "label": "Won last time out",
+            "detail": "Did not win last time",
+            "zScore": -0.7071067811865475,
+            "weight": 0.1,
+            "probabilityDelta": -0.00872014957233222,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "completionRate",
+            "label": "Completion record",
+            "detail": "—",
+            "weight": 0.08,
+            "probabilityDelta": 0,
+            "availability": {
+              "notApplicable": {
+                "_0": "only meaningful over obstacles"
+              }
+            }
+          },
+          {
+            "factor": "daysSinceLastRun",
+            "label": "Days since last run",
+            "detail": "35 days",
+            "zScore": 0,
+            "weight": 0.06,
+            "probabilityDelta": 0,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "age",
+            "label": "Age",
+            "detail": "4yo",
+            "zScore": 1,
+            "weight": 0.04,
+            "probabilityDelta": 0.0028306148977150225,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "weightCarried",
+            "label": "Weight carried",
+            "detail": "9-02",
+            "zScore": 0.4833682445228318,
+            "weight": 0.02,
+            "probabilityDelta": 0.0014129595315331284,
+            "availability": {
+              "available": {}
+            }
+          },
+          {
+            "factor": "draw",
+            "label": "Draw",
+            "detail": "Stall 2",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "notApplicable": {
+                "_0": "no draw-bias data for this course yet"
+              }
+            }
+          },
+          {
+            "factor": "headgear",
+            "label": "Headgear",
+            "detail": "Wearing p",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "requiresPaidTier": {
+                "_0": "first-time headgear needs a headgear history"
+              }
+            }
+          },
+          {
+            "factor": "jockeyStrikeRate",
+            "label": "Jockey strike rate",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in the archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerStrikeRate",
+            "label": "Trainer strike rate",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in the archive yet"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "confidence": "low",
+    "minimumValueEdge": 0.05,
+    "minimumValueProbability": 0.08
+  },
+  "tip": {
+    "raceID": "rac_1001",
+    "raceDate": "2026-09-20",
+    "offAt": "2026-09-20T13:30:00Z",
+    "courseName": "Ascot",
+    "raceName": "Sky Bet Handicap",
+    "raceType": "flat",
+    "fieldSizeAtTip": 4,
+    "selectionHorseID": "hrs_1",
+    "selectionHorseName": "Kyprios",
+    "predictedProbability": 0.45688903401942443,
+    "wasFormOnly": true,
+    "confidence": "low",
+    "modelVersion": "market-anchored-3",
+    "weightsID": "v2",
+    "contributions": [
+      {
+        "factor": "officialRating",
+        "label": "Official rating",
+        "detail": "OR 95",
+        "zScore": 1.1624763874381911,
+        "weight": 0.3,
+        "probabilityDelta": 0.0878803919115102,
+        "availability": {
+          "available": {}
+        }
+      },
+      {
+        "factor": "handicapBandPosition",
+        "label": "Position in the handicap",
+        "detail": "100% up the 0-95 band",
+        "zScore": 1.1624763874381963,
+        "weight": 0.2,
+        "probabilityDelta": 0.058705487338918394,
+        "availability": {
+          "available": {}
+        }
+      },
+      {
+        "factor": "recentForm",
+        "label": "Recent form",
+        "detail": "1-3241",
+        "zScore": 0.4702896554538385,
+        "weight": 0.25,
+        "probabilityDelta": 0.019301600134709773,
+        "availability": {
+          "available": {}
+        }
+      },
+      {
+        "factor": "wonLastTime",
+        "label": "Won last time out",
+        "detail": "Won last time",
+        "zScore": 1.4142135623730951,
+        "weight": 0.1,
+        "probabilityDelta": 0.04101040559059699,
+        "availability": {
+          "available": {}
+        }
+      },
+      {
+        "factor": "completionRate",
+        "label": "Completion record",
+        "detail": "—",
+        "weight": 0.08,
+        "probabilityDelta": 0,
+        "availability": {
+          "notApplicable": {
+            "_0": "only meaningful over obstacles"
+          }
+        }
+      },
+      {
+        "factor": "daysSinceLastRun",
+        "label": "Days since last run",
+        "detail": "21 days",
+        "zScore": 0,
+        "weight": 0.06,
+        "probabilityDelta": 0,
+        "availability": {
+          "available": {}
+        }
+      },
+      {
+        "factor": "age",
+        "label": "Age",
+        "detail": "5yo",
+        "zScore": 1,
+        "weight": 0.04,
+        "probabilityDelta": 0.015085855043963092,
+        "availability": {
+          "available": {}
+        }
+      },
+      {
+        "factor": "weightCarried",
+        "label": "Weight carried",
+        "detail": "9-07",
+        "zScore": -1.4501047335684953,
+        "weight": 0.02,
+        "probabilityDelta": -0.008383714853182511,
+        "availability": {
+          "available": {}
+        }
+      },
+      {
+        "factor": "draw",
+        "label": "Draw",
+        "detail": "Stall 3",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "notApplicable": {
+            "_0": "no draw-bias data for this course yet"
+          }
+        }
+      },
+      {
+        "factor": "headgear",
+        "label": "Headgear",
+        "detail": "Wearing b",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "requiresPaidTier": {
+            "_0": "first-time headgear needs a headgear history"
+          }
+        }
+      },
+      {
+        "factor": "jockeyStrikeRate",
+        "label": "Jockey strike rate",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "only 2 runs recorded so far"
+          }
+        }
+      },
+      {
+        "factor": "trainerStrikeRate",
+        "label": "Trainer strike rate",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "only 2 runs recorded so far"
+          }
+        }
+      }
+    ],
+    "createdAt": "2026-09-20T09:00:00Z"
+  },
+  "result": {
+    "id": "rac_1001",
+    "courseName": "Ascot",
+    "name": "Sky Bet Handicap",
+    "date": "2026-09-20",
+    "offDateTime": "2026-09-20T13:30:00Z",
+    "distance": {
+      "furlongs": 8
+    },
+    "going": "goodToFirm",
+    "surface": "turf",
+    "type": "flat",
+    "raceClass": 3,
+    "finishers": [
+      {
+        "horseID": "hrs_2",
+        "horseName": "Stradivarius",
+        "position": {
+          "finished": {
+            "_0": 1
+          }
+        },
+        "clothNumber": 2,
+        "draw": 1,
+        "weightPounds": 130,
+        "officialRating": 92,
+        "jockeyID": "jky_2",
+        "trainerID": "trn_2"
+      },
+      {
+        "horseID": "hrs_1",
+        "horseName": "Kyprios",
+        "position": {
+          "finished": {
+            "_0": 2
+          }
+        },
+        "clothNumber": 1,
+        "draw": 3,
+        "weightPounds": 133,
+        "officialRating": 95,
+        "jockeyID": "jky_1",
+        "trainerID": "trn_1"
+      },
+      {
+        "horseID": "hrs_4",
+        "horseName": "Numeric Types",
+        "position": {
+          "finished": {
+            "_0": 3
+          }
+        },
+        "clothNumber": 4,
+        "draw": 2,
+        "weightPounds": 128,
+        "officialRating": 88,
+        "jockeyID": "jky_4",
+        "trainerID": "trn_4"
+      }
+    ]
+  }
+}

@@ -3,18 +3,31 @@ import Foundation
 /// A single secret the user enters in Settings.
 ///
 /// Flat slots rather than one blob: the Keychain stores generic-password items
-/// keyed by account, and the two providers are configured independently — a user
-/// may set up the Racing API and never touch Betfair.
+/// keyed by account.
+///
+/// Only the two server slots are entered now. The provider slots are what the
+/// app used before the server held the Racing API and Betfair credentials;
+/// they stay in the enum so `removeAll()` still reaches any value a device
+/// saved back then, and Settings clears them once the server is connected.
 public enum CredentialSlot: String, CaseIterable, Sendable {
+    case serverURL
+    case serverToken
     case racingAPIUsername
     case racingAPIPassword
     case betfairAppKey
     case betfairUsername
     case betfairPassword
 
+    /// The slots the app no longer asks for.
+    public static let legacyProviderSlots: [CredentialSlot] = [
+        .racingAPIUsername, .racingAPIPassword, .betfairAppKey, .betfairUsername, .betfairPassword,
+    ]
+
     /// What Settings calls this field.
     public var label: String {
         switch self {
+        case .serverURL: return "Server address"
+        case .serverToken: return "API token"
         case .racingAPIUsername: return "Username"
         case .racingAPIPassword: return "Password"
         case .betfairAppKey: return "Application key"
@@ -25,8 +38,8 @@ public enum CredentialSlot: String, CaseIterable, Sendable {
 
     public var isSecret: Bool {
         switch self {
-        case .racingAPIPassword, .betfairPassword: return true
-        case .racingAPIUsername, .betfairAppKey, .betfairUsername: return false
+        case .serverToken, .racingAPIPassword, .betfairPassword: return true
+        case .serverURL, .racingAPIUsername, .betfairAppKey, .betfairUsername: return false
         }
     }
 }

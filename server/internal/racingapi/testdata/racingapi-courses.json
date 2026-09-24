@@ -1,0 +1,12 @@
+{
+  "courses": [
+    { "id": "crs_1", "course": "Ascot", "region_code": "gb", "region": "GB" },
+    { "id": "crs_2", "course": "Newmarket (July)", "region_code": "gb", "region": "GB" },
+    { "id": "crs_3", "course": "Newmarket", "region_code": "gb", "region": "GB" },
+    { "id": "crs_4", "course": "Wolverhampton (AW)", "region_code": "gb", "region": "GB" },
+    { "id": "crs_5", "course": "Leopardstown", "region_code": "ire", "region": "IRE" },
+    { "id": "", "course": "Nameless", "region_code": "gb", "region": "GB" },
+    { "id": "crs_7", "course": "", "region_code": "gb", "region": "GB" }
+  ],
+  "total": 7
+}

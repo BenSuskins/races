@@ -38,23 +38,37 @@ final class AlgorithmViewModel {
     }
 
     private(set) var archivedRaceCount = 0
+    /// Settled races the server can learn from, and how many it needs first.
+    private(set) var trainingSamples: Int?
+    private(set) var trainingMinimum: Int?
+    /// Why the server's model could not be loaded, when it could not.
+    private(set) var loadFailure: APIError?
 
-    private let weights: RatingWeights
-    private let store: RacesStore?
+    /// The weights the server is running. Starts as the kit's v2 so the
+    /// screen has something true to show before the first response.
+    private(set) var weights: RatingWeights
+    private let link: ServerLink
 
-    init(weights: RatingWeights = .v1, store: RacesStore?) {
+    init(link: ServerLink, weights: RatingWeights = .v2) {
+        self.link = link
         self.weights = weights
-        self.store = store
     }
 
     convenience init(environment: AppEnvironment) {
-        self.init(store: environment.store)
+        self.init(link: environment.link)
     }
 
     func loadIfNeeded() async {
-        guard let store else { return }
-        await store.loadIfNeeded()
-        archivedRaceCount = await store.archivedRaceCount
+        do {
+            let model = try await link.require().model()
+            weights = model.active
+            archivedRaceCount = model.archivedRaces
+            trainingSamples = model.samples["settled"]
+            trainingMinimum = model.samples["minimumRaces"]
+            loadFailure = nil
+        } catch {
+            loadFailure = .from(error)
+        }
     }
 
     // MARK: - Identity

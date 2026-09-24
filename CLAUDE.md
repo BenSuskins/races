@@ -3,25 +3,38 @@
 UK horse racing for iOS: browse **course → race → runner**, get an explainable
 recommendation for each race, and track how well those recommendations actually do.
 
-Native SwiftUI app plus a Foundation-only Swift package. **No backend** — the app
-talks to two third-party providers directly and keeps its own history on device.
+Three parts:
+
+- **`server/`** — a Go backend with one SQLite file, deployed as a container on
+  the homelab `docker` host and reached at `https://races-api.suskins.co.uk` over
+  the LAN and Tailscale. It owns the two providers, the rater, the sealing rule,
+  settlement, the accuracy record, retraining and back-tests. **It is where the
+  history lives**, and it keeps every raw provider payload.
+- **`ios/RacesKit/`** — a Foundation-only Swift package: the domain models the
+  app decodes the server's JSON into, the server client, and — until it is
+  deleted — the Swift rater the Go one was ported from.
+- **`ios/Races/`** — a SwiftUI client that *reads*. It holds the server's
+  address and an API token, and nothing it does can change the record.
+
+Single user, several phones: every app talks to the same server with the same
+token. `server/README.md` has the API, the timetable and the configuration.
 
 ## What is left
 
 `docs/roadmap.md` is the current backlog: what remains, who owns each item (some
 need a device, real credentials or a billing decision rather than a commit), and
-the dependencies between them — two items look ready to build and are not. It also
-records the live blockers, which are not work items: the Actions quota, and the
+the dependencies between them. It also records the live blockers, which are not
+work items: the Actions quota, the absence of any backup of `races.db`, and the
 fact that `RacesKitTests` is absent from `Races.xcscheme` so the kit's tests are
 covered only by the Linux job.
 
 ## Provider Reference
 
 `docs/providers.md` is the canonical list of every third-party endpoint we call
-(provider, tier required, rate limit, fields consumed, runnable `curl`).
+(provider, tier required, rate limit, schedule, fields consumed, runnable `curl`).
 **Whenever you add, remove, or change a provider call in
-`ios/RacesKit/Sources/RacesKit/Providers/`, update `docs/providers.md` in the same
-change.** Do not let it drift.
+`server/internal/racingapi/` or `server/internal/betfair/`, update
+`docs/providers.md` in the same change.** Do not let it drift.
 
 It matters more than a typical API doc: we don't own these APIs, and the free/paid
 boundary is invisible until a 403 arrives at runtime.
@@ -30,8 +43,29 @@ boundary is invisible until a 403 arrives at runtime.
 
 | Component | Directory | Description |
 |-----------|-----------|-------------|
-| Shared kit | `ios/RacesKit/` | Models, networking, matching, **the rating algorithm**, storage. Foundation-only so Linux CI tests it in seconds |
+| Server | `server/` | Go 1.25, `modernc.org/sqlite` (no cgo). Providers, matching, **the rating algorithm**, tracking, training, back-test, HTTP API |
+| Shared kit | `ios/RacesKit/` | Models, the server client, and the Swift rater kept for parity. Foundation-only so Linux CI tests it in seconds |
 | iOS app | `ios/Races/` | SwiftUI client — views, view models, Keychain |
+
+```
+server/
+├── cmd/races-server/   # Env config, wiring, HTTP server, scheduler
+└── internal/
+    ├── domain/         # Race, Runner, RaceResult… in RacesKit's Codable JSON shape
+    ├── rating/         # Port of RacesKit/Rating — factors, form, overround, rater
+    ├── training/       # Nightly re-fit, promoted only on held-out improvement
+    ├── tracking/       # Tips, sealing rule, settlement, accuracy, strike-rate archive
+    ├── matching/       # Normalisers, runner and race matchers
+    ├── httpx/          # Rate limiter, retry, status mapping, response shapes
+    ├── racingapi/      # The Racing API client
+    ├── betfair/        # Session (login, latch, keep-alive), client, faults
+    ├── store/          # SQLite; migrations embedded
+    ├── service/        # The jobs and the timetable
+    ├── importer/       # A phone's pre-server documents → the database
+    ├── backtest/       # Any weights, over history, against the market
+    ├── api/            # HTTP; bearer token on /v1
+    └── parity/         # Golden file pinning Go to Swift
+```
 
 ### App targets
 
@@ -42,83 +76,78 @@ boundary is invisible until a 403 arrives at runtime.
 
 ```
 ios/Races/Races/
-├── App/           # AppEnvironment, RacesStore, RacecardLoader, MarketLoader, BackgroundRefresh
+├── App/           # AppEnvironment + ServerLink, RacesStore (cache) + LegacyHistory, RacecardLoader
 ├── Components/    # StateContentView, ErrorStateView, RaceRow
 ├── Today/         # Today's and tomorrow's meetings
 ├── Tips/          # The model's selection per race
 ├── Courses/       # Every course, searchable — pushed from Racing, not a tab
-├── Model/         # The algorithm on screen: weights, factors, guardrails
+├── Model/         # The algorithm on screen: the server's active weights
 ├── Race/          # Race card, runner detail, the factor breakdown
 ├── Record/        # Strike rate, favourite baseline, coverage
-├── Settings/      # Credential entry, connection test, disclaimer
+├── Settings/      # Server address and token, connection test, history upload
 └── Credentials/   # KeychainCredentialsStore
 ```
 
-Three types carry the app's state, and each has one job:
+The app's state is carried by a few types, each with one job:
 
-- **`AppEnvironment`** — the only place that decides whether a provider exists.
-  Every view model takes an optional dependency plus an `unavailable: APIError?`
-  and reports that rather than inventing one, which keeps "not configured" a
-  single decision instead of one per screen. It also owns `refreshResults()`,
-  the **single** path for collecting results, shared by launch, the Record tab
-  and the background task.
-- **`RacesStore`** — an `actor` owning persistence, the tip ledger, the results
-  archive, the racecard cache and the rater. An actor because persistence is
-  async and the background task touches it off the main thread; one actor so a
-  tip write and a results ingest cannot interleave. It never reaches the
-  network — it is handed races and results and decides what to keep, which is
-  what makes it testable against `InMemoryDocumentStore` with no provider.
-- **`RacecardLoader`** — reads a day's card through the disk cache, shared by
-  Today and Tips so the two cannot disagree about what is running and opening
-  both costs one request, not two.
-- **`MarketLoader`** — the fourth, and the only one that is a single long-lived
-  instance. It fetches Betfair's catalogue, runs `RaceMatcher`, prices **only
-  the markets that matched**, and returns `MarketLoad`: snapshots keyed by *our*
-  race id, plus the matcher's refusals and any failure. It never throws, because
-  no market is an ordinary state. Its provider is swapped in place by
-  `AppEnvironment.refresh()` rather than the loader being replaced — see the
-  gotcha below.
+- **`AppEnvironment`** — the only place that decides whether the server exists.
+  It reads the address and token from the Keychain and puts a client — or the
+  reason there is none — into the `ServerLink`.
+- **`ServerLink`** — one long-lived object every view model holds. Its server is
+  swapped in place by `AppEnvironment.refresh()`, never replaced, so a screen
+  built before the token was entered sees the server without a relaunch (see the
+  gotcha below). `require()` returns the server or throws the reason.
+- **`RacecardLoader`** — reads a day's card from the server, shared by Racing,
+  Tips and Courses so they cannot disagree and opening all three costs one
+  request. Falls back to the last card saved on disk when the server is out of
+  reach, and says so.
+- **`RacesStore`** — an `actor` holding the last card and record on disk. A cache,
+  never authoritative, never written back.
+- **`LegacyHistory`** — the tip ledger, results archive and training state a
+  phone wrote to Application Support before the server existed. Settings uploads
+  them once (`POST /v1/import`); they are read, never modified.
 
 Tabs are **Racing, Tips, Model, Record, Settings** — and five is the ceiling.
 iOS collapses a sixth into a "More" list, which would bury Settings, where
-credentials are entered. So the course directory is **pushed from Racing** rather
-than holding a tab: Racing's own search covers the meetings on today's card, and
-the directory covers the courses with no fixture, which is the only thing the
-card cannot tell you.
+the server is configured. So the course directory is **pushed from Racing**
+rather than holding a tab: Racing's own search covers the meetings on today's
+card, and the directory covers the courses with no fixture, which is the only
+thing the card cannot tell you.
 
 **The Model tab is read-only, and that is a constraint rather than an omission.**
 `weightsID` is stamped onto every stored tip, so editing a weight without
-changing the id silently invalidates the accuracy history — and changing the id
-splits the record into two populations the Record tab would have to keep apart.
-Tuning belongs behind the back-test, which can say whether a changed weight is
-better or merely different. What the screen does show is everything: all twelve
-factors including the four at zero, α and β, the clip, the coverage floor and the
-form-scoring table.
+changing the id silently invalidates the accuracy history. The server changes
+weights only by minting a new id — nightly retraining, promoted only when the
+candidate beats the current set on races it never saw — and `GET /v1/record?weightsID=`
+keeps the populations apart. Trying a set without running it is what
+`POST /v1/backtests` is for. The screen shows the server's active set: all
+twelve factors including the four at zero, α and β, the clip, the coverage floor
+and the form-scoring table.
 
-**Prices are fetched before tips are recorded, never after.** Recording is what
-seals a tip, so `TipsViewModel` loads the market first and hands the snapshots to
-`assessAndRecord`. A tip sealed form-only and re-rated with prices afterwards
-would be a record of something the user was never shown.
+**Prices are fetched before tips are sealed, never after.** The server's seal
+job prices every race inside the five-minute window and stores that book as the
+race's `seal` snapshot before rating it. A tip sealed form-only and re-rated
+with prices afterwards would be a record of something nobody was shown.
 
-**Only `TipsViewModel` records tips, and it records the whole card.** Not the
-races the user happened to open: a ledger of races that looked interesting is a
-biased sample, and the favourite baseline would be measured against a different
-population from the tips. `RaceView` assesses for display and never writes.
+**The server records the whole card, on a clock.** Every race is drafted every
+fifteen minutes and sealed inside the window whether or not a phone is open. A
+ledger of races someone happened to look at is a biased sample, and the
+favourite baseline would be measured against a different population. The app
+never records anything.
 
 `Races.xcodeproj` is **checked in and was written by hand**, not generated by
 Xcode — see the gotcha below. The macOS CI job is what validates it.
 
 ```
 ios/RacesKit/Sources/RacesKit/
-├── Core/          # ViewState, APIError, RetryPolicy, RateLimiter, HTTPClient
-├── Models/        # Course, Race, Runner, RaceResult — provider-agnostic domain types
-├── Providers/     # RacingAPI + Betfair clients behind two protocols
-│   ├── RacingAPI/ # Client, DTOs, mapping
-│   └── Betfair/   # Session (login/keep-alive), client, DTOs, faults, mapping
-├── Matching/      # Joins the two providers' views of the same race
-├── Rating/        # The algorithm: factors, weights, the rater
-├── Tracking/      # Tip ledger, reconciliation, accuracy metrics
-└── Store/         # Codable JSON on disk; the growing results archive
+├── Core/          # ViewState, APIError, RetryPolicy, RateLimiter, HTTPClient, credentials
+├── Server/        # RacesServing, RacesServerClient, the server's response types
+├── Models/        # Course, Race, Runner, RaceResult — what the server's JSON decodes into
+├── Rating/        # The Swift rater — kept for ServerParityTests until deleted
+├── Tracking/      # TipRecord, AccuracyReport and the logic they came with
+├── Providers/     # The old Swift provider clients — no longer on any request path
+├── Matching/      # CourseNameNormaliser is still used by the course directory
+└── Store/         # Codable JSON on disk
 ```
 
 ## Key Patterns
@@ -128,23 +157,36 @@ ios/RacesKit/Sources/RacesKit/
 framework is imported. Anything needing the Keychain lives in the app target
 behind a protocol declared in `Core/`.
 
-**Two provider protocols, not one** — `RacingDataProviding` (cards, results) and
-`MarketDataProviding` (prices, SP). They are separate because either can be absent:
-the user may not have configured Betfair, or a race may not match. Both absences are
-normal states, never errors.
+**The server speaks the kit's Codable.** Every response is the JSON shape
+Swift's synthesised Codable produces for the matching RacesKit type: camelCase
+keys, optionals omitted, enums with associated values as single-key objects
+(`{"won":{"betfairSP":4.2}}`, `{"finished":{"_0":3}}`), `ClosedRange` as a pair,
+and dates as whole-second UTC through `domain.Instant`. That is what lets the
+app decode `Race`, `RaceAssessment`, `TipRecord` and `AccuracyReport` with the
+models it already had, and what lets the server read a phone's uploaded ledger.
+Two committed fixture sets hold it: `server-*.json` (real API responses,
+decoded by `ServerContractTests`) and `server-golden-rating.json` (the Go rater's
+numbers, matched by `ServerParityTests`). The Go tests compare both byte for
+byte, so a shape change fails Go first; regenerate with `-update` and run the
+Swift tests before merging.
 
-`MarketDataProviding` returns `ExchangeMarketPrices`, keyed by Betfair's own
+**Two provider interfaces, not one** — `service.RacingData` (cards, results) and
+`service.MarketData` (prices, SP). They are separate because either can be
+absent: the server may have no Betfair credentials, or a race may not match.
+Both absences are normal states, never errors.
+
+`MarketData` returns `matching.ExchangePrices`, keyed by Betfair's own
 **selection id** — deliberately not `MarketSnapshot`, which is keyed by *our*
 horse id and can only exist after matching has joined the two providers. Handing
 the rater exchange-keyed prices would mean it had to know two providers exist,
-which is the thing the matching layer is for. `BetfairMapping.snapshot(from:horseIDsBySelectionID:)`
-is the one place that crossing happens, and it **drops** unmatched selections
-rather than guessing.
+which is the thing the matching layer is for. `matching.Snapshot` is the one
+place that crossing happens, and it **drops** unmatched selections rather than
+guessing.
 
 **`MarketReference` is the one exception, and it is deliberate.** Settlement is a
 different job from rating: Betfair returns starting prices keyed by its own
 selection ids, and by the time a race settles the catalogue that would let us
-re-derive the mapping may be gone. So `RaceMarketMatch.reference()` freezes
+re-derive the mapping may be gone. So `matching.Match.Reference()` freezes
 `marketID` plus the whole field's `horseID → selectionID` map onto the `TipRecord`
 at the moment the match was made and believed. It stores the **whole field**, not
 just the selection, because the favourite baseline needs a price too — priced tip
@@ -152,19 +194,25 @@ against priceless benchmark is the most flattering possible asymmetry. Keyed our
 id → theirs so the stored ledger is a readable JSON object rather than a flat
 alternating array.
 
-**Tier degradation is a feature** — `formHistory(horseID:)` throws
-`APIError.tierUnavailable` on the free tier. The rater catches it and drops those
-factors. `APIError.isExpectedLimitation` is what the UI keys off to show plain
-information rather than an error banner. **Never** let a missing paid endpoint fail
-a whole race.
+**Tier degradation is a feature** — `racingapi.Client.FormHistory` returns
+`TierUnavailable` on the free tier, and the first 403 latches so twenty runners
+do not burn twenty rate-limit slots. **Never** let a missing paid endpoint fail a
+whole race. On the app side `APIError.isExpectedLimitation` is still what keys
+plain information ("not configured") rather than an error banner.
 
 **Everything the rater needs is pure** — the algorithm takes plain structs and
 returns plain structs. No network, no clock, no disk. That is what lets the
-back-test run on Linux in seconds, and it is a rule worth defending.
+back-test replay history in seconds, and it is a rule worth defending.
 
-**Rate limiting** — each provider client owns a `RateLimiter`. The Racing API free
-tier is 1 req/s. Always `await limiter.acquire()` before sending; `HTTPClient` does
-this for you.
+**Rate limiting** — each provider client owns an `httpx.RateLimiter`. The Racing
+API free tier is 1 req/s. `httpx.Client` waits on it before every send, and
+retries only idempotent calls.
+
+**One SQLite connection** — `store.Open` sets `MaxOpenConns(1)` and every job
+runs under one mutex, so a seal and a results ingest can never interleave, which
+is the job the `RacesStore` actor used to do. The consequence: inside
+`Store.Tx`, use only the `Tx` methods. Calling a `Store` method from within the
+transaction waits for the connection the transaction holds, forever.
 
 **Matching refuses rather than guesses** — `docs/matching.md` has the design.
 The rule that shapes it: a race with no market falls back to form only and says
@@ -173,11 +221,13 @@ race's prices and looks entirely normal. So ties, thin overlaps and ambiguity ar
 all refused, and every refusal carries a reason.
 
 **Credentials cross the module boundary as a protocol** — `CredentialsStoring` and
-`ProviderConfiguration` live in the kit; `KeychainCredentialsStore` implements them
-in the app. *Which* secrets count as a configured provider is kit logic, and
-therefore tested on Linux; only the `SecItem*` calls are app-side. Half-configured
-is not configured: a username with no password would 401 and the user would be
-told their credentials are wrong rather than that a field is blank.
+`ServerConfiguration` live in the kit; `KeychainCredentialsStore` implements them
+in the app. *Which* secrets count as configured is kit logic — a token makes the
+server configured, a blank address means the default one — and therefore tested
+on Linux; only the `SecItem*` calls are app-side. The five provider slots stay
+in `CredentialSlot` so `removeAll()` still reaches anything a phone saved before
+the server; saving the server clears them. The provider credentials themselves
+live in Ansible Vault, and only the server sees them.
 
 ## Gotchas
 
@@ -383,19 +433,20 @@ told their credentials are wrong rather than that a field is blank.
   where they would read more naturally.
 - **A view model captures its dependencies when SwiftUI builds it, and `@State`
   keeps it alive across a credential change.** So handing a screen a *new*
-  loader on `refresh()` does nothing: Tips would still hold the one with no
-  Betfair provider until the app was relaunched, which is the exact opposite of
-  what `AppEnvironment.refresh()` exists to do. `MarketLoader` is therefore one
-  long-lived object whose provider is replaced by `use(provider:)`, clearing its
-  caches — prices fetched under another app key are not ours to show.
+  loader on `refresh()` does nothing: a screen built before the token was
+  entered would hold "not configured" until the app was relaunched, which is the
+  exact opposite of what `AppEnvironment.refresh()` exists to do. `ServerLink` is
+  therefore one long-lived object whose server is replaced by `use(server:)`,
+  and every view model holds the link rather than a server. (The old
+  `MarketLoader` learned this first.)
 - **"Matched a market" and "has prices" are two different claims, and the Tips
   coverage line makes the second one.** Betfair will return a book whose every
   runner has no back, lay, last-traded or forecast price. The rater is already
   safe from it — `Overround.impliedProbability` returns `nil` for such a runner,
   coverage comes out at 0, and the assessment stays form-only — but counting
   that race as priced would overstate the footer, which exists precisely to
-  show when the model is *not* anchored. So `MarketLoader` drops those books,
-  and the two numbers cannot disagree.
+  show when the model is *not* anchored. So the server's `priced` drops those
+  books, and Tips counts races whose assessment has a market source.
 - **`marketSource` is `MarketSnapshot.Source?`, so unwrap it before switching.**
   `switch assessment.marketSource { case .none: … }` reads as three cases and is
   really `Optional.none` competing with pattern promotion; `guard let source`
@@ -408,18 +459,33 @@ told their credentials are wrong rather than that a field is blank.
   changes. The failure mode it guards is silent: a weight on screen with nothing
   explaining it looks like a finished row.
 - **A matched market is worth recording even when nothing was priced.**
-  `MarketLoad.references` is deliberately a wider set than `MarketLoad.snapshots`:
+  In `service.priced` the references are deliberately a wider set than the snapshots:
   an early book with no money in it yields no snapshot, so the tip is form-only —
   but that race still settles with a Betfair SP hours later, and that is the ROI
   figure. Gating the reference on live prices would lose ROI for exactly the races
   that were hardest to price at the time.
 - **The results pass makes two independent calls, and the second must not be able
-  to cost the first.** `refreshResults()` fetches the Racing API results and then
-  Betfair's settled starting prices; `betfairStartingPrices(now:)` swallows every
-  failure and returns `[:]`. A failure there costs the ROI figure for those tips
-  and nothing else — `ResultReconciler` settles them on the result alone. Losing
+  to cost the first.** `service.CollectResults` fetches the Racing API results and
+  then Betfair's settled starting prices; `startingPrices` swallows the Betfair
+  failure and falls back to the prices already stored. A failure there costs the
+  ROI figure for those tips and nothing else — `tracking.Settle` settles them on
+  the result alone. Losing
   the strike rate as well would be the real bug, and the free results endpoint is
   today-only, so there is no second attempt at it.
+- **Dates cross to the app as whole seconds, or not at all.** Go's `time.Time`
+  marshals RFC3339Nano, and Swift's `.iso8601` decoding strategy rejects a
+  fractional second — one sub-second timestamp anywhere in a response makes the
+  app discard the whole card. Every time in a response is a `domain.Instant`,
+  which truncates. A new response field of type `time.Time` is the bug.
+- **The trainer has a hard floor of 100 training races, whatever the
+  configuration says.** It is in the Swift original too:
+  `eligible.count - validationCount >= 100`. RacesKit's own trainer tests run at
+  40 races and assert a fit, which that guard cannot reach — so the Go tests use
+  150. If those Swift tests are red, that is why, and it predates the server.
+- **Qualify the column inside `json_each`.** `json_each(json, '$.runnerIDs')` in
+  an `UPDATE training_samples` silently matched nothing — the bare `json` is
+  ambiguous with the function of the same name. `training_samples.json` works,
+  and `TestTrainingWinner` exists because the failure was a quiet zero.
 - **Don't hand `Optional.map` a main-actor closure.** `configuration.racingAPI.map(makeRacingProvider)`
   is the natural way to write `AppEnvironment.refresh()` and it fails: `map` wants
   a nonisolated closure, so passing an isolated one loses the global actor. An
@@ -427,12 +493,17 @@ told their credentials are wrong rather than that a field is blank.
 
 ## CI
 
-Two workflows, split by cost rather than by tidiness.
+Three workflows, split by cost rather than by tidiness.
 
 | Workflow | Job | Runs when |
 |---|---|---|
+| `server.yml` | `Server (Go)`, then `Image (GHCR)` on `main` | `server/**` or the `server-*.json` contract fixtures change |
 | `kit.yml` | `RacesKit (Linux)` | `ios/RacesKit/**` changes |
 | `app.yml` | `Races (Xcode)` | `ios/Races/**`, `ios/RacesKit/Sources/**` or `Package.swift` changes |
+
+`server.yml` pushes `ghcr.io/bensuskins/races-server:latest` (and a `sha-` tag
+to roll back to) from `main`; the homelab's `update.yml` pulls it on its next
+run, as it does the other self-built images.
 
 **This repository is private, so every runner minute is billed — and macOS bills
 at 10x.** On 2026-09-22 roughly 112 minutes of Xcode wall time billed at about
@@ -473,13 +544,18 @@ run is never recorded at all.
 All of it is now on screen in the Record tab, laid out so the favourite baseline
 sits directly beneath the strike rate — the two are meaningless apart. ROI stays
 hidden below 50 settled tips and says why, and coverage is shown whether or not it
-flatters, because the free results endpoint is today-only and a race day the app
-never saw is a result gone for good. Those tips expire and are counted rather
-than dropped.
+flatters, because the free results endpoint is today-only and a race day the
+server never saw is a result gone for good. Those tips expire and are counted
+rather than dropped. The server enforces the rule now (`tracking.Decide`), so the
+record no longer depends on anyone opening the app inside the window; tips
+uploaded from a phone keep their `device:` source and are labelled on screen.
 
 ## Testing
 
-- XCTest throughout, table-driven where it fits.
+- Go's `testing` on the server, XCTest in the kit and app, table-driven where it fits.
+- The server is tested against fakes of both providers with an injected clock:
+  `service_test.go` runs a whole race day — draft, seal, results, settlement,
+  back-test — in milliseconds, and `api_test.go` drives the HTTP surface.
 - Prefer fakes over mocks; fakes live in the test target alongside what they fake.
 - Provider payloads are committed as fixtures under
   `ios/RacesKit/Tests/RacesKitTests/Fixtures/` and loaded via `Fixture.load(_:)`.
@@ -488,8 +564,9 @@ than dropped.
   only be tested with live credentials, the seam is in the wrong place.
 
 ```bash
-swift test --package-path ios/RacesKit          # the fast loop; also what CI runs first
-swift test --package-path ios/RacesKit --filter BackTest
+(cd server && go test ./...)                    # the server, in seconds
+(cd server && go test ./internal/api ./internal/parity -update)  # regenerate the contract fixtures
+swift test --package-path ios/RacesKit          # the kit, including ServerContractTests and ServerParityTests
 
 # The app half. Needs macOS. CI runs this, resolving the simulator the same way.
 xcodebuild test -project ios/Races/Races.xcodeproj -scheme Races \
@@ -498,18 +575,19 @@ xcodebuild test -project ios/Races/Races.xcodeproj -scheme Races \
   CODE_SIGNING_ALLOWED=NO
 ```
 
-App-side fakes live in `ios/Races/RacesTests/Fakes.swift`:
-`FakeRacingDataProvider` (scripted `Result`s for cards, courses and results, plus
-call counts, so caching and degradation are assertable) and
+App-side fakes live in `ios/Races/RacesTests/Fakes.swift`: `FakeRacesServer`
+(scripted `Result`s per endpoint, defaulting to a loud "not scripted" failure,
+plus call counts and the jobs and uploads it received) and
 `InMemoryCredentialsStore` (which can also be told to throw, for the
 broken-Keychain path), with `fixture` builders for `Race`, `Runner`, `Course`,
-`RaceResult` and `Finisher`. Prefer extending those over writing a second fake.
+`RaceResult`, `ServerRacecard`, `ServerRecord` and `ServerStatus`, and
+`temporaryHistory()` for `LegacyHistory`. Prefer extending those over writing a
+second fake.
 
-The store is tested against `InMemoryDocumentStore` from the kit, which
-round-trips through JSON exactly as `JSONFileStore` does — so a type that fails
-to encode fails in the tests too. Constructing a **second** `RacesStore` over the
-same document store is how a relaunch is tested, and that is the only honest way
-to prove persistence.
+The app's cache is tested against `InMemoryDocumentStore` from the kit, which
+round-trips through JSON exactly as `JSONFileStore` does. Constructing a
+**second** `RacesStore` over the same document store is how a relaunch is
+tested. On the server, a relaunch is a second `store.Open` over the same file.
 
 An unsigned build has no keychain-access entitlement, so the real Keychain returns
 `errSecMissingEntitlement` (`-34018`) in CI and in previews. That is why

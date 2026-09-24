@@ -1,12 +1,13 @@
 import Foundation
+import UIKit
 import RacesKit
 
-/// Credential entry, and a connection test that reports the detected tier.
+/// Settings: where the server is, its token, and the one-off upload of the
+/// history this phone collected before the server existed.
 ///
-/// Drafts are held separately from the Keychain and written on an explicit save,
-/// so a half-typed password is never stored — `ProviderConfiguration` treats a
-/// username with no password as "not configured", and a partial write would make
-/// the app claim to be set up when it would 401.
+/// The Racing API and Betfair credentials are no longer entered here. They
+/// live in Ansible Vault on the homelab and only the server uses them; the
+/// phone holds a token that lets it read.
 @Observable
 @MainActor
 final class SettingsViewModel {
@@ -14,53 +15,80 @@ final class SettingsViewModel {
     nonisolated enum TestResult: Equatable {
         case untested
         case testing
-        case succeeded(courseCount: Int, capability: ProviderCapability)
+        case succeeded(ServerStatus)
         case failed(APIError)
     }
 
-    var username = ""
-    var password = ""
+    nonisolated enum UploadResult: Equatable {
+        case idle
+        case uploading
+        case succeeded(ServerImportSummary)
+        case failed(APIError)
+    }
+
+    var serverURL = ""
+    var token = ""
 
     private(set) var testResult: TestResult = .untested
+    private(set) var uploadResult: UploadResult = .idle
     private(set) var saveError: String?
+    private(set) var historyUploadedAt: Date?
 
     private let environment: AppEnvironment
+    private let deviceName: String
+    private let now: () -> Date
 
-    init(environment: AppEnvironment) {
+    init(
+        environment: AppEnvironment,
+        deviceName: String = UIDevice.current.name,
+        now: @escaping () -> Date = Date.init
+    ) {
         self.environment = environment
-        loadExistingUsername()
+        self.deviceName = deviceName
+        self.now = now
+        loadExistingAddress()
+        historyUploadedAt = environment.history.uploadedAt
     }
 
-    var isConfigured: Bool { environment.configuration?.racingAPI != nil }
+    var isConfigured: Bool { environment.configuration != nil }
     var isTesting: Bool { testResult == .testing }
+    var isUploading: Bool { uploadResult == .uploading }
     var credentialsFailure: APIError? { environment.credentialsFailure }
+    var hasAnyStoredCredential: Bool { environment.hasAnyStoredCredential }
+    var defaultServerURL: String { ServerConfiguration.defaultBaseURL.absoluteString }
 
-    /// The username is not a secret, so showing it back confirms which account is
-    /// in use. The password is never read back into the form — there is no way to
-    /// display it that is more useful than blank, and a populated field would
-    /// imply editing it in place is safe when submitting it unchanged is not.
-    private func loadExistingUsername() {
-        do {
-            username = try environment.read(.racingAPIUsername) ?? ""
-        } catch {
-            username = ""
-        }
+    /// The history upload is offered while there is history and a server,
+    /// and until it has been sent once.
+    var hasHistoryToUpload: Bool { environment.history.exists }
+
+    private func loadExistingAddress() {
+        serverURL = (try? environment.read(.serverURL)) ?? ""
     }
 
+    /// A new token, or an address change on a server already configured.
     var canSave: Bool {
-        !username.trimmingCharacters(in: .whitespaces).isEmpty
-            && !password.isEmpty
+        !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isConfigured
     }
 
     func save() {
         saveError = nil
         testResult = .untested
+        let address = serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let newToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
-            try environment.write(username.trimmingCharacters(in: .whitespaces), to: .racingAPIUsername)
-            try environment.write(password, to: .racingAPIPassword)
-            password = ""
+            try environment.write(address.isEmpty ? nil : address, to: .serverURL)
+            if !newToken.isEmpty {
+                try environment.write(newToken, to: .serverToken)
+            }
+            token = ""
         } catch {
             saveError = "Couldn't save to the Keychain."
+            return
+        }
+        // The provider credentials this phone used to hold are the server's
+        // job now. Clearing them is housekeeping, so a failure is not reported.
+        for slot in CredentialSlot.legacyProviderSlots {
+            try? environment.write(nil, to: slot)
         }
     }
 
@@ -69,29 +97,45 @@ final class SettingsViewModel {
         testResult = .untested
         do {
             try environment.removeAllCredentials()
-            username = ""
-            password = ""
+            serverURL = ""
+            token = ""
         } catch {
             saveError = "Couldn't clear the Keychain."
         }
     }
 
-    /// Ask for the course list — the cheapest authenticated call there is, and one
-    /// every tier allows, so a failure here is about credentials and nothing else.
+    /// `GET /v1/status`: whether the server answers, and how its providers are.
     func test() async {
-        guard let provider = environment.racingProvider else {
-            testResult = .failed(.notConfigured(provider: "The Racing API"))
+        guard let server = environment.server else {
+            testResult = .failed(environment.unavailabilityReason ?? .notConfigured(provider: "The Races server"))
             return
         }
-
         testResult = .testing
         do {
-            let courses = try await provider.courses(regionCodes: BrowseRegions.codes)
-            testResult = .succeeded(
-                courseCount: courses.count,
-                capability: await provider.capability)
+            testResult = .succeeded(try await server.status())
         } catch {
             testResult = .failed(.from(error))
+        }
+    }
+
+    /// Send the phone's pre-server history. Safe to repeat: the server keeps
+    /// what it already has and reports what, if anything, was new.
+    func uploadHistory() async {
+        guard let server = environment.server else {
+            uploadResult = .failed(environment.unavailabilityReason ?? .notConfigured(provider: "The Races server"))
+            return
+        }
+        let upload = environment.history.upload(device: deviceName)
+        guard !upload.isEmpty else { return }
+        uploadResult = .uploading
+        do {
+            let summary = try await server.importHistory(upload)
+            uploadResult = .succeeded(summary)
+            let moment = now()
+            try? environment.history.markUploaded(at: moment)
+            historyUploadedAt = environment.history.uploadedAt ?? moment
+        } catch {
+            uploadResult = .failed(.from(error))
         }
     }
 }

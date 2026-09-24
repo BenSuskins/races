@@ -1,110 +1,79 @@
 import Foundation
 import RacesKit
 
-/// One transport for the process, not one per rebuild: `URLSession` pools
-/// connections, and a fresh session on every credential save would throw that away.
-///
-/// It lives in a `nonisolated` namespace rather than as a static on
-/// `AppEnvironment`, because a static on a `@MainActor` type is itself
-/// main-actor-isolated — and the provider-building closure that reads it is
-/// nonisolated, so that would not compile.
+/// One transport for the whole app, so every request shares a URLSession.
 private nonisolated enum SharedTransport {
     static let instance: any HTTPPerforming = URLSessionTransport()
 }
 
-/// Owns the one mutable thing the whole app depends on: whether we have working
-/// credentials, and therefore whether there is a provider to call.
+/// The only place that decides whether the server exists.
 ///
-/// It exists so that "not configured" is resolved in exactly one place. Every
-/// view model takes an optional provider and reports
-/// `APIError.notConfigured` when it is absent, which `ErrorStateView` renders as
-/// information rather than as a fault.
-///
-/// `makeRacingProvider` is injected so tests can drive the whole UI from a fake
-/// without a Keychain, a network or a subscription.
+/// The app no longer talks to The Racing API or Betfair: the Races server on
+/// the homelab does, and holds those credentials in Ansible Vault. What the
+/// app keeps in the Keychain is the server's address and its API token.
 @Observable
 @MainActor
 final class AppEnvironment {
 
     private let credentials: any CredentialsStoring
-    private let makeRacingProvider: (ProviderConfiguration.RacingAPI) -> any RacingDataProviding
-    private let makeMarketProvider: (ProviderConfiguration.Betfair) -> any MarketDataProviding
+    private let makeServer: (ServerConfiguration) -> any RacesServing
 
-    /// Persistence, the tip ledger, the results archive and the rater.
+    /// Last-known responses on disk, and the history a device collected
+    /// before the server existed.
     let store: RacesStore
+    let history: LegacyHistory
 
-
-    private(set) var configuration: ProviderConfiguration?
-    /// Non-nil when the Keychain itself failed.
-    ///
-    /// Deliberately distinct from "nothing stored". Reading a broken Keychain as
-    /// empty would tell the user to enter credentials they have already given us,
-    /// and they'd have no way to tell that re-entering them cannot work.
+    private(set) var configuration: ServerConfiguration?
     private(set) var credentialsFailure: APIError?
-    private(set) var racingProvider: (any RacingDataProviding)?
-    private(set) var marketProvider: (any MarketDataProviding)?
+    private(set) var hasAnyStoredCredential = false
 
-    /// Exchange prices for a day's card, matched to our races.
+    /// Long-lived, and the server inside it is swapped by `refresh()` rather
+    /// than the link being replaced.
     ///
-    /// One instance for the process, unlike `makeRacecardLoader()`: the catalogue
-    /// and book calls are the expensive part of a market fetch, so Tips and a
-    /// race detail screen should share one cache. `refresh()` re-points it
-    /// rather than replacing it, so a view model that captured it still sees a
-    /// newly entered app key without a relaunch.
-    let marketLoader = MarketLoader(provider: nil)
+    /// A view model captures its dependencies when SwiftUI builds it and
+    /// `@State` keeps it alive across a credential change, so handing screens
+    /// a *new* object would leave them talking to the old server until a
+    /// relaunch. The old `MarketLoader` learned this first; the link is the same fix.
+    let link: ServerLink
+    let racecards: RacecardLoader
 
     init(
         credentials: any CredentialsStoring,
         store: RacesStore? = nil,
-        makeRacingProvider: ((ProviderConfiguration.RacingAPI) -> any RacingDataProviding)? = nil,
-        makeMarketProvider: ((ProviderConfiguration.Betfair) -> any MarketDataProviding)? = nil
+        history: LegacyHistory = .applicationSupport(),
+        makeServer: ((ServerConfiguration) -> any RacesServing)? = nil
     ) {
         self.credentials = credentials
-        self.store = store ?? RacesStore(documents: AppEnvironment.makeDocumentStore())
-        self.makeRacingProvider = makeRacingProvider ?? { racingAPI in
-            RacingAPIClient(
-                credentials: RacingAPICredentials(
-                    username: racingAPI.username,
-                    password: racingAPI.password),
-                transport: SharedTransport.instance)
+        let store = store ?? RacesStore(documents: AppEnvironment.makeDocumentStore())
+        self.store = store
+        self.history = history
+        self.makeServer = makeServer ?? { configuration in
+            RacesServerClient(configuration: configuration, transport: SharedTransport.instance)
         }
-        self.makeMarketProvider = makeMarketProvider ?? { betfair in
-            BetfairClient.make(
-                credentials: BetfairCredentials(
-                    appKey: betfair.appKey,
-                    username: betfair.username,
-                    password: betfair.password),
-                transport: SharedTransport.instance)
-        }
+        let link = ServerLink(server: nil, unavailable: nil)
+        self.link = link
+        self.racecards = RacecardLoader(link: link, store: store)
         refresh()
     }
 
-    /// Re-read the Keychain and rebuild the provider. Called at launch and after
-    /// Settings writes, so a newly entered key takes effect without a relaunch.
+    /// Re-read the Keychain and rebuild the client.
     func refresh() {
         do {
-            let configuration = try ProviderConfiguration(reading: credentials)
-            self.configuration = configuration
-            self.credentialsFailure = nil
-            // An explicit `if let` rather than `Optional.map`: `map` wants a
-            // nonisolated closure, and these builders are main-actor-isolated.
-            if let racingAPI = configuration.racingAPI {
-                self.racingProvider = makeRacingProvider(racingAPI)
+            if let configuration = try ServerConfiguration(reading: credentials) {
+                self.configuration = configuration
+                self.credentialsFailure = nil
+                link.use(server: makeServer(configuration), unavailable: nil)
             } else {
-                self.racingProvider = nil
-            }
-            if let betfair = configuration.betfair {
-                self.marketProvider = makeMarketProvider(betfair)
-            } else {
-                self.marketProvider = nil
+                self.configuration = nil
+                self.credentialsFailure = nil
+                link.use(server: nil, unavailable: .notConfigured(provider: "The Races server"))
             }
         } catch {
+            let failure = APIError.from(error)
             self.configuration = nil
-            self.credentialsFailure = .from(error)
-            self.racingProvider = nil
-            self.marketProvider = nil
+            self.credentialsFailure = failure
+            link.use(server: nil, unavailable: failure)
         }
-        marketLoader.use(provider: marketProvider)
         hasAnyStoredCredential = CredentialSlot.allCases.contains { slot in
             (try? credentials.read(slot))?.isEmpty == false
         }
@@ -124,106 +93,40 @@ final class AppEnvironment {
         refresh()
     }
 
-    /// The error a screen should show when it has nothing to call.
-    ///
-    /// A broken Keychain outranks a missing key: if we cannot read the store, the
-    /// user's credentials may well be there, and telling them to add some would be
-    /// wrong as well as unhelpful.
-    var unavailabilityReason: APIError? {
-        if let credentialsFailure { return credentialsFailure }
-        if racingProvider == nil { return .notConfigured(provider: "The Racing API") }
-        return nil
-    }
+    /// Why there is no server, or nil when there is one.
+    var unavailabilityReason: APIError? { link.unavailable }
 
-    /// The same question for the market side, which is allowed to be absent.
-    ///
-    /// Separate from `unavailabilityReason` because the two are not
-    /// interchangeable: no Racing API means no card and an empty screen, while
-    /// no Betfair means form-only tips, which is a working app. Anything that
-    /// conflated them would refuse to show a card because prices were missing.
-    var marketUnavailabilityReason: APIError? {
-        if let credentialsFailure { return credentialsFailure }
-        if marketProvider == nil { return .notConfigured(provider: "Betfair") }
-        return nil
-    }
+    var server: (any RacesServing)? { link.server }
 
-    /// Whether there is anything to clear. Not the same as either provider being
-    /// configured: a half-entered Betfair username counts here and not there.
-    ///
-    /// Computed once per `refresh()` rather than on demand, because Settings
-    /// reads it from a view body and the on-demand version is five `SecItem`
-    /// calls per render.
-    private(set) var hasAnyStoredCredential = false
-
-    /// Settled Betfair starting prices for the tips that still need one.
-    ///
-    /// The one number the free Racing API tier cannot supply at all — its
-    /// results endpoint carries no starting price — so without this the Record
-    /// tab has a strike rate and no ROI, for ever.
-    ///
-    /// Never throws and never blocks the ingest. A failure here costs the ROI
-    /// figure for those tips and nothing else: `ResultReconciler` settles them
-    /// on the result alone, and an absent price is omitted rather than
-    /// defaulted, because a zero would read as a starting price of evens and
-    /// wreck the figure it was meant to inform.
-    private func betfairStartingPrices(now: Date) async -> [String: [Int64: Double]] {
-        guard let marketProvider else { return [:] }
-        let marketIDs = await store.marketIDsAwaitingStartingPrice(now: now)
-        guard !marketIDs.isEmpty else { return [:] }
-
-        do {
-            return try await marketProvider.startingPrices(marketIDs: marketIDs)
-        } catch {
-            return [:]
-        }
-    }
-
-    /// Application Support, falling back to memory.
-    ///
-    /// If the directory cannot be created there is nothing the user can do, and
-    /// running without history beats refusing to launch — but the fallback is
-    /// in-memory rather than Caches, because iOS may evict Caches whenever it
-    /// likes and a silently truncated accuracy record looks exactly like a real
-    /// one.
     private static func makeDocumentStore() -> any DocumentStoring {
         do {
-            return try JSONFileStore.applicationSupport()
+            return try JSONFileStore.applicationSupport(subdirectory: "Races/Cache")
         } catch {
             return InMemoryDocumentStore()
         }
     }
+}
 
-    /// A loader bound to the current provider and store.
-    ///
-    /// Made per screen rather than held, so that re-entering a tab after saving
-    /// credentials picks up the new provider without any invalidation dance.
-    func makeRacecardLoader() -> RacecardLoader {
-        RacecardLoader(provider: racingProvider, store: store)
+/// The server, or why there isn't one — held in one long-lived object so every
+/// screen sees a credential change at once.
+@MainActor
+final class ServerLink {
+    private(set) var server: (any RacesServing)?
+    private(set) var unavailable: APIError?
+
+    init(server: (any RacesServing)?, unavailable: APIError? = nil) {
+        self.server = server
+        self.unavailable = unavailable
     }
 
-    /// Fetch today's results, archive them, and settle whatever they answer.
-    ///
-    /// The single path for this, shared by launch, the Record tab and the
-    /// background task. It matters that it is one path: the free results endpoint
-    /// covers **today only**, so a day the app never runs this is a day of
-    /// results gone for good, and a second implementation is a second thing that
-    /// can quietly stop working.
-    @discardableResult
-    func refreshResults(now: Date = Date()) async -> ResultsIngestion? {
-        await store.loadIfNeeded()
-        guard let provider = racingProvider else { return nil }
+    func use(server: (any RacesServing)?, unavailable: APIError?) {
+        self.server = server
+        self.unavailable = unavailable
+    }
 
-        do {
-            let results = try await provider.results(day: .today)
-            let startingPrices = await betfairStartingPrices(now: now)
-            return await store.ingest(
-                results: results, startingPrices: startingPrices, now: now)
-        } catch {
-            // Never surfaced as an error: a provider that cannot give results
-            // right now is not a fault the user can act on, and the tips it would
-            // have settled stay pending until they expire, which the report
-            // counts and displays.
-            return nil
-        }
+    /// The server, or the reason there is none, as an error a screen can show.
+    func require() throws -> any RacesServing {
+        if let server { return server }
+        throw unavailable ?? APIError.notConfigured(provider: "The Races server")
     }
 }

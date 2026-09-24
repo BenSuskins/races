@@ -1,0 +1,91 @@
+name: Races server
+
+# The Go backend. Linux only, so it is the cheap end of the bill: the whole
+# suite runs in seconds, and the image build only on main.
+#
+# Paths follow the same rules as kit.yml and app.yml: the workflow lists itself
+# so a CI change is tested by the CI it changes, and the concurrency group is
+# namespaced so it cannot cancel the other two.
+#
+# The contract fixtures the app decodes are written by this module's tests into
+# ios/RacesKit/Tests/RacesKitTests/Fixtures/, and those tests compare them byte
+# for byte — so a change to a fixture there must run this job too.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - 'ios/RacesKit/Tests/RacesKitTests/Fixtures/server-*.json'
+      - '.github/workflows/server.yml'
+  pull_request:
+    paths:
+      - 'server/**'
+      - 'ios/RacesKit/Tests/RacesKitTests/Fixtures/server-*.json'
+      - '.github/workflows/server.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# See kit.yml: superseding is right for a pull request and wrong for main.
+concurrency:
+  group: server-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  test:
+    name: Server (Go)
+    runs-on: ubuntu-latest
+    # Observed well under a minute locally. A hang is capped, not left to
+    # GitHub's 6-hour default.
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: Format
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race ./...
+
+  image:
+    name: Image (GHCR)
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # `latest` is what the homelab task pulls, as its other self-built
+      # images do; the sha tag is there to roll back to.
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: server
+          push: true
+          build-args: VERSION=${{ github.sha }}
+          tags: |
+            ghcr.io/bensuskins/races-server:latest
+            ghcr.io/bensuskins/races-server:sha-${{ github.sha }}

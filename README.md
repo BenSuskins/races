@@ -3,8 +3,11 @@
 UK horse racing for iOS. Browse **course → race → runner**, get an explainable
 recommendation for each race, and see honestly how well those recommendations do.
 
-Native SwiftUI, no backend. The app talks to two providers directly and keeps its
-own history on device.
+Native SwiftUI app, backed by a small Go server on the homelab
+([`server/`](server/README.md)) that talks to the two providers, rates and seals
+every race on a clock, and keeps the whole history in SQLite — including every
+raw provider response, so future models can be trained and back-tested against
+it. The app reads from the server over the LAN or Tailscale.
 
 ## Status
 
@@ -20,6 +23,7 @@ each item is actually blocked on, is in [`docs/roadmap.md`](docs/roadmap.md).
 | M4 — tip ledger and accuracy tracking | Done |
 | M5 — Betfair SP, so ROI has a price source | Done |
 | M6 — the model on screen: every weight, and why | Done |
+| M7 — the server: collection, sealing, history, retraining and back-tests off the phone | Built; deploying |
 
 Two things are outstanding and neither is a feature: the **Betfair login spike**
 (two minutes, on a device, and three merged changes depend on the answer), and
@@ -35,7 +39,7 @@ down, and [`CLAUDE.md`](CLAUDE.md) for developer context.
 Short version: it starts from the betting market's own implied probability and
 nudges it with the form factors available on the free data tier — official rating,
 the form string, days since last run, and strike rates accumulated from the app's
-own growing archive.
+server's own growing archive.
 
 The nudge is a single bounded dial. Turn it to zero and the model reproduces the
 market exactly. That is deliberate: it makes the one question that matters —

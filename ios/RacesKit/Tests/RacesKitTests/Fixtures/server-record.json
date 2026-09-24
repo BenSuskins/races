@@ -1,0 +1,53 @@
+{
+  "commission": 0.05,
+  "report": {
+    "total": 5,
+    "settled": 2,
+    "wins": 1,
+    "voided": 0,
+    "unresolved": 0,
+    "expired": 1,
+    "pending": 2,
+    "coverage": 0.6666666666666666,
+    "expectedWins": 0.5800000000000001,
+    "brierScore": 0.19619999999999999,
+    "roi": {
+      "bets": 2,
+      "returned": 2.558
+    },
+    "settledWithoutPrice": 0,
+    "favouriteBaseline": {
+      "settled": 1,
+      "wins": 1,
+      "roi": {
+        "bets": 1,
+        "returned": 2.558
+      }
+    },
+    "whenAgreeingWithFavourite": {
+      "settled": 1,
+      "wins": 1,
+      "roi": {
+        "bets": 1,
+        "returned": 2.558
+      }
+    },
+    "whenDisagreeing": {
+      "settled": 1,
+      "wins": 0,
+      "roi": {
+        "bets": 1,
+        "returned": 0
+      }
+    }
+  },
+  "weightsInUse": {
+    "learned-1757689000-520": 1,
+    "v2": 4
+  },
+  "sources": {
+    "device:phone": 3,
+    "server": 2
+  },
+  "archivedRaces": 4
+}

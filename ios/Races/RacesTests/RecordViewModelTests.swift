@@ -2,99 +2,71 @@ import XCTest
 @testable import Races
 import RacesKit
 
-/// `@MainActor async` throughout — see the gotcha in CLAUDE.md.
+/// Every test is `@MainActor async`; see the gotcha in CLAUDE.md.
 final class RecordViewModelTests: XCTestCase {
 
-    @MainActor
-    func test_anEmptyLedgerReportsZeroRatherThanFailing() async throws {
-        let store = RacesStore(documents: InMemoryDocumentStore())
-        let model = RecordViewModel(environment: nil, store: store)
-
-        await model.load()
-
-        let report = try XCTUnwrap(model.state.value)
-        XCTAssertEqual(report.total, 0)
-        XCTAssertNil(report.strikeRate)
+    private func tip(_ id: String, outcome: TipOutcome?) -> TipRecord {
+        TipRecord(
+            raceID: id, raceDate: "2026-06-16", offAt: nil, courseName: "Ascot", raceName: "A Race",
+            raceType: .flat, fieldSizeAtTip: 8, selectionHorseID: "h", selectionHorseName: "H",
+            predictedProbability: 0.3, marketProbabilityAtTip: nil, marketBackPriceAtTip: nil,
+            marketFavouriteHorseID: nil, agreedWithFavourite: nil, wasFormOnly: true, confidence: .medium,
+            modelVersion: RaceRater.modelVersion, weightsID: "v2", contributions: [],
+            createdAt: Date(timeIntervalSince1970: 0), outcome: outcome)
     }
 
     @MainActor
-    func test_theReportReflectsSettledTips() async throws {
-        let store = RacesStore(documents: InMemoryDocumentStore())
-        let offAt = Date(timeIntervalSince1970: 10_000)
-        let race = Race(
-            id: "rac_1", courseName: "Ascot", name: "A Race", offTime: "2:30",
-            offDateTime: offAt, date: "2026-06-16",
-            runners: [.fixture(id: "a", officialRating: 100),
-                      .fixture(id: "b", officialRating: 50)])
+    func test_theReportIsTheServers() async throws {
+        let record = ServerRecord.fixture(
+            tips: [tip("a", outcome: .won(betfairSP: 4)), tip("b", outcome: .lost(position: 3, betfairSP: 6))],
+            sources: ["server": 1, "device:phone": 1],
+            archivedRaces: 12)
+        let model = RecordViewModel(link: ServerLink(server: FakeRacesServer(record: .success(record))), store: nil)
 
-        await store.assessAndRecord([race], now: offAt.addingTimeInterval(-3_600))
-        let recorded = await store.tip(forRace: "rac_1")
-        let tip = try XCTUnwrap(recorded)
-        await store.ingest(
-            results: [.settleable(id: "rac_1", winner: tip.selectionHorseID)],
-            now: offAt.addingTimeInterval(600))
-
-        let model = RecordViewModel(environment: nil, store: store)
         await model.load()
 
         let report = try XCTUnwrap(model.state.value)
-        XCTAssertEqual(report.settled, 1)
+        XCTAssertEqual(report.settled, 2)
         XCTAssertEqual(report.wins, 1)
-        XCTAssertEqual(report.strikeRate, 1.0)
+        XCTAssertEqual(model.archivedRaceCount, 12)
+        XCTAssertEqual(model.uploadedTipCount, 1, "uploaded history is labelled, not hidden")
     }
 
     @MainActor
-    func test_roiIsWithheldBelowTheMinimumSample() async throws {
-        let store = RacesStore(documents: InMemoryDocumentStore())
-        let model = RecordViewModel(environment: nil, store: store)
+    func test_refreshAsksTheServerToCollectResults() async throws {
+        let server = FakeRacesServer(record: .success(.fixture()))
+        let model = RecordViewModel(link: ServerLink(server: server), store: nil)
 
+        await model.refresh()
+
+        XCTAssertEqual(server.jobs, ["results"])
+        XCTAssertFalse(model.isRefreshingResults)
+    }
+
+    @MainActor
+    func test_anUnreachableServerShowsTheLastSavedRecordAndSaysSo() async throws {
+        let store = RacesStore(documents: InMemoryDocumentStore())
+        let server = FakeRacesServer(record: .success(.fixture(tips: [tip("a", outcome: .won(betfairSP: 4))])))
+        let moment = Date(timeIntervalSince1970: 5_000)
+        let model = RecordViewModel(link: ServerLink(server: server), store: store, now: { moment })
         await model.load()
 
-        // Level-stakes ROI over a handful of bets is noise, and showing it would
-        // invite exactly the wrong conclusion.
-        let report = try XCTUnwrap(model.state.value)
-        XCTAssertFalse(report.isSufficientSampleForROI)
+        server.setRecord(.failure(.offline))
+        await model.load()
+
+        XCTAssertEqual(try XCTUnwrap(model.state.value).wins, 1)
+        XCTAssertEqual(model.staleSince, moment)
     }
 
     @MainActor
-    func test_noStoreReportsAnExpectedLimitation() async {
-        let model = RecordViewModel(environment: nil, store: nil)
+    func test_noServerAndNothingSavedFails() async {
+        let model = RecordViewModel(link: ServerLink(server: nil, unavailable: .notConfigured(provider: "The Races server")), store: nil)
 
         await model.load()
 
         guard case .failed(let error) = model.state else {
-            return XCTFail("Expected a failed state, got \(model.state)")
+            return XCTFail("expected failure")
         }
         XCTAssertTrue(error.isExpectedLimitation)
-    }
-
-    @MainActor
-    func test_clearingHistoryEmptiesTheReport() async throws {
-        let store = RacesStore(documents: InMemoryDocumentStore())
-        await store.assessAndRecord([
-            Race.fixture(runners: [.fixture(id: "a"), .fixture(id: "b")]),
-        ])
-        let model = RecordViewModel(environment: nil, store: store)
-        await model.load()
-        XCTAssertEqual(try XCTUnwrap(model.state.value).total, 1)
-
-        await model.clearHistory()
-
-        let report = try XCTUnwrap(model.state.value)
-        XCTAssertEqual(report.total, 0)
-    }
-
-    @MainActor
-    func test_theArchiveCountIsSurfaced() async {
-        let store = RacesStore(documents: InMemoryDocumentStore())
-        await store.ingest(results: [
-            .fixture(id: "r1", finishers: [.fixture(horseID: "a", position: 1)]),
-            .fixture(id: "r2", finishers: [.fixture(horseID: "b", position: 1)]),
-        ])
-        let model = RecordViewModel(environment: nil, store: store)
-
-        await model.load()
-
-        XCTAssertEqual(model.archivedRaceCount, 2)
     }
 }

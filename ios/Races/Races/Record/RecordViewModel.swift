@@ -1,12 +1,7 @@
 import Foundation
 import RacesKit
 
-/// How the tips have actually done.
-///
-/// The report is computed from the ledger, never stored, so it cannot drift from
-/// the tips it describes. Opening this tab also runs a results pass, because this
-/// is the screen a user opens in the evening — exactly when today's results are
-/// still available and about to stop being.
+/// The accuracy record, as the server computes it over every tip it holds.
 @Observable
 @MainActor
 final class RecordViewModel {
@@ -14,19 +9,24 @@ final class RecordViewModel {
     private(set) var state: ViewState<AccuracyReport> = .idle
     private(set) var archivedRaceCount = 0
     private(set) var isRefreshingResults = false
-    /// What the last results pass changed, for a one-line confirmation.
-    private(set) var lastIngestion: ResultsIngestion?
+    /// Tips by where they came from: `server`, or `device:<name>` for history
+    /// uploaded from a phone.
+    private(set) var sources: [String: Int] = [:]
+    /// Non-nil when the record on screen is the last one saved on the phone.
+    private(set) var staleSince: Date?
 
-    private let environment: AppEnvironment?
+    private let link: ServerLink
     private let store: RacesStore?
+    private let now: () -> Date
 
-    init(environment: AppEnvironment?, store: RacesStore?) {
-        self.environment = environment
+    init(link: ServerLink, store: RacesStore?, now: @escaping () -> Date = Date.init) {
+        self.link = link
         self.store = store
+        self.now = now
     }
 
     convenience init(environment: AppEnvironment) {
-        self.init(environment: environment, store: environment.store)
+        self.init(link: environment.link, store: environment.store)
     }
 
     func loadIfNeeded() async {
@@ -34,37 +34,46 @@ final class RecordViewModel {
         await load()
     }
 
-    /// Show the record from what is already on disk.
     func load() async {
-        guard let store else {
-            state = .failed(.notConfigured(provider: "The Racing API"))
-            return
+        if state.value == nil { state = .loading }
+        do {
+            let record = try await link.require().record(weightsID: nil)
+            apply(record)
+            staleSince = nil
+            if let store { await store.saveRecord(record) }
+        } catch {
+            // Unwrap before the call: optional-chaining an async call is the
+            // double-optional gotcha in CLAUDE.md.
+            var cached: ServerRecord?
+            if let store { cached = await store.cachedRecord() }
+            if let cached {
+                apply(cached)
+                staleSince = now()
+            } else {
+                state = .failed(.from(error))
+            }
         }
-        await store.loadIfNeeded()
-        state = .loaded(await store.report())
-        archivedRaceCount = await store.archivedRaceCount
     }
 
-    /// Fetch today's results, then recompute.
-    ///
-    /// Deliberately never fails the screen: an unreachable provider does not
-    /// invalidate the record already on disk, and the report itself displays
-    /// coverage so an incomplete record cannot pass as a complete one.
+    private func apply(_ record: ServerRecord) {
+        state = .loaded(record.report)
+        archivedRaceCount = record.archivedRaces
+        sources = record.sources
+    }
+
+    /// Ask the server to collect results now rather than at its next quarter
+    /// hour, then reload.
     func refresh() async {
         isRefreshingResults = true
-        if let environment {
-            // Not `await environment?.refreshResults()`: optional-chaining an
-            // async call yields a double optional, which will not assign here.
-            lastIngestion = await environment.refreshResults()
+        if let server = link.server {
+            try? await server.runJob("results")
         }
         isRefreshingResults = false
         await load()
     }
 
-    func clearHistory() async {
-        guard let store else { return }
-        await store.clearHistory()
-        lastIngestion = nil
-        await load()
+    /// How many tips came from a phone's history rather than the server.
+    var uploadedTipCount: Int {
+        sources.filter { $0.key.hasPrefix("device:") }.reduce(0) { $0 + $1.value }
     }
 }

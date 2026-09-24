@@ -1,8 +1,15 @@
 # Provider Reference
 
-Every third-party endpoint this app calls, what tier it needs, and what we take
-from it. **Keep this in step with `ios/RacesKit/Sources/RacesKit/Providers/` — if
-you add, remove or re-tier a call, update this file in the same change.**
+Every third-party endpoint the Races server calls, what tier it needs, and what we
+take from it. **Keep this in step with `server/internal/racingapi/` and
+`server/internal/betfair/` — if you add, remove or re-tier a call, update this
+file in the same change.**
+
+The app calls none of these any more. The server on the homelab does, on a
+schedule (`server/internal/service/scheduler.go`), with credentials from Ansible
+Vault, and keeps every response body gzipped in `raw_payloads`. The Swift
+clients under `ios/RacesKit/Sources/RacesKit/Providers/` remain only until the
+Swift rater is deleted; they are no longer on any request path.
 
 This matters more than a normal API doc would, because we don't own these APIs and
 **the free/paid boundary is invisible until a 403 arrives at runtime**. This file
@@ -22,8 +29,9 @@ export BF_TOKEN=...               # Betfair session token from /api/login
 ## The Racing API — `https://api.theracingapi.com`
 
 **Auth:** HTTP Basic (`Authorization: Basic base64(user:pass)`).
-**Current tier: Free.** Credentials are entered by the user in Settings and held in
-the Keychain; nothing is bundled in the app.
+**Current tier: Free.** Credentials are `RACING_API_USERNAME` and
+`RACING_API_PASSWORD` in the server's environment, from Ansible Vault; nothing is
+on the phone.
 
 > **Naming trap.** The endpoint names are inverted relative to the tier names:
 > `/v1/racecards/free` returns the *Basic* schema, and `/v1/racecards/basic`
@@ -37,7 +45,7 @@ the Keychain; nothing is bundled in the app.
   the Model tab took the fifth slot).
 - **Tier:** Free · **Rate limit:** 1 req/s
 - **Fields consumed:** `id`, `course`, `region_code`, `region`
-- **Caching:** Indefinite. Courses do not change.
+- **Schedule:** Daily at 06:00 London. Courses do not change.
 
 ```bash
 curl -s -u "$RACING_USER:$RACING_PASS" \
@@ -55,8 +63,8 @@ curl -s -u "$RACING_USER:$RACING_PASS" \
   `sire`/`dam`/`damsire` (+ ids), `trainer`/`trainer_id`, `owner`/`owner_id`,
   `number`, `draw`, `headgear`, `lbs`, `ofr`, `jockey`/`jockey_id`, `last_run`,
   `form`
-- **Caching:** 15 minutes. Cards themselves barely change, but non-runners are
-  declared through the day.
+- **Schedule:** Today's card every 15 minutes 06:00–22:59, tomorrow's hourly.
+  Cards barely change, but non-runners are declared through the day.
 
 ```bash
 curl -s -u "$RACING_USER:$RACING_PASS" \
@@ -64,7 +72,9 @@ curl -s -u "$RACING_USER:$RACING_PASS" \
 ```
 
 #### `GET /v1/results/today/free`
-- **Usecase:** Reconciling tips against outcomes, and growing the on-device archive.
+- **Usecase:** Reconciling tips against outcomes, and growing the server's archive.
+- **Schedule:** Every 15 minutes from 12:00, plus 23:55 London. Today-only, so the
+  last pass of the day is the one that matters.
 - **Tier:** Free · **Rate limit:** 1 req/s
 - **Runner fields:** `horse_id`, `horse`, `position`, `number`, `draw`, `weight_lbs`,
   `headgear`, `or`, `jockey_id`, `trainer_id`
@@ -135,9 +145,11 @@ key**, which is for placing bets and which this app does not need.
 - **Caveat:** interactive login can be challenged by 2FA or CAPTCHA, which an app
   cannot transparently satisfy. If that proves common, the fallback is certificate
   login at `identitysso-cert.betfair.com/api/certlogin`.
-- **Implemented by** `BetfairSession`. Note that a refusal arrives as **HTTP 200
+- **Implemented by** `betfair.Session`. Credentials are `BETFAIR_APP_KEY`,
+  `BETFAIR_USERNAME` and `BETFAIR_PASSWORD` in the server's environment; all
+  three or none. Note that a refusal arrives as **HTTP 200
   with `status: "FAIL"`** and the reason in `error`, so a status-code check reads
-  it as a success with no token. `BetfairLoginFailure` keys off the body and
+  it as a success with no token. `betfair.LoginFailure` keys off the body and
   classifies the code three ways, because they need different handling and
   different copy:
 
@@ -155,9 +167,11 @@ key**, which is for placing bets and which this app does not need.
   abroad and the screen said only "We received an unexpected response. Please try
   again.": Betfair answering with something that is not a login reply at all.
   Every field of the response is optional, so any JSON object decodes — a decode
-  failure here therefore means the body was not JSON. `logIn()` reads it raw and
-  throws `BetfairLoginFailure.unreadableResponse(_:)` carrying status, content
-  type, byte count and a redacted snippet.
+  failure here therefore means the body was not JSON. `LogIn` reads it raw and
+  returns a `LoginFailure` with code `UNREADABLE_RESPONSE` carrying status,
+  content type, byte count and a redacted snippet. `GET /v1/status` reports the
+  last login failure, its class and Betfair's own code, which is what Settings
+  shows under "Test connection".
 
   | Class | Codes | What the app does |
   |---|---|---|
@@ -194,7 +208,7 @@ curl -s -X POST "https://identitysso.betfair.com/api/login" \
 All calls are `POST` with a JSON body.
 
 #### `listMarketCatalogue`
-- **Implemented by** `BetfairClient.markets(day:countries:)`.
+- **Implemented by** `betfair.Client.Markets`.
 - **Usecase:** Today's GB win markets with per-runner metadata — a free second
   racecard, and the join target for our Racing API cards.
 - **Filter:** `eventTypeIds: ["7"]` (Horse Racing), `marketCountries: ["GB", "IE"]`,
@@ -205,18 +219,19 @@ All calls are `POST` with a JSON body.
 - **Metadata consumed:** `CLOTH_NUMBER` (the join key), `FORM`,
   `DAYS_SINCE_LAST_RUN`, `OFFICIAL_RATING`, `ADJUSTED_RATING`, `WEIGHT_VALUE`,
   `STALL_DRAW`, `JOCKEY_NAME`, `TRAINER_NAME`, `WEARING`, `COLOURS_FILENAME`
-- **Caching:** 15 minutes, applied by `MarketLoader` in the app — the same
-  window as a racecard, and for the same reason: the field changes through the
-  day, but far more slowly than the prices do.
+- **Schedule:** With the card — every 15 minutes for today, hourly for
+  tomorrow — followed by a matching pass whose result (a market, or a refusal
+  with its reason) is stored per race.
 - **Note:** `maxResults` is required and capped; page through a day by start time.
 
 #### `listMarketBook`
 - **Usecase:** Current back/lay prices → implied probability, the model's anchor.
 - **Batching:** up to 40 market ids per call — respect this, it is a hard limit.
-- **Caching:** 5 minutes, applied by `MarketLoader` in the app, and **only for
-  markets a race actually matched** — pricing the whole catalogue would spend a
-  book call per forty markets on races we cannot join.
-- **Implemented by** `BetfairClient.prices(marketIDs:)`, which batches at 40 and
+- **Schedule:** Every 15 minutes for the drafts, and once per race inside the
+  five-minute seal window, **only for markets a race actually matched** —
+  pricing the whole catalogue would spend a book call per forty markets on races
+  we cannot join. The book a tip was sealed on is stored as its `seal` snapshot.
+- **Implemented by** `betfair.Client.Prices`, which batches at 40 and
   then **splits further on `TOO_MUCH_DATA`**. That code is an instruction rather
   than a failure: the same markets come back when asked for in smaller groups,
   so the batch is halved recursively. Surfacing it as an error would turn a
@@ -232,13 +247,14 @@ All calls are `POST` with a JSON body.
   without this call the Record tab has a strike rate and no ROI, permanently.
 - **Source:** `listMarketBook` with `priceProjection.priceData` including `SP_TRADED`
   after the off, read once a market is settled.
-- **Implemented by** `BetfairClient.startingPrices(marketIDs:)`. An absent or
+- **Implemented by** `betfair.Client.StartingPrices`. An absent or
   zero `actualSP` is **omitted rather than defaulted**: a zero would read as a
   starting price and wreck the ROI figure, and a missing one just means the race
   has not settled yet.
-- **Called by** `AppEnvironment.refreshResults()`, in the same pass as the Racing
-  API results, for the market ids of tips still awaiting an outcome
-  (`TipLedger.marketIDsAwaitingStartingPrice`). A settled BSP never changes, so a
+- **Called by** `service.CollectResults`, in the same pass as the Racing API
+  results, for the market ids of tips still awaiting an outcome
+  (`tracking.MarketIDsAwaitingStartingPrice`). Settled prices are kept in
+  `starting_prices`. A settled BSP never changes, so a
   tip that has one is never re-requested, and a race that never matched a market
   is never asked about.
 - **Not cached.** The two calls are independent: a failure here costs the ROI
@@ -254,8 +270,8 @@ All calls are `POST` with a JSON body.
 
 ## Rate limiting
 
-Each provider gets its own `RateLimiter` (`Core/RateLimiter.swift`), since the
-limits are unrelated.
+Each provider gets its own `httpx.RateLimiter` (`server/internal/httpx`), since
+the limits are unrelated.
 
 | Provider | Limit applied | Why it is not a bottleneck |
 |---|---|---|

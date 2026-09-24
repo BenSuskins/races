@@ -160,10 +160,18 @@ struct AlgorithmView: View {
             if model.archivedRaceCount > 0 {
                 LabeledContent("Races archived", value: "\(model.archivedRaceCount)")
             }
+            if let samples = model.trainingSamples {
+                LabeledContent("Races to learn from", value: model.trainingMinimum.map { "\(samples) of \($0)" } ?? "\(samples)")
+            }
+            if let failure = model.loadFailure {
+                Label(failure.errorDescription ?? "Couldn't reach the server.", systemImage: "wifi.exclamationmark")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         } header: {
             Text("Version")
         } footer: {
-            Text("Both are stamped onto every tip. Change a weight without changing the id and the accuracy record silently stops meaning anything — which is why the numbers above are read-only. None of them are fitted: they are reasoned starting points, and the back-test exists to replace them with something earned.")
+            Text("These are the weights the server is running. Both ids are stamped onto every tip, and the server only changes weights by minting a new id — retraining nightly once enough races have settled, and promoting a new set only when it beats the current one on races it never saw.")
         }
     }
 }

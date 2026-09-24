@@ -3,9 +3,8 @@ import RacesKit
 
 /// A day's racing, grouped into meetings.
 ///
-/// Reads through `RacecardLoader`, so the disk cache means a cold launch shows
-/// the last card immediately rather than a spinner, and a tab switch costs no
-/// request against the 1 req/s free tier.
+/// Reads through `RacecardLoader`, so a tab switch costs no request and a
+/// phone off the tailnet still opens on the last card it saw.
 @Observable
 @MainActor
 final class TodayViewModel {
@@ -27,24 +26,16 @@ final class TodayViewModel {
         await load()
     }
 
-    private let loader: RacecardLoader?
-    private let unavailable: APIError?
+    private let loader: RacecardLoader
     private let now: () -> Date
 
-    init(
-        loader: RacecardLoader?,
-        unavailable: APIError?,
-        now: @escaping () -> Date = Date.init
-    ) {
+    init(loader: RacecardLoader, now: @escaping () -> Date = Date.init) {
         self.loader = loader
-        self.unavailable = unavailable
         self.now = now
     }
 
     convenience init(environment: AppEnvironment) {
-        self.init(
-            loader: environment.makeRacecardLoader(),
-            unavailable: environment.credentialsFailure)
+        self.init(loader: environment.racecards)
     }
 
     func loadIfNeeded() async {
@@ -53,19 +44,7 @@ final class TodayViewModel {
     }
 
     func load(forceRefresh: Bool = false) async {
-        // Only a broken Keychain short-circuits. A missing key does not: the
-        // cache may still hold a card worth showing, and the loader decides.
-        if let unavailable {
-            state = .failed(unavailable)
-            return
-        }
-        guard let loader else {
-            state = .failed(.notConfigured(provider: "The Racing API"))
-            return
-        }
-
         if state.value == nil { state = .loading }
-
         do {
             let load = try await loader.load(day: day, forceRefresh: forceRefresh, now: now())
             state = .loaded(load.races.groupedIntoMeetings())

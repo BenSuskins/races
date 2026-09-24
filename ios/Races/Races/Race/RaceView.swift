@@ -23,7 +23,8 @@ struct RaceView: View {
     /// exchange's opinion would overstate it.
     private func marketFooter(for assessment: RaceAssessment) -> String {
         guard let source = assessment.marketSource else {
-            return "Form only — no market matched this race, so there's nothing to anchor it to. Treat it as a read of the racecard, nothing more."
+            let reason = model.refusal.map { " (\($0.displayName))" } ?? ""
+            return "Form only — no market matched this race\(reason), so there's nothing to anchor it to. Treat it as a read of the racecard, nothing more."
         }
         switch source {
         case .forecast:
