@@ -53,7 +53,7 @@ public enum AssessmentConfidence: String, Codable, Hashable, Sendable, CaseItera
     }
 }
 
-public struct RunnerAssessment: Hashable, Sendable, Identifiable {
+public struct RunnerAssessment: Codable, Hashable, Sendable, Identifiable {
     public let horseID: String
     public let horseName: String
     public let clothNumber: Int?
@@ -102,7 +102,7 @@ public struct RunnerAssessment: Hashable, Sendable, Identifiable {
     }
 }
 
-public struct RaceAssessment: Hashable, Sendable {
+public struct RaceAssessment: Codable, Hashable, Sendable {
     public let raceID: String
     public let generatedAt: Date
     public let modelVersion: String

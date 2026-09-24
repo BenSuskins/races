@@ -1,0 +1,69 @@
+[
+  {
+    "marketId": "1.245678901",
+    "marketName": "2m Hcap Chs",
+    "marketStartTime": "2026-09-22T13:45:00.000Z",
+    "event": {
+      "id": "33445566",
+      "name": "Ascot 22nd Sep",
+      "venue": "Ascot",
+      "countryCode": "GB",
+      "timezone": "Europe/London"
+    },
+    "runners": [
+      {
+        "selectionId": 12345678,
+        "runnerName": "1. Kyprios (IRE)",
+        "status": "ACTIVE",
+        "metadata": {
+          "CLOTH_NUMBER": "1",
+          "JOCKEY_NAME": "R Moore",
+          "TRAINER_NAME": "A O'Brien",
+          "FORM": "1-3241",
+          "OFFICIAL_RATING": "118",
+          "STALL_DRAW": "4",
+          "WEARING": ""
+        }
+      },
+      {
+        "selectionId": 22345678,
+        "runnerName": "2. Trueshan",
+        "status": "ACTIVE",
+        "metadata": {
+          "CLOTH_NUMBER": "2",
+          "JOCKEY_NAME": "H Doyle",
+          "TRAINER_NAME": "A King",
+          "FORM": "21-11",
+          "OFFICIAL_RATING": "116"
+        }
+      },
+      {
+        "selectionId": 32345678,
+        "runnerName": "3. Withdrawn Horse",
+        "status": "REMOVED",
+        "metadata": { "CLOTH_NUMBER": "3" }
+      },
+      {
+        "selectionId": 42345678,
+        "runnerName": "Unnumbered Runner",
+        "status": "ACTIVE",
+        "metadata": { "CLOTH_NUMBER": "0" }
+      }
+    ]
+  },
+  {
+    "marketId": "1.245678902",
+    "marketName": "5f Nov Stks",
+    "marketStartTime": "2026-09-22T14:20:00.000Z",
+    "event": { "id": "33445567", "name": "Ayr 22nd Sep", "venue": "Ayr", "countryCode": "GB" },
+    "runners": [
+      { "selectionId": 52345678, "runnerName": "1. Baaeed", "status": "ACTIVE", "metadata": { "CLOTH_NUMBER": "1" } }
+    ]
+  },
+  {
+    "marketId": "1.245678903",
+    "marketName": "No Start Time",
+    "event": { "venue": "Nowhere" },
+    "runners": []
+  }
+]

@@ -1,0 +1,284 @@
+{
+  "modelVersion": "market-anchored-3",
+  "active": {
+    "id": "v2",
+    "marketExponent": 1,
+    "formInfluence": 0.35,
+    "formInfluenceNoMarket": 0.9,
+    "clip": 2.5,
+    "overroundMethod": "proportional",
+    "minimumMarketCoverage": 0.8,
+    "factorWeights": {
+      "age": 0.04,
+      "completionRate": 0.08,
+      "daysSinceLastRun": 0.06,
+      "draw": 0,
+      "handicapBandPosition": 0.2,
+      "headgear": 0,
+      "jockeyStrikeRate": 0,
+      "officialRating": 0.3,
+      "recentForm": 0.25,
+      "trainerStrikeRate": 0,
+      "weightCarried": 0.02,
+      "wonLastTime": 0.1
+    },
+    "formDecay": 0.75,
+    "formPoints": {
+      "1": 1,
+      "2": 0.72,
+      "3": 0.55,
+      "4": 0.42,
+      "5": 0.32,
+      "6": 0.25,
+      "7": 0.2,
+      "8": 0.16,
+      "9": 0.13,
+      "nonCompletion": 0,
+      "tenOrWorse": 0.05
+    },
+    "formSeasonBreakPenalty": 0.8,
+    "formLongBreakPenalty": 0.5,
+    "formMaxRuns": 6,
+    "minimumStrikeRateSample": 30,
+    "minimumValueEdge": 0.05,
+    "minimumValueProbability": 0.08
+  },
+  "weights": [
+    {
+      "weights": {
+        "id": "learned-1757689000-520",
+        "marketExponent": 1.02,
+        "formInfluence": 0.4,
+        "formInfluenceNoMarket": 0.9,
+        "clip": 2.5,
+        "overroundMethod": "proportional",
+        "minimumMarketCoverage": 0.8,
+        "factorWeights": {
+          "age": 0.04,
+          "officialRating": 0.4,
+          "recentForm": 0.2
+        },
+        "formDecay": 0.75,
+        "formPoints": {
+          "1": 1,
+          "2": 0.72,
+          "nonCompletion": 0,
+          "tenOrWorse": 0.05
+        },
+        "formSeasonBreakPenalty": 0.8,
+        "formLongBreakPenalty": 0.5,
+        "formMaxRuns": 6,
+        "minimumStrikeRateSample": 30,
+        "minimumValueEdge": 0.05,
+        "minimumValueProbability": 0.08
+      },
+      "origin": "device",
+      "createdAt": "2026-09-20T09:00:00Z",
+      "active": false
+    },
+    {
+      "weights": {
+        "id": "market-only",
+        "marketExponent": 1,
+        "formInfluence": 0,
+        "formInfluenceNoMarket": 0,
+        "clip": 2.5,
+        "overroundMethod": "proportional",
+        "minimumMarketCoverage": 0.8,
+        "factorWeights": {},
+        "formDecay": 0.75,
+        "formPoints": {
+          "1": 1,
+          "2": 0.72,
+          "3": 0.55,
+          "4": 0.42,
+          "5": 0.32,
+          "6": 0.25,
+          "7": 0.2,
+          "8": 0.16,
+          "9": 0.13,
+          "nonCompletion": 0,
+          "tenOrWorse": 0.05
+        },
+        "formSeasonBreakPenalty": 0.8,
+        "formLongBreakPenalty": 0.5,
+        "formMaxRuns": 6,
+        "minimumStrikeRateSample": 30,
+        "minimumValueEdge": 0.05,
+        "minimumValueProbability": 0.08
+      },
+      "origin": "preset",
+      "createdAt": "2026-09-20T09:00:00Z",
+      "active": false
+    },
+    {
+      "weights": {
+        "id": "v1",
+        "marketExponent": 1,
+        "formInfluence": 0.35,
+        "formInfluenceNoMarket": 0.9,
+        "clip": 2.5,
+        "overroundMethod": "proportional",
+        "minimumMarketCoverage": 0.8,
+        "factorWeights": {
+          "age": 0.04,
+          "completionRate": 0.08,
+          "daysSinceLastRun": 0.06,
+          "draw": 0,
+          "handicapBandPosition": 0.2,
+          "headgear": 0,
+          "jockeyStrikeRate": 0,
+          "officialRating": 0.3,
+          "recentForm": 0.25,
+          "trainerStrikeRate": 0,
+          "weightCarried": 0.02,
+          "wonLastTime": 0.1
+        },
+        "formDecay": 0.75,
+        "formPoints": {
+          "1": 1,
+          "2": 0.72,
+          "3": 0.55,
+          "4": 0.42,
+          "5": 0.32,
+          "6": 0.25,
+          "7": 0.2,
+          "8": 0.16,
+          "9": 0.13,
+          "nonCompletion": 0,
+          "tenOrWorse": 0.05
+        },
+        "formSeasonBreakPenalty": 0.8,
+        "formLongBreakPenalty": 0.5,
+        "formMaxRuns": 6,
+        "minimumStrikeRateSample": 30,
+        "minimumValueEdge": 0,
+        "minimumValueProbability": 0
+      },
+      "origin": "preset",
+      "createdAt": "2026-09-20T09:00:00Z",
+      "active": false
+    },
+    {
+      "weights": {
+        "id": "v2",
+        "marketExponent": 1,
+        "formInfluence": 0.35,
+        "formInfluenceNoMarket": 0.9,
+        "clip": 2.5,
+        "overroundMethod": "proportional",
+        "minimumMarketCoverage": 0.8,
+        "factorWeights": {
+          "age": 0.04,
+          "completionRate": 0.08,
+          "daysSinceLastRun": 0.06,
+          "draw": 0,
+          "handicapBandPosition": 0.2,
+          "headgear": 0,
+          "jockeyStrikeRate": 0,
+          "officialRating": 0.3,
+          "recentForm": 0.25,
+          "trainerStrikeRate": 0,
+          "weightCarried": 0.02,
+          "wonLastTime": 0.1
+        },
+        "formDecay": 0.75,
+        "formPoints": {
+          "1": 1,
+          "2": 0.72,
+          "3": 0.55,
+          "4": 0.42,
+          "5": 0.32,
+          "6": 0.25,
+          "7": 0.2,
+          "8": 0.16,
+          "9": 0.13,
+          "nonCompletion": 0,
+          "tenOrWorse": 0.05
+        },
+        "formSeasonBreakPenalty": 0.8,
+        "formLongBreakPenalty": 0.5,
+        "formMaxRuns": 6,
+        "minimumStrikeRateSample": 30,
+        "minimumValueEdge": 0.05,
+        "minimumValueProbability": 0.08
+      },
+      "origin": "preset",
+      "createdAt": "2026-09-20T09:00:00Z",
+      "active": true
+    }
+  ],
+  "factors": [
+    {
+      "id": "officialRating",
+      "label": "Official rating",
+      "summary": "The handicapper's number. The strongest thing the free tier gives us."
+    },
+    {
+      "id": "handicapBandPosition",
+      "label": "Position in the handicap",
+      "summary": "Where the rating sits inside the race's own band — well in at the top, struggling at the bottom."
+    },
+    {
+      "id": "recentForm",
+      "label": "Recent form",
+      "summary": "The form string, read right to left and weighted toward the most recent run."
+    },
+    {
+      "id": "wonLastTime",
+      "label": "Won last time out",
+      "summary": "Whether the last completed run was a win."
+    },
+    {
+      "id": "completionRate",
+      "label": "Completion record",
+      "summary": "How often the horse finishes at all. It means far more over fences than on the Flat."
+    },
+    {
+      "id": "daysSinceLastRun",
+      "label": "Days since last run",
+      "summary": "Time off, scored as a bell rather than a line — a fortnight is better than three days or three months."
+    },
+    {
+      "id": "age",
+      "label": "Age",
+      "summary": "Age against the race's own age band."
+    },
+    {
+      "id": "weightCarried",
+      "label": "Weight carried",
+      "summary": "Pounds carried, negated so less is better.",
+      "rationale": "Near zero on purpose: in a handicap, weight is the handicapper's equaliser, so it substantially double-counts the official rating."
+    },
+    {
+      "id": "draw",
+      "label": "Draw",
+      "summary": "Stall number.",
+      "rationale": "Draw bias is real, but it is a course × distance × going × field-size interaction. Without a bias table it is noise, so the code ships switched off."
+    },
+    {
+      "id": "headgear",
+      "label": "Headgear",
+      "summary": "Blinkers, a visor, a hood, cheekpieces.",
+      "rationale": "The signal is *first-time* headgear, and the free tier has no headgear history to detect it with."
+    },
+    {
+      "id": "jockeyStrikeRate",
+      "label": "Jockey strike rate",
+      "summary": "The jockey's win rate in the server's own archive, shrunk toward the field average.",
+      "rationale": "Legitimate, but derived from an archive that starts empty. It switches on once enough race days have been collected."
+    },
+    {
+      "id": "trainerStrikeRate",
+      "label": "Trainer strike rate",
+      "summary": "The trainer's win rate in the server's own archive, shrunk toward the field average.",
+      "rationale": "Legitimate, but derived from an archive that starts empty. It switches on once enough race days have been collected."
+    }
+  ],
+  "samples": {
+    "minimumRaces": 500,
+    "pending": 1,
+    "settled": 1
+  },
+  "archivedRaces": 4
+}

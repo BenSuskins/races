@@ -21,6 +21,13 @@ struct TipsView: View {
                         description: Text("Every race on today's card has already run."))
                 } else {
                     List {
+                        if let staleSince = model.staleSince {
+                            Label(
+                                "Couldn't reach the server — showing the card saved \(staleSince.formatted(date: .omitted, time: .shortened)).",
+                                systemImage: "wifi.exclamationmark")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
                         ForEach(selections) { selection in
                             NavigationLink(value: selection.race) {
                                 TipRow(selection: selection)
@@ -128,12 +135,6 @@ private struct MarketCoverageRow: View {
     }
 
     private var line: String {
-        if let failure = coverage.failure {
-            if case .notConfigured = failure {
-                return "Betfair isn't connected, so every tip is form-only. Add it in Settings to anchor them to the market."
-            }
-            return failure.errorDescription ?? "No market prices this time, so every tip is form-only."
-        }
         if coverage.isComplete {
             return "Every race matched a market."
         }
@@ -152,7 +153,7 @@ struct DisclaimerFooter: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("For information only. Not betting advice.")
             if archivedRaceCount == 0 {
-                Text("No results archived yet, so jockey and trainer records aren't in play. They start counting from the first evening you open the app after racing.")
+                Text("No results archived yet, so jockey and trainer records aren't in play. The server starts counting from its first evening of racing.")
             } else {
                 Text("\(archivedRaceCount) races archived — jockey and trainer records are in play and sharpen with every race day.")
             }

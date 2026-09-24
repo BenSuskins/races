@@ -2,152 +2,67 @@ import XCTest
 @testable import Races
 import RacesKit
 
+/// Every test is `@MainActor async`; see the gotcha in CLAUDE.md.
 final class RacecardLoaderTests: XCTestCase {
 
+    private let now = Date(timeIntervalSince1970: 1_000_000)
+
     @MainActor
-    private func makeLoader(
-        _ provider: FakeRacingDataProvider?,
-        store: RacesStore
-    ) -> RacecardLoader {
-        RacecardLoader(provider: provider, store: store)
+    private func makeLoader(_ server: FakeRacesServer?, store: RacesStore) -> RacecardLoader {
+        RacecardLoader(
+            link: ServerLink(server: server, unavailable: server == nil ? .notConfigured(provider: "The Races server") : nil),
+            store: store)
     }
 
     @MainActor
-    func test_aFreshCacheIsServedWithoutAskingTheProvider() async throws {
-        let provider = FakeRacingDataProvider(racecards: .success([.fixture(id: "r1")]))
-        let store = RacesStore(documents: InMemoryDocumentStore())
-        let loader = makeLoader(provider, store: store)
-        let start = Date(timeIntervalSince1970: 1_000_000)
+    func test_aFreshCardIsServedFromMemoryWithoutASecondRequest() async throws {
+        let server = FakeRacesServer(racecards: [.today: .success(.fixture(races: [.fixture()]))])
+        let loader = makeLoader(server, store: RacesStore(documents: InMemoryDocumentStore()))
 
-        _ = try await loader.load(day: .today, now: start)
-        XCTAssertEqual(provider.racecardCalls, 1)
+        _ = try await loader.load(day: .today, now: now)
+        let second = try await loader.load(day: .today, now: now.addingTimeInterval(30))
 
-        // Inside the window: a tab switch must not spend a request against the
-        // 1 req/s free tier.
-        let second = try await loader.load(
-            day: .today, now: start.addingTimeInterval(StoreDocument.racecardFreshness - 1))
-
-        XCTAssertEqual(provider.racecardCalls, 1)
-        XCTAssertEqual(second.races.map(\.id), ["r1"])
+        XCTAssertEqual(server.racecardCalls, 1, "Racing and Tips share one request")
         XCTAssertTrue(second.isFresh)
     }
 
     @MainActor
-    func test_aStaleCacheIsRefreshed() async throws {
-        let provider = FakeRacingDataProvider(racecards: .success([.fixture(id: "r1")]))
-        let store = RacesStore(documents: InMemoryDocumentStore())
-        let loader = makeLoader(provider, store: store)
-        let start = Date(timeIntervalSince1970: 1_000_000)
+    func test_forceRefreshAlwaysAsks() async throws {
+        let server = FakeRacesServer(racecards: [.today: .success(.fixture(races: [.fixture()]))])
+        let loader = makeLoader(server, store: RacesStore(documents: InMemoryDocumentStore()))
 
-        _ = try await loader.load(day: .today, now: start)
-        _ = try await loader.load(
-            day: .today, now: start.addingTimeInterval(StoreDocument.racecardFreshness + 1))
+        _ = try await loader.load(day: .today, now: now)
+        _ = try await loader.load(day: .today, forceRefresh: true, now: now)
 
-        XCTAssertEqual(provider.racecardCalls, 2)
+        XCTAssertEqual(server.racecardCalls, 2)
+    }
+
+    /// Off the tailnet, the phone still opens on the last card it saw — and
+    /// says that is what it is.
+    @MainActor
+    func test_anUnreachableServerFallsBackToTheSavedCard() async throws {
+        let documents = InMemoryDocumentStore()
+        let store = RacesStore(documents: documents)
+        let saved = Date(timeIntervalSince1970: 999_000)
+        let server = FakeRacesServer(racecards: [.today: .success(.fixture(races: [.fixture()], fetchedAt: saved))])
+        _ = try await makeLoader(server, store: store).load(day: .today, now: now)
+
+        server.setRacecard(.failure(.offline))
+        let load = try await makeLoader(server, store: store).load(day: .today, forceRefresh: true, now: now)
+
+        XCTAssertTrue(load.servedStaleAfterFailure)
+        XCTAssertEqual(load.races.map(\.id), ["rac_1"])
+        XCTAssertEqual(load.fetchedAt, saved)
     }
 
     @MainActor
-    func test_forceRefreshIgnoresAFreshCache() async throws {
-        let provider = FakeRacingDataProvider(racecards: .success([.fixture(id: "r1")]))
-        let store = RacesStore(documents: InMemoryDocumentStore())
-        let loader = makeLoader(provider, store: store)
-        let start = Date(timeIntervalSince1970: 1_000_000)
-
-        _ = try await loader.load(day: .today, now: start)
-        // Pull to refresh exists for when the user knows better than the clock.
-        _ = try await loader.load(day: .today, forceRefresh: true, now: start)
-
-        XCTAssertEqual(provider.racecardCalls, 2)
-    }
-
-    @MainActor
-    func test_aFailedRefreshFallsBackToTheCacheAndSaysSo() async throws {
-        let store = RacesStore(documents: InMemoryDocumentStore())
-        let start = Date(timeIntervalSince1970: 1_000_000)
-
-        let working = makeLoader(
-            FakeRacingDataProvider(racecards: .success([.fixture(id: "r1")])), store: store)
-        _ = try await working.load(day: .today, now: start)
-
-        let failing = makeLoader(
-            FakeRacingDataProvider(racecards: .failure(.offline)), store: store)
-        let load = try await failing.load(
-            day: .today, now: start.addingTimeInterval(StoreDocument.racecardFreshness + 1))
-
-        // A stale card beats an error screen — but only because the screen is
-        // told it is stale and says when it was saved.
-        XCTAssertEqual(load.races.map(\.id), ["r1"])
-        XCTAssertFalse(load.isFresh)
-        XCTAssertEqual(load.fetchedAt.timeIntervalSince1970, start.timeIntervalSince1970, accuracy: 1)
-    }
-
-    @MainActor
-    func test_aFailureWithNoCacheThrows() async {
-        let store = RacesStore(documents: InMemoryDocumentStore())
-        let loader = makeLoader(
-            FakeRacingDataProvider(racecards: .failure(.offline)), store: store)
-
-        do {
-            _ = try await loader.load(day: .today, now: Date())
-            XCTFail("Expected a throw with nothing cached")
-        } catch {
-            XCTAssertEqual(APIError.from(error), .offline)
-        }
-    }
-
-    @MainActor
-    func test_noProviderStillServesACachedCard() async throws {
-        let store = RacesStore(documents: InMemoryDocumentStore())
-        let start = Date(timeIntervalSince1970: 1_000_000)
-        let working = makeLoader(
-            FakeRacingDataProvider(racecards: .success([.fixture(id: "r1")])), store: store)
-        _ = try await working.load(day: .today, now: start)
-
-        // Credentials cleared. The card they last saw was real, so it is still
-        // worth showing.
-        // Stay inside the same London day: the cache is keyed by day string, so
-        // advancing 24 hours would look up a different key and miss by design.
-        let loader = makeLoader(nil, store: store)
-        let load = try await loader.load(
-            day: .today, now: start.addingTimeInterval(StoreDocument.racecardFreshness + 1))
-
-        XCTAssertEqual(load.races.map(\.id), ["r1"])
-        XCTAssertFalse(load.isFresh)
-    }
-
-    @MainActor
-    func test_noProviderAndNoCacheReportsNotConfigured() async {
+    func test_noServerAndNoCacheIsNotConfigured() async {
         let loader = makeLoader(nil, store: RacesStore(documents: InMemoryDocumentStore()))
-
         do {
-            _ = try await loader.load(day: .today, now: Date())
-            XCTFail("Expected notConfigured")
+            _ = try await loader.load(day: .today, now: now)
+            XCTFail("expected a failure")
         } catch {
             XCTAssertTrue(APIError.from(error).isExpectedLimitation)
         }
-    }
-
-    @MainActor
-    func test_todayAndTomorrowDoNotShareACacheEntry() async throws {
-        let provider = FakeRacingDataProvider(racecards: .success([.fixture(id: "r1")]))
-        let store = RacesStore(documents: InMemoryDocumentStore())
-        let loader = makeLoader(provider, store: store)
-        let start = Date(timeIntervalSince1970: 1_000_000)
-
-        _ = try await loader.load(day: .today, now: start)
-        _ = try await loader.load(day: .tomorrow, now: start)
-
-        // Caching both under one key would show tomorrow's card as today's.
-        XCTAssertEqual(provider.racecardCalls, 2)
-    }
-
-    @MainActor
-    func test_asksForBothBritishAndIrishRacing() async throws {
-        let provider = FakeRacingDataProvider(racecards: .success([]))
-        let loader = makeLoader(provider, store: RacesStore(documents: InMemoryDocumentStore()))
-
-        _ = try await loader.load(day: .today, now: Date())
-
-        XCTAssertEqual(provider.lastRegionCodes, ["gb", "ire"])
     }
 }

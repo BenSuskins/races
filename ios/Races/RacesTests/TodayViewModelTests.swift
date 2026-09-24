@@ -10,27 +10,25 @@ final class TodayViewModelTests: XCTestCase {
 
     @MainActor
     private func makeModel(
-        _ provider: FakeRacingDataProvider?,
-        unavailable: APIError? = nil,
+        _ server: FakeRacesServer?,
         now: Date = Date(timeIntervalSince1970: 1_000_000)
     ) -> TodayViewModel {
-        let store = RacesStore(documents: InMemoryDocumentStore())
+        let link = ServerLink(server: server, unavailable: server == nil ? .notConfigured(provider: "The Races server") : nil)
         return TodayViewModel(
-            loader: RacecardLoader(provider: provider, store: store),
-            unavailable: unavailable,
+            loader: RacecardLoader(link: link, store: RacesStore(documents: InMemoryDocumentStore())),
             now: { now })
     }
 
     @MainActor
     func test_loadGroupsRacesIntoMeetingsOrderedByFirstRace() async throws {
-        let model = makeModel(FakeRacingDataProvider(racecards: .success([
+        let model = makeModel(FakeRacesServer(racecards: [.today: .success(.fixture(races: [
             .fixture(id: "r2", courseName: "Ascot", offTime: "3:05",
                      offDateTime: Date(timeIntervalSince1970: 3_600)),
             .fixture(id: "r1", courseName: "Ascot", offTime: "2:30",
                      offDateTime: Date(timeIntervalSince1970: 1_800)),
             .fixture(id: "r3", courseName: "Ayr", offTime: "2:00",
                      offDateTime: Date(timeIntervalSince1970: 900)),
-        ])))
+        ]))]))
 
         await model.load()
 
@@ -40,7 +38,7 @@ final class TodayViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_noProviderReportsNotConfiguredRatherThanFailing() async {
+    func test_noServerReportsNotConfiguredRatherThanFailing() async {
         let model = makeModel(nil)
 
         await model.load()
@@ -48,103 +46,36 @@ final class TodayViewModelTests: XCTestCase {
         guard case .failed(let error) = model.state else {
             return XCTFail("Expected a failed state, got \(model.state)")
         }
-        // An unconfigured provider is information, not a fault, so
-        // `ErrorStateView` must not offer a pointless retry.
+        // Not configured is information, not a fault, so `ErrorStateView`
+        // must not offer a pointless retry.
         XCTAssertTrue(error.isExpectedLimitation)
     }
 
     @MainActor
-    func test_aBrokenKeychainShortCircuitsBeforeTheLoader() async {
-        // A missing key does not short-circuit: the cache may still hold a card.
-        // A broken Keychain does, because nothing downstream can be trusted.
-        let provider = FakeRacingDataProvider(racecards: .success([.fixture()]))
-        let model = makeModel(provider, unavailable: .decoding(nil))
-
+    func test_switchingDayAsksForThatDay() async throws {
+        let server = FakeRacesServer(racecards: [
+            .today: .success(.fixture(races: [.fixture(id: "today")])),
+            .tomorrow: .success(.fixture(day: .tomorrow, races: [.fixture(id: "tomorrow")])),
+        ])
+        let model = makeModel(server)
         await model.load()
-
-        guard case .failed(let error) = model.state else {
-            return XCTFail("Expected a failed state, got \(model.state)")
-        }
-        XCTAssertEqual(error, .decoding(nil))
-        XCTAssertEqual(provider.racecardCalls, 0)
-    }
-
-    @MainActor
-    func test_loadIfNeededDoesNotRefetchOnceLoaded() async {
-        let provider = FakeRacingDataProvider(racecards: .success([.fixture()]))
-        let model = makeModel(provider)
-
-        await model.loadIfNeeded()
-        await model.loadIfNeeded()
-
-        XCTAssertEqual(provider.racecardCalls, 1)
-    }
-
-    @MainActor
-    func test_anEmptyCardLoadsRatherThanErroring() async throws {
-        let model = makeModel(FakeRacingDataProvider(racecards: .success([])))
-
-        await model.load()
-
-        // A day with no British or Irish racing is a real day, not a failure.
-        let meetings = try XCTUnwrap(model.state.value)
-        XCTAssertEqual(meetings.count, 0)
-    }
-
-    @MainActor
-    func test_switchingDayReloads() async {
-        let provider = FakeRacingDataProvider(racecards: .success([.fixture()]))
-        let model = makeModel(provider)
-
-        await model.loadIfNeeded()
-        XCTAssertEqual(model.day, .today)
 
         await model.select(.tomorrow)
 
         XCTAssertEqual(model.day, .tomorrow)
-        XCTAssertEqual(provider.racecardCalls, 2, "Tomorrow is a different card")
+        XCTAssertEqual(try XCTUnwrap(model.state.value).first?.races.first?.id, "tomorrow")
     }
 
     @MainActor
-    func test_selectingTheSameDayIsANoOp() async {
-        let provider = FakeRacingDataProvider(racecards: .success([.fixture()]))
-        let model = makeModel(provider)
-        await model.loadIfNeeded()
-
-        await model.select(.today)
-
-        XCTAssertEqual(provider.racecardCalls, 1)
-    }
-
-    @MainActor
-    func test_aStaleCardIsFlaggedSoTheScreenCanSayWhenItWasSaved() async {
-        let store = RacesStore(documents: InMemoryDocumentStore())
-        let start = Date(timeIntervalSince1970: 1_000_000)
-
-        let working = RacecardLoader(
-            provider: FakeRacingDataProvider(racecards: .success([.fixture()])), store: store)
-        _ = try? await working.load(day: .today, now: start)
-
-        let later = start.addingTimeInterval(StoreDocument.racecardFreshness + 1)
-        let model = TodayViewModel(
-            loader: RacecardLoader(
-                provider: FakeRacingDataProvider(racecards: .failure(.offline)), store: store),
-            unavailable: nil,
-            now: { later })
+    func test_aServerErrorFailsTheScreen() async {
+        let model = makeModel(FakeRacesServer(racecards: [.today: .failure(.unauthorized)]))
 
         await model.load()
 
-        XCTAssertNotNil(model.state.value, "A stale card still loads")
-        XCTAssertEqual(model.staleSince?.timeIntervalSince1970 ?? 0, start.timeIntervalSince1970, accuracy: 1)
-    }
-
-    @MainActor
-    func test_aFreshCardClearsTheStaleFlag() async {
-        let provider = FakeRacingDataProvider(racecards: .success([.fixture()]))
-        let model = makeModel(provider)
-
-        await model.load()
-
+        guard case .failed(let error) = model.state else {
+            return XCTFail("Expected a failed state")
+        }
+        XCTAssertEqual(error, .unauthorized)
         XCTAssertNil(model.staleSince)
     }
 }

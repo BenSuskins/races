@@ -1,0 +1,39 @@
+{
+  "results": [
+    {
+      "race_id": "rac_1001",
+      "course": "Ascot",
+      "date": "2026-09-20",
+      "off_dt": "2026-09-20T14:30:00+01:00",
+      "race_name": "Sky Bet Handicap",
+      "dist_f": "8.0",
+      "region": "GB",
+      "class": "Class 3",
+      "type": "Flat",
+      "going": "Good To Firm",
+      "surface": "Turf",
+      "runners": [
+        { "horse_id": "hrs_2", "horse": "Stradivarius", "position": "1", "number": "2", "draw": "1", "weight_lbs": "130", "or": "92", "jockey_id": "jky_2", "trainer_id": "trn_2" },
+        { "horse_id": "hrs_1", "horse": "Kyprios", "position": "2", "number": "1", "draw": "3", "weight_lbs": "133", "or": "95", "jockey_id": "jky_1", "trainer_id": "trn_1" },
+        { "horse_id": "hrs_4", "horse": "Numeric Types", "position": 3, "number": 4, "draw": 2, "weight_lbs": 128, "or": 88, "jockey_id": "jky_4", "trainer_id": "trn_4" }
+      ]
+    },
+    {
+      "race_id": "rac_1002",
+      "course": "Wetherby",
+      "date": "2026-09-20",
+      "race_name": "Novices' Chase",
+      "dist_f": "20.0",
+      "class": "4",
+      "type": "Chase",
+      "going": "Soft",
+      "surface": "Turf",
+      "runners": [
+        { "horse_id": "hrs_6", "horse": "Jumper Two", "position": "1", "number": "2" },
+        { "horse_id": "hrs_5", "horse": "Jumper One", "position": "PU", "number": "1" },
+        { "horse_id": "hrs_7", "horse": "Jumper Three", "position": "F", "number": "3" }
+      ]
+    }
+  ],
+  "total": 2
+}

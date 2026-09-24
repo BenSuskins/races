@@ -3,14 +3,13 @@ import RacesKit
 
 /// The app's tabs.
 struct RootView: View {
-    @Environment(\.scenePhase) private var scenePhase
     @State private var environment: AppEnvironment
 
     init(credentials: any CredentialsStoring) {
         _environment = State(initialValue: AppEnvironment(credentials: credentials))
     }
 
-    /// For previews and tests, which supply their own store and provider.
+    /// For previews and tests, which supply their own store and server.
     init(environment: AppEnvironment) {
         _environment = State(initialValue: environment)
     }
@@ -37,19 +36,6 @@ struct RootView: View {
                 SettingsView(environment: environment)
             }
         }
-        .task {
-            // Collect today's results on every launch. The free endpoint is
-            // today-only, so a launch is an opportunity that does not come back.
-            await environment.refreshResults()
-        }
-        .onChange(of: scenePhase) { _, phase in
-            // Ask for the next background run on the way out, which is when the
-            // system wants to hear it and when we know we are about to stop
-            // collecting in the foreground.
-            if phase == .background {
-                BackgroundRefresh.schedule()
-            }
-        }
     }
 }
 
@@ -66,8 +52,7 @@ struct RootView: View {
 private nonisolated final class PreviewCredentialsStore: CredentialsStoring {
     func read(_ slot: CredentialSlot) throws -> String? {
         switch slot {
-        case .racingAPIUsername: return "preview"
-        case .racingAPIPassword: return "preview"
+        case .serverToken: return "preview"
         default: return nil
         }
     }

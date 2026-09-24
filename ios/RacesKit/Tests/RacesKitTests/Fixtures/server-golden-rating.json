@@ -1,0 +1,322 @@
+{
+  "cases": [
+    {
+      "raceID": "rac_1001",
+      "weightsID": "v1",
+      "withMarket": true,
+      "selectionID": "hrs_1",
+      "confidence": "high",
+      "coverage": 1,
+      "runners": [
+        {
+          "horseID": "hrs_1",
+          "winProbability": 0.6270373719058225,
+          "formScore": 0.8512298691484959,
+          "marketProbability": 0.5566091140673648
+        },
+        {
+          "horseID": "hrs_2",
+          "winProbability": 0.2507289944180818,
+          "formScore": 0.17158687558881983,
+          "marketProbability": 0.2823379564109822
+        },
+        {
+          "horseID": "hrs_3",
+          "winProbability": 0.09395573959763438,
+          "formScore": -0.014864851284812752,
+          "marketProbability": 0.11293518256439286
+        },
+        {
+          "horseID": "hrs_4",
+          "winProbability": 0.028277894078461277,
+          "formScore": -1.0079518934525022,
+          "marketProbability": 0.048117746957260114
+        }
+      ]
+    },
+    {
+      "raceID": "rac_1001",
+      "weightsID": "v1",
+      "withMarket": false,
+      "selectionID": "hrs_1",
+      "confidence": "low",
+      "coverage": 0,
+      "runners": [
+        {
+          "horseID": "hrs_1",
+          "winProbability": 0.45688903401942443,
+          "formScore": 0.8512298691484959
+        },
+        {
+          "horseID": "hrs_2",
+          "winProbability": 0.24783466569199805,
+          "formScore": 0.17158687558881983
+        },
+        {
+          "horseID": "hrs_3",
+          "winProbability": 0.20954851737344599,
+          "formScore": -0.014864851284812752
+        },
+        {
+          "horseID": "hrs_4",
+          "winProbability": 0.08572778291513135,
+          "formScore": -1.0079518934525022
+        }
+      ]
+    },
+    {
+      "raceID": "rac_1002",
+      "weightsID": "v1",
+      "withMarket": true,
+      "selectionID": "hrs_6",
+      "confidence": "low",
+      "coverage": 1,
+      "runners": [
+        {
+          "horseID": "hrs_6",
+          "winProbability": 0.5406807417694213,
+          "formScore": 0.09000000000000007,
+          "marketProbability": 0.525
+        },
+        {
+          "horseID": "hrs_5",
+          "winProbability": 0.4593192582305788,
+          "formScore": -0.09000000000000001,
+          "marketProbability": 0.475
+        }
+      ]
+    },
+    {
+      "raceID": "rac_1002",
+      "weightsID": "v1",
+      "withMarket": false,
+      "selectionID": "hrs_6",
+      "confidence": "low",
+      "coverage": 0,
+      "runners": [
+        {
+          "horseID": "hrs_6",
+          "winProbability": 0.5404116583366201,
+          "formScore": 0.09000000000000007
+        },
+        {
+          "horseID": "hrs_5",
+          "winProbability": 0.45958834166338,
+          "formScore": -0.09000000000000001
+        }
+      ]
+    },
+    {
+      "raceID": "rac_1001",
+      "weightsID": "v2",
+      "withMarket": true,
+      "selectionID": "hrs_1",
+      "confidence": "high",
+      "coverage": 1,
+      "runners": [
+        {
+          "horseID": "hrs_1",
+          "winProbability": 0.6270373719058225,
+          "formScore": 0.8512298691484959,
+          "marketProbability": 0.5566091140673648
+        },
+        {
+          "horseID": "hrs_2",
+          "winProbability": 0.2507289944180818,
+          "formScore": 0.17158687558881983,
+          "marketProbability": 0.2823379564109822
+        },
+        {
+          "horseID": "hrs_3",
+          "winProbability": 0.09395573959763438,
+          "formScore": -0.014864851284812752,
+          "marketProbability": 0.11293518256439286
+        },
+        {
+          "horseID": "hrs_4",
+          "winProbability": 0.028277894078461277,
+          "formScore": -1.0079518934525022,
+          "marketProbability": 0.048117746957260114
+        }
+      ]
+    },
+    {
+      "raceID": "rac_1001",
+      "weightsID": "v2",
+      "withMarket": false,
+      "selectionID": "hrs_1",
+      "confidence": "low",
+      "coverage": 0,
+      "runners": [
+        {
+          "horseID": "hrs_1",
+          "winProbability": 0.45688903401942443,
+          "formScore": 0.8512298691484959
+        },
+        {
+          "horseID": "hrs_2",
+          "winProbability": 0.24783466569199805,
+          "formScore": 0.17158687558881983
+        },
+        {
+          "horseID": "hrs_3",
+          "winProbability": 0.20954851737344599,
+          "formScore": -0.014864851284812752
+        },
+        {
+          "horseID": "hrs_4",
+          "winProbability": 0.08572778291513135,
+          "formScore": -1.0079518934525022
+        }
+      ]
+    },
+    {
+      "raceID": "rac_1002",
+      "weightsID": "v2",
+      "withMarket": true,
+      "selectionID": "hrs_6",
+      "confidence": "low",
+      "coverage": 1,
+      "runners": [
+        {
+          "horseID": "hrs_6",
+          "winProbability": 0.5406807417694213,
+          "formScore": 0.09000000000000007,
+          "marketProbability": 0.525
+        },
+        {
+          "horseID": "hrs_5",
+          "winProbability": 0.4593192582305788,
+          "formScore": -0.09000000000000001,
+          "marketProbability": 0.475
+        }
+      ]
+    },
+    {
+      "raceID": "rac_1002",
+      "weightsID": "v2",
+      "withMarket": false,
+      "selectionID": "hrs_6",
+      "confidence": "low",
+      "coverage": 0,
+      "runners": [
+        {
+          "horseID": "hrs_6",
+          "winProbability": 0.5404116583366201,
+          "formScore": 0.09000000000000007
+        },
+        {
+          "horseID": "hrs_5",
+          "winProbability": 0.45958834166338,
+          "formScore": -0.09000000000000001
+        }
+      ]
+    },
+    {
+      "raceID": "rac_1001",
+      "weightsID": "market-only",
+      "withMarket": true,
+      "selectionID": "hrs_1",
+      "confidence": "high",
+      "coverage": 1,
+      "runners": [
+        {
+          "horseID": "hrs_1",
+          "winProbability": 0.5566091140673648,
+          "formScore": 0,
+          "marketProbability": 0.5566091140673648
+        },
+        {
+          "horseID": "hrs_2",
+          "winProbability": 0.28233795641098225,
+          "formScore": 0,
+          "marketProbability": 0.2823379564109822
+        },
+        {
+          "horseID": "hrs_3",
+          "winProbability": 0.11293518256439287,
+          "formScore": 0,
+          "marketProbability": 0.11293518256439286
+        },
+        {
+          "horseID": "hrs_4",
+          "winProbability": 0.04811774695726012,
+          "formScore": 0,
+          "marketProbability": 0.048117746957260114
+        }
+      ]
+    },
+    {
+      "raceID": "rac_1001",
+      "weightsID": "market-only",
+      "withMarket": false,
+      "selectionID": "hrs_1",
+      "confidence": "low",
+      "coverage": 0,
+      "runners": [
+        {
+          "horseID": "hrs_1",
+          "winProbability": 0.25,
+          "formScore": 0
+        },
+        {
+          "horseID": "hrs_2",
+          "winProbability": 0.25,
+          "formScore": 0
+        },
+        {
+          "horseID": "hrs_3",
+          "winProbability": 0.25,
+          "formScore": 0
+        },
+        {
+          "horseID": "hrs_4",
+          "winProbability": 0.25,
+          "formScore": 0
+        }
+      ]
+    },
+    {
+      "raceID": "rac_1002",
+      "weightsID": "market-only",
+      "withMarket": true,
+      "selectionID": "hrs_6",
+      "confidence": "low",
+      "coverage": 1,
+      "runners": [
+        {
+          "horseID": "hrs_6",
+          "winProbability": 0.525,
+          "formScore": 0,
+          "marketProbability": 0.525
+        },
+        {
+          "horseID": "hrs_5",
+          "winProbability": 0.475,
+          "formScore": 0,
+          "marketProbability": 0.475
+        }
+      ]
+    },
+    {
+      "raceID": "rac_1002",
+      "weightsID": "market-only",
+      "withMarket": false,
+      "selectionID": "hrs_5",
+      "confidence": "low",
+      "coverage": 0,
+      "runners": [
+        {
+          "horseID": "hrs_5",
+          "winProbability": 0.5,
+          "formScore": 0
+        },
+        {
+          "horseID": "hrs_6",
+          "winProbability": 0.5,
+          "formScore": 0
+        }
+      ]
+    }
+  ]
+}

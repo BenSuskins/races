@@ -24,18 +24,16 @@ final class CoursesViewModel {
     /// usable, so this is a note rather than an error state.
     private(set) var cardUnavailable: APIError?
 
-    private let provider: (any RacingDataProviding)?
-    private let unavailable: APIError?
+    private let link: ServerLink
+    private let racecards: RacecardLoader
 
-    init(provider: (any RacingDataProviding)?, unavailable: APIError?) {
-        self.provider = provider
-        self.unavailable = unavailable
+    init(link: ServerLink, racecards: RacecardLoader) {
+        self.link = link
+        self.racecards = racecards
     }
 
     convenience init(environment: AppEnvironment) {
-        self.init(
-            provider: environment.racingProvider,
-            unavailable: environment.unavailabilityReason)
+        self.init(link: environment.link, racecards: environment.racecards)
     }
 
     func loadIfNeeded() async {
@@ -44,22 +42,13 @@ final class CoursesViewModel {
     }
 
     func load() async {
-        if let unavailable {
-            state = .failed(unavailable)
-            return
-        }
-        guard let provider else {
-            state = .failed(.notConfigured(provider: "The Racing API"))
-            return
-        }
-
         if state.value == nil {
             state = .loading
         }
 
         let courses: [Course]
         do {
-            courses = try await provider.courses(regionCodes: BrowseRegions.codes)
+            courses = try await link.require().courses()
         } catch {
             state = .failed(.from(error))
             return
@@ -67,8 +56,7 @@ final class CoursesViewModel {
 
         var racesByCourseName: [String: [Race]] = [:]
         do {
-            let races = try await provider.racecards(
-                day: .today, regionCodes: BrowseRegions.codes)
+            let races = try await racecards.load(day: .today).races
             racesByCourseName = Dictionary(grouping: races) {
                 CourseNameNormaliser.key($0.courseName)
             }

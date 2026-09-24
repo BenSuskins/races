@@ -2,122 +2,86 @@ import Foundation
 @testable import Races
 import RacesKit
 
-/// Scripted provider. `@unchecked Sendable` with a lock rather than an actor,
-/// because `RacingDataProviding` is a class-bound protocol and the view models
-/// call it across an isolation boundary — a lock keeps the call counters honest
-/// without making every assertion `await`.
-final class FakeRacingDataProvider: RacingDataProviding, @unchecked Sendable {
+/// The Races server, scripted. `@unchecked Sendable` with a lock rather than
+/// an actor, because `RacesServing` is a class-bound protocol called across an
+/// isolation boundary — a lock keeps the call counters honest without making
+/// every assertion `await`.
+///
+/// Every result defaults to a failure that says it was not scripted, so a test
+/// that reaches an endpoint it did not expect fails loudly rather than getting
+/// an empty success that looks like "no racing".
+final class FakeRacesServer: RacesServing, @unchecked Sendable {
     private let lock = NSLock()
+
+    private var _racecards: [RaceDay: Result<ServerRacecard, APIError>]
+    private var _race: Result<ServerRaceDetail, APIError>
+    private var _record: Result<ServerRecord, APIError>
+    private var _model: Result<ServerModel, APIError>
+    private var _status: Result<ServerStatus, APIError>
+    private var _courses: Result<[Course], APIError>
+    private var _import: Result<ServerImportSummary, APIError>
+
     private var _racecardCalls = 0
-    private var _coursesCalls = 0
+    private var _jobs: [String] = []
+    private var _uploads: [ServerHistoryUpload] = []
+
+    static let unscripted = APIError.server(status: 599, serverMessage: "FakeRacesServer: not scripted")
+
+    init(
+        racecards: [RaceDay: Result<ServerRacecard, APIError>] = [:],
+        race: Result<ServerRaceDetail, APIError> = .failure(FakeRacesServer.unscripted),
+        record: Result<ServerRecord, APIError> = .failure(FakeRacesServer.unscripted),
+        model: Result<ServerModel, APIError> = .failure(FakeRacesServer.unscripted),
+        status: Result<ServerStatus, APIError> = .failure(FakeRacesServer.unscripted),
+        courses: Result<[Course], APIError> = .failure(FakeRacesServer.unscripted),
+        importSummary: Result<ServerImportSummary, APIError> = .failure(FakeRacesServer.unscripted)
+    ) {
+        self._racecards = racecards
+        self._race = race
+        self._record = record
+        self._model = model
+        self._status = status
+        self._courses = courses
+        self._import = importSummary
+    }
 
     var racecardCalls: Int { lock.withLock { _racecardCalls } }
-    var coursesCalls: Int { lock.withLock { _coursesCalls } }
-    /// Region codes from the most recent racecards call.
-    private var _lastRegionCodes: [String] = []
-    var lastRegionCodes: [String] { lock.withLock { _lastRegionCodes } }
+    var jobs: [String] { lock.withLock { _jobs } }
+    var uploads: [ServerHistoryUpload] { lock.withLock { _uploads } }
 
-    private let coursesResult: Result<[Course], APIError>
-    private let racecardsResult: Result<[Race], APIError>
-    private let resultsResult: Result<[RaceResult], APIError>
-    private let capabilityValue: ProviderCapability
-
-    private var _resultsCalls = 0
-    var resultsCalls: Int { lock.withLock { _resultsCalls } }
-
-    init(
-        courses: Result<[Course], APIError> = .success([]),
-        racecards: Result<[Race], APIError> = .success([]),
-        results: Result<[RaceResult], APIError> = .success([]),
-        capability: ProviderCapability = .free
-    ) {
-        self.coursesResult = courses
-        self.racecardsResult = racecards
-        self.resultsResult = results
-        self.capabilityValue = capability
+    func setRacecard(_ result: Result<ServerRacecard, APIError>, for day: RaceDay = .today) {
+        lock.withLock { _racecards[day] = result }
     }
 
-    var capability: ProviderCapability {
-        get async { capabilityValue }
+    func setRecord(_ result: Result<ServerRecord, APIError>) {
+        lock.withLock { _record = result }
     }
 
-    func courses(regionCodes: [String]) async throws -> [Course] {
-        lock.withLock { _coursesCalls += 1 }
-        return try coursesResult.get()
-    }
+    func status() async throws -> ServerStatus { try lock.withLock { _status }.get() }
+    func courses() async throws -> [Course] { try lock.withLock { _courses }.get() }
 
-    func racecards(day: RaceDay, regionCodes: [String]) async throws -> [Race] {
-        lock.withLock {
+    func racecard(day: RaceDay) async throws -> ServerRacecard {
+        let result = lock.withLock { () -> Result<ServerRacecard, APIError> in
             _racecardCalls += 1
-            _lastRegionCodes = regionCodes
+            return _racecards[day] ?? .failure(Self.unscripted)
         }
-        return try racecardsResult.get()
+        return try result.get()
     }
 
-    func results(day: RaceDay) async throws -> [RaceResult] {
-        lock.withLock { _resultsCalls += 1 }
-        return try resultsResult.get()
-    }
-}
+    func race(id: String) async throws -> ServerRaceDetail { try lock.withLock { _race }.get() }
+    func record(weightsID: String?) async throws -> ServerRecord { try lock.withLock { _record }.get() }
+    func model() async throws -> ServerModel { try lock.withLock { _model }.get() }
 
-/// Scripted exchange. Same shape and the same reasoning as
-/// `FakeRacingDataProvider`: a lock rather than an actor, so a test can assert
-/// call counts without awaiting.
-///
-/// The counters are the point of it — `MarketLoader` caches the catalogue and
-/// the books separately, and a cache that quietly refetches is indistinguishable
-/// from one that works unless the calls are counted.
-final class FakeMarketDataProvider: MarketDataProviding, @unchecked Sendable {
-    private let lock = NSLock()
-    private var _marketCalls = 0
-    private var _priceCalls = 0
-    private var _lastPricedMarketIDs: [String] = []
-
-    var marketCalls: Int { lock.withLock { _marketCalls } }
-    var priceCalls: Int { lock.withLock { _priceCalls } }
-    var lastPricedMarketIDs: [String] { lock.withLock { _lastPricedMarketIDs } }
-
-    private var _startingPriceCalls = 0
-    private var _lastStartingPriceMarketIDs: [String] = []
-
-    var startingPriceCalls: Int { lock.withLock { _startingPriceCalls } }
-    var lastStartingPriceMarketIDs: [String] { lock.withLock { _lastStartingPriceMarketIDs } }
-
-    private let marketsResult: Result<[ExchangeMarket], Error>
-    private let pricesResult: Result<[ExchangeMarketPrices], Error>
-    private let startingPricesResult: Result<[String: [Int64: Double]], Error>
-
-    init(
-        markets: Result<[ExchangeMarket], Error> = .success([]),
-        prices: Result<[ExchangeMarketPrices], Error> = .success([]),
-        startingPrices: Result<[String: [Int64: Double]], Error> = .success([:])
-    ) {
-        self.marketsResult = markets
-        self.pricesResult = prices
-        self.startingPricesResult = startingPrices
-    }
-
-    func markets(day: RaceDay, countries: [String]) async throws -> [ExchangeMarket] {
-        lock.withLock { _marketCalls += 1 }
-        return try marketsResult.get()
-    }
-
-    func prices(marketIDs: [String]) async throws -> [ExchangeMarketPrices] {
-        lock.withLock {
-            _priceCalls += 1
-            _lastPricedMarketIDs = marketIDs.sorted()
+    func importHistory(_ upload: ServerHistoryUpload) async throws -> ServerImportSummary {
+        let result = lock.withLock { () -> Result<ServerImportSummary, APIError> in
+            _uploads.append(upload)
+            return _import
         }
-        // Only the books that were asked for, so a test cannot accidentally
-        // pass because the fake handed back a market the loader never wanted.
-        return try pricesResult.get().filter { marketIDs.contains($0.marketID) }
+        return try result.get()
     }
 
-    func startingPrices(marketIDs: [String]) async throws -> [String: [Int64: Double]] {
-        lock.withLock {
-            _startingPriceCalls += 1
-            _lastStartingPriceMarketIDs = marketIDs.sorted()
-        }
-        return try startingPricesResult.get()
+    func runJob(_ name: String) async throws {
+        lock.withLock { _jobs.append(name) }
     }
 }
 
@@ -309,50 +273,79 @@ extension RaceResult {
     }
 }
 
-extension ExchangeMarket {
-    /// A win market whose runners are the exchange's view of the given cloth
-    /// numbers and names.
-    ///
-    /// `selectionID` is derived from the cloth number rather than passed in, so
-    /// a test can state the field once and still assert the join landed on the
-    /// right horse.
+extension ServerRacecard {
+    /// A day's card with assessments rated by the kit's own rater — the same
+    /// numbers the server's Go port produces, as ServerParityTests pins.
     static func fixture(
-        id: String = "1.234",
-        venue: String = "Ascot",
-        startTime: Date,
-        runners: [(clothNumber: Int, name: String)]
-    ) -> ExchangeMarket {
-        ExchangeMarket(
-            id: id,
-            venue: venue,
-            startTime: startTime,
-            marketName: "WIN",
-            runners: runners.map {
-                ExchangeRunner(
-                    id: Int64(1_000 + $0.clothNumber),
-                    name: $0.name,
-                    clothNumber: $0.clothNumber)
-            })
+        day: RaceDay = .today,
+        date: String = "2026-06-16",
+        races: [Race],
+        market: [String: MarketSnapshot] = [:],
+        sealed: Set<String> = [],
+        archivedRaces: Int = 0,
+        fetchedAt: Date? = nil
+    ) -> ServerRacecard {
+        var assessments: [String: RaceAssessment] = [:]
+        var tips: [String: TipRecord] = [:]
+        let now = Date(timeIntervalSince1970: 0)
+        for race in races {
+            let assessment = RaceRater(weights: .v2).rate(race, market: market[race.id], now: now)
+            assessments[race.id] = assessment
+            if var tip = TipRecord(assessment: assessment, race: race, now: now) {
+                if sealed.contains(race.id) { tip.sealedAt = now }
+                tips[race.id] = tip
+            }
+        }
+        return ServerRacecard(
+            day: day, date: date, fetchedAt: fetchedAt, races: races,
+            assessments: assessments, tips: tips, archivedRaces: archivedRaces)
     }
 }
 
-extension ExchangeMarketPrices {
-    /// A book priced by cloth number, matching `ExchangeMarket.fixture`'s
-    /// selection ids.
+extension ServerRecord {
     static func fixture(
-        marketID: String = "1.234",
-        capturedAt: Date = Date(timeIntervalSince1970: 1_000_000),
-        backPricesByClothNumber: [Int: Double]
-    ) -> ExchangeMarketPrices {
-        var prices: [Int64: RunnerPrice] = [:]
-        for (clothNumber, backPrice) in backPricesByClothNumber {
-            prices[Int64(1_000 + clothNumber)] = RunnerPrice(backPrice: backPrice)
-        }
-        return ExchangeMarketPrices(
-            marketID: marketID,
-            status: "OPEN",
-            capturedAt: capturedAt,
-            isDelayed: true,
-            prices: prices)
+        tips: [TipRecord] = [],
+        sources: [String: Int] = [:],
+        archivedRaces: Int = 0
+    ) -> ServerRecord {
+        ServerRecord(
+            report: AccuracyCalculator.report(for: tips),
+            sources: sources,
+            archivedRaces: archivedRaces)
     }
+}
+
+extension ServerImportSummary {
+    /// Decoded, because the server is the only thing that ever builds one.
+    static func fixture(tipsAdded: Int = 3, tipsKept: Int = 0) -> ServerImportSummary {
+        let json = """
+        {"device":"phone","tipsReceived":\(tipsAdded + tipsKept),"tipsAdded":\(tipsAdded),"tipsReplaced":0,
+         "tipsKept":\(tipsKept),"archiveRacesAdded":0,"archiveSkipped":false,"samplesReceived":0,
+         "samplesAdded":0,"pendingAdded":0,"weightsAdded":[],"unreadableDocuments":[]}
+        """
+        // A literal the test controls; force-unwrapping it is a test bug, not
+        // a runtime path.
+        return try! RacesServerClient.decoder.decode(ServerImportSummary.self, from: Data(json.utf8))
+    }
+}
+
+extension ServerStatus {
+    static func fixture(betfairConfigured: Bool = true) -> ServerStatus {
+        ServerStatus(
+            racingAPI: ServerProviderStatus(configured: true, healthy: true),
+            betfair: ServerProviderStatus(configured: betfairConfigured, healthy: betfairConfigured),
+            counts: ["tips": 12, "results": 40])
+    }
+}
+
+/// A `LegacyHistory` over a fresh temporary directory, optionally seeded with
+/// documents.
+func temporaryHistory(documents: [String: String] = [:]) throws -> LegacyHistory {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("races-history-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    for (name, body) in documents {
+        try Data(body.utf8).write(to: directory.appendingPathComponent(name))
+    }
+    return LegacyHistory(directory: directory)
 }

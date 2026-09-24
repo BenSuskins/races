@@ -4,32 +4,18 @@
 <dict>
 	<!-- Export-compliance declaration, answered here so TestFlight does not ask
 	     per build. `false` means "uses no non-exempt encryption": the app's only
-	     cryptography is ATS/TLS for the two provider APIs and the Keychain for
-	     the user's credentials, both supplied by the operating system. It
-	     implements none of its own and ships none.
+	     cryptography is ATS/TLS to the Races server and the Keychain for its
+	     API token, both supplied by the operating system. It implements none of
+	     its own and ships none.
 
 	     Without this key every upload sits at "Missing Compliance" in App Store
 	     Connect until the questionnaire is answered by hand. -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 
-	<!-- Background results collection. The free results endpoint covers today
-	     only, so a race day the app never runs on is a day of results lost for
-	     good — along with the jockey and trainer records that accumulate from
-	     them. `fetch` is what lets the app pick them up in the evening without
-	     being opened. -->
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>fetch</string>
-	</array>
-
-	<!-- Must list every identifier passed to BGTaskScheduler.register.
-	     Registering an identifier absent from this array traps at launch, so
-	     this array and `BackgroundRefresh.taskIdentifier` have to agree
-	     exactly. -->
-	<key>BGTaskSchedulerPermittedIdentifiers</key>
-	<array>
-		<string>uk.co.suskins.Races.refresh</string>
-	</array>
+	<!-- No background modes. Results collection used to need `fetch`, because
+	     the free results endpoint is today-only and a phone asleep all evening
+	     lost the day. The server polls it all evening now, so the app has
+	     nothing to do in the background. -->
 </dict>
 </plist>

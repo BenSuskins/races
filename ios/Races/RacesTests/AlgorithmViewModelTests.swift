@@ -13,9 +13,9 @@ final class AlgorithmViewModelTests: XCTestCase {
     @MainActor
     private func makeModel(
         weights: RatingWeights = .v1,
-        store: RacesStore? = RacesStore(documents: InMemoryDocumentStore())
+        server: FakeRacesServer? = nil
     ) -> AlgorithmViewModel {
-        AlgorithmViewModel(weights: weights, store: store)
+        AlgorithmViewModel(link: ServerLink(server: server), weights: weights)
     }
 
     @MainActor
@@ -89,17 +89,16 @@ final class AlgorithmViewModelTests: XCTestCase {
         var weights = RatingWeights.v1
         weights.id = "test-trainer"
         weights.factorWeights[FactorID.trainerStrikeRate.rawValue] = 0.10
-        let store = RacesStore(documents: InMemoryDocumentStore())
-        await store.loadIfNeeded()
-        await store.ingest(results: [.settleable(winner: "hrs_1")])
+        let server = FakeRacesServer(model: .success(ServerModel(active: weights, archivedRaces: 1)))
 
-        let model = makeModel(weights: weights, store: store)
+        let model = makeModel(server: server)
         await model.loadIfNeeded()
 
         let trainer = try XCTUnwrap(model.factors.first { $0.id == .trainerStrikeRate })
         XCTAssertTrue(trainer.isActive)
         XCTAssertNil(trainer.inactiveReason)
         XCTAssertEqual(model.archivedRaceCount, 1)
+        XCTAssertEqual(model.weightsID, "test-trainer", "the screen shows the weights the server runs")
     }
 
     @MainActor
@@ -131,16 +130,18 @@ final class AlgorithmViewModelTests: XCTestCase {
 
     @MainActor
     func test_theVersionStampsMatchWhatGoesIntoATip() async {
-        let store = RacesStore(documents: InMemoryDocumentStore())
-        await store.loadIfNeeded()
-        let assessment = await store.assess(
+        let assessment = RaceRater(weights: .v2).rate(
             .fixture(runners: [.fixture(id: "a"), .fixture(id: "b")]))
-        let model = makeModel(store: store)
+        let server = FakeRacesServer(model: .success(ServerModel(active: .v2, samples: ["settled": 12, "minimumRaces": 500])))
+        let model = makeModel(server: server)
+        await model.loadIfNeeded()
 
         // The screen must report the same identifiers the ledger records, or it
         // is describing a model other than the one that produced the tips.
         XCTAssertEqual(model.modelVersion, assessment.modelVersion)
         XCTAssertEqual(model.weightsID, assessment.weightsID)
+        XCTAssertEqual(model.trainingSamples, 12)
+        XCTAssertEqual(model.trainingMinimum, 500)
     }
 
     @MainActor
@@ -157,13 +158,14 @@ final class AlgorithmViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_withNoStoreTheScreenStillDescribesTheModel() async {
-        // Nothing here depends on a provider or a store except the archive
-        // count, so the screen must work before anything is configured.
-        let model = makeModel(store: nil)
+    func test_withNoServerTheScreenStillDescribesTheModel() async {
+        // The screen must work before anything is configured: it shows the
+        // kit's weights and says the server could not be reached.
+        let model = makeModel(server: nil)
         await model.loadIfNeeded()
 
         XCTAssertEqual(model.archivedRaceCount, 0)
+        XCTAssertNotNil(model.loadFailure)
         XCTAssertEqual(model.factors.count, FactorID.allCases.count)
         XCTAssertFalse(model.weightsID.isEmpty)
     }

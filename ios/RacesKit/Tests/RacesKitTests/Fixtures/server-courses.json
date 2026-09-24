@@ -1,0 +1,10 @@
+{
+  "courses": [
+    {
+      "id": "crs_1",
+      "name": "Ascot",
+      "regionCode": "gb",
+      "region": "Great Britain"
+    }
+  ]
+}

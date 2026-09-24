@@ -1,16 +1,12 @@
 import SwiftUI
 import RacesKit
 
-/// Credentials, tier status, and the disclaimer.
+/// Where the server is, its token, and the one-off history upload.
 struct SettingsView: View {
     @State private var model: SettingsViewModel
-    @State private var betfair: BetfairSettingsViewModel
-    private let environment: AppEnvironment
 
     init(environment: AppEnvironment) {
-        self.environment = environment
         _model = State(initialValue: SettingsViewModel(environment: environment))
-        _betfair = State(initialValue: BetfairSettingsViewModel(environment: environment))
     }
 
     var body: some View {
@@ -26,22 +22,22 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    TextField("Username", text: $model.username)
-                        .textContentType(.username)
+                    TextField(model.defaultServerURL, text: $model.serverURL)
+                        .keyboardType(.URL)
+                        .textContentType(.URL)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-
                     SecureField(
-                        model.isConfigured ? "Password (saved)" : "Password",
-                        text: $model.password)
-                        .textContentType(.password)
-
+                        model.isConfigured ? "API token (saved)" : "API token",
+                        text: $model.token)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
                     Button("Save") { model.save() }
                         .disabled(!model.canSave)
                 } header: {
-                    Text("The Racing API")
+                    Text("Races server")
                 } footer: {
-                    Text("Stored in the device Keychain. Nothing is sent anywhere but The Racing API.")
+                    Text("Leave the address blank for the homelab default. The server holds the Racing API and Betfair credentials and does all the collecting; this phone keeps only its token, in the Keychain. Reachable at home or over Tailscale.")
                 }
 
                 Section {
@@ -56,7 +52,7 @@ struct SettingsView: View {
                     }
                     .disabled(!model.isConfigured || model.isTesting)
 
-                    TestResultRow(result: model.testResult)
+                    StatusRow(result: model.testResult)
                 }
 
                 if let saveError = model.saveError {
@@ -65,56 +61,34 @@ struct SettingsView: View {
                     }
                 }
 
-                Section {
-                    TextField("Application key", text: $betfair.appKey)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+                if model.hasHistoryToUpload {
+                    Section {
+                        Button {
+                            Task { await model.uploadHistory() }
+                        } label: {
+                            if model.isUploading {
+                                HStack { ProgressView(); Text("Uploading…") }
+                            } else {
+                                Text(model.historyUploadedAt == nil ? "Upload history" : "Upload history again")
+                            }
+                        }
+                        .disabled(!model.isConfigured || model.isUploading)
 
-                    TextField("Username", text: $betfair.username)
-                        .textContentType(.username)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-
-                    SecureField(
-                        betfair.isConfigured ? "Password (saved)" : "Password",
-                        text: $betfair.password)
-                        .textContentType(.password)
-
-                    Button("Save") { betfair.save() }
-                        .disabled(!betfair.canSave)
-                } header: {
-                    Text("Betfair")
-                } footer: {
-                    Text("Optional. Without it, tips are read off the racecard alone — the app works, but the model has no market to anchor to. The free delayed application key is enough.")
-                }
-
-                Section {
-                    Button {
-                        Task { await betfair.test() }
-                    } label: {
-                        if betfair.isTesting {
-                            HStack { ProgressView(); Text("Testing…") }
+                        UploadRow(result: model.uploadResult)
+                    } header: {
+                        Text("History from before the server")
+                    } footer: {
+                        if let uploadedAt = model.historyUploadedAt {
+                            Text("Uploaded \(uploadedAt.formatted(date: .abbreviated, time: .shortened)). Sending it again is safe — the server keeps what it already has.")
                         } else {
-                            Text("Test Betfair")
+                            Text("The tips, results archive and training data this phone collected on its own. Free results are today-only, so this is the only copy — send it once so the record and the model can use it.")
                         }
                     }
-                    .disabled(!betfair.isConfigured || betfair.isTesting)
-
-                    BetfairTestResultRow(result: betfair.testResult)
-
-                    Button("Remove Betfair", role: .destructive) { betfair.clear() }
-                        .disabled(!betfair.isConfigured)
-                }
-
-                if let saveError = betfair.saveError {
-                    Section {
-                        Text(saveError).foregroundStyle(.red)
-                    }
                 }
 
                 Section {
-                    Button("Clear all credentials", role: .destructive) { model.clear() }
-                        .disabled(!environment.hasAnyStoredCredential)
+                    Button("Clear saved server details", role: .destructive) { model.clear() }
+                        .disabled(!model.hasAnyStoredCredential)
                 }
 
                 Section {
@@ -128,98 +102,114 @@ struct SettingsView: View {
     }
 }
 
-/// Betfair's three refusals, each with the instruction that actually applies.
-///
-/// Being told to check a password that is correct is worse than being told
-/// nothing, so a 2FA challenge and a certificate requirement say what they are
-/// and carry Betfair's own code for anyone who needs to look it up.
-private struct BetfairTestResultRow: View {
-    let result: BetfairSettingsViewModel.TestResult
-
-    var body: some View {
-        switch result {
-        case .untested, .testing:
-            EmptyView()
-        case .succeeded(let marketCount):
-            VStack(alignment: .leading, spacing: 4) {
-                Label("Connected — \(marketCount) win markets today", systemImage: "checkmark.circle")
-                    .foregroundStyle(Color.green)
-                if marketCount == 0 {
-                    Text("The login worked; there is just no GB or Irish racing listed right now.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        case .refused(let failure):
-            VStack(alignment: .leading, spacing: 4) {
-                Label(
-                    failure.message,
-                    systemImage: failure.isInformational ? "info.circle" : "xmark.circle")
-                    // Explicit, because a `Label` in this section otherwise
-                    // inherits the section's tint and renders a failure in the
-                    // same green as a success.
-                    .foregroundStyle(failure.isInformational ? Color.primary : Color.red)
-                if failure.requiresCertificateLogin {
-                    Text("Nothing you can change here will fix this. Certificate login isn't supported yet — tips will stay form-only.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else if failure.requiresUserAction {
-                    Text("Sign in at betfair.com, clear whatever it asks for, then test again.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else if failure.isUnreadableResponse {
-                    Text("Your credentials were never sent for checking, so there is nothing to re-type. If you are abroad or on a VPN, try again from a UK connection.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .textSelection(.enabled)
-        case .failed(let error):
-            VStack(alignment: .leading, spacing: 4) {
-                Label(
-                    error.errorDescription ?? "Couldn't connect",
-                    systemImage: error.isExpectedLimitation ? "info.circle" : "xmark.circle")
-                    .foregroundStyle(error.isExpectedLimitation ? Color.primary : Color.red)
-                if let suggestion = error.recoverySuggestion {
-                    Text(suggestion)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            // A diagnostic nobody can copy is a diagnostic nobody can report.
-            .textSelection(.enabled)
-        }
-    }
-}
-
-private struct TestResultRow: View {
+/// What `GET /v1/status` said. Selectable, because a diagnostic nobody can
+/// copy is a diagnostic nobody can report.
+private struct StatusRow: View {
     let result: SettingsViewModel.TestResult
 
     var body: some View {
         switch result {
         case .untested, .testing:
             EmptyView()
-        case .succeeded(let courseCount, let capability):
-            VStack(alignment: .leading, spacing: 4) {
-                Label("Connected — \(courseCount) courses", systemImage: "checkmark.circle")
-                Text(capability.summary)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+
+        case .succeeded(let status):
+            VStack(alignment: .leading, spacing: 6) {
+                Label("Connected — server \(status.version), weights \(status.activeWeightsID)", systemImage: "checkmark.circle")
+                    .foregroundStyle(Color.green)
+                ProviderLine(name: "The Racing API", status: status.racingAPI)
+                ProviderLine(name: "Betfair", status: status.betfair)
+                if let tips = status.counts["tips"], let results = status.counts["results"] {
+                    Text("\(tips) tips, \(results) results stored.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
+            .textSelection(.enabled)
+
         case .failed(let error):
             VStack(alignment: .leading, spacing: 4) {
                 Label(
                     error.errorDescription ?? "Couldn't connect",
                     systemImage: error.isExpectedLimitation ? "info.circle" : "xmark.circle")
                     .foregroundStyle(error.isExpectedLimitation ? Color.primary : Color.red)
-                if let suggestion = error.recoverySuggestion {
+                if error == .unauthorized {
+                    Text("The server refused the token. Check it matches RACES_API_TOKEN in the vault.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if let suggestion = error.recoverySuggestion {
                     Text(suggestion)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("At home, check the server is running. Away, check Tailscale is connected.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
-            // A diagnostic nobody can copy is a diagnostic nobody can report.
             .textSelection(.enabled)
         }
+    }
+}
+
+private struct ProviderLine: View {
+    let name: String
+    let status: ServerProviderStatus
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Label(line, systemImage: icon)
+                .font(.caption)
+                .foregroundStyle(status.healthy ? Color.secondary : Color.orange)
+            if let failure = status.loginFailure {
+                Text(failure.message)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var icon: String {
+        if !status.configured { return "minus.circle" }
+        return status.healthy ? "checkmark.circle" : "exclamationmark.triangle"
+    }
+
+    private var line: String {
+        if !status.configured { return "\(name): not configured on the server" }
+        if status.healthy { return "\(name): working" }
+        return "\(name): \(status.detail ?? "failing")"
+    }
+}
+
+private struct UploadRow: View {
+    let result: SettingsViewModel.UploadResult
+
+    var body: some View {
+        switch result {
+        case .idle, .uploading:
+            EmptyView()
+
+        case .succeeded(let summary):
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Uploaded — \(summary.tipsAdded + summary.tipsReplaced) new tips", systemImage: "checkmark.circle")
+                    .foregroundStyle(Color.green)
+                Text(detail(summary))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .textSelection(.enabled)
+
+        case .failed(let error):
+            Label(error.errorDescription ?? "Couldn't upload", systemImage: "xmark.circle")
+                .foregroundStyle(Color.red)
+                .textSelection(.enabled)
+        }
+    }
+
+    private func detail(_ s: ServerImportSummary) -> String {
+        var parts = ["\(s.tipsKept) already on the server", "\(s.samplesAdded + s.pendingAdded) training races"]
+        if s.archiveRacesAdded > 0 { parts.append("\(s.archiveRacesAdded) archived results") }
+        if s.archiveSkipped { parts.append("results archive overlapped the server's and was not merged") }
+        if !s.unreadableDocuments.isEmpty { parts.append("unreadable: \(s.unreadableDocuments.joined(separator: "; "))") }
+        return parts.joined(separator: " · ") + "."
     }
 }
