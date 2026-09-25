@@ -1,10 +1,14 @@
 package backtest
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
+	"github.com/bensuskins/races/server/internal/domain"
 	"github.com/bensuskins/races/server/internal/rating"
+	"github.com/bensuskins/races/server/internal/store"
 )
 
 func TestApplyOverridesClonesAndRejectsUnknownFields(t *testing.T) {
@@ -22,5 +26,43 @@ func TestApplyOverridesClonesAndRejectsUnknownFields(t *testing.T) {
 	}
 	if _, err := ApplyOverrides(base, SweepVariant{Name: "bad", Overrides: map[string]json.RawMessage{"newThreshold": json.RawMessage("0.5")}}); err == nil {
 		t.Fatal("unknown field was accepted")
+	}
+}
+
+func TestSnapshotLogLossDoesNotStandInForEmptyReplayCohort(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	now := time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC)
+	weights := rating.V3()
+	if _, err := st.EnsureWeights(ctx, weights, "preset", now); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := rating.TrainingSnapshot{
+		RaceID: "training-race", CreatedAt: domain.At(now),
+		RunnerIDs: []string{"horse-1", "horse-2"}, MarketProbabilities: []float64{0.5, 0.5},
+		FactorIDs: []rating.FactorID{rating.RecentForm}, ZScores: [][]float64{{-2, 2}},
+	}
+	if err := st.SaveTrainingSnapshot(ctx, snapshot, "server"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.SetTrainingWinner(ctx, snapshot.RaceID, "horse-1"); err != nil {
+		t.Fatal(err)
+	}
+	report, err := Run(ctx, st, weights, Request{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.HighestProbability.Races != 0 || report.MarketLogLoss != nil {
+		t.Fatalf("expected an empty replay cohort: %+v", report)
+	}
+	if report.SnapshotLogLoss == nil || report.SnapshotMarketLogLoss == nil {
+		t.Fatalf("expected separate training-snapshot diagnostics: %+v", report)
+	}
+	if report.BeatsMarket != nil {
+		t.Fatalf("training snapshots must not decide the replay promotion gate: %+v", report.BeatsMarket)
 	}
 }

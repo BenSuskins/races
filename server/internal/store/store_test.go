@@ -65,6 +65,39 @@ func TestSealCardIsImmutableAndStoredWithTip(t *testing.T) {
 	}
 }
 
+func TestSaveRecoveredSealCardIsInsertOnlyAndAudited(t *testing.T) {
+	ctx := context.Background()
+	s := open(t)
+	capturedAt := time.Date(2026, 9, 20, 12, 0, 0, 0, time.UTC)
+	recoveredAt := capturedAt.Add(24 * time.Hour)
+	if err := s.SavePayload(ctx, "racingapi", "GET", "/v1/racecards/free", "day=today", 200, []byte(`{"racecards":[]}`), capturedAt); err != nil {
+		t.Fatal(err)
+	}
+	race := domain.Race{ID: "race", Name: "Original card", Runners: []domain.Runner{{ID: "horse", Name: "Runner"}}}
+	inserted, err := s.SaveRecoveredSealCard(ctx, race, 1, capturedAt, recoveredAt)
+	if err != nil || !inserted {
+		t.Fatalf("first recovered card was not inserted: %v, %v", inserted, err)
+	}
+	changed := race
+	changed.Name = "Changed card"
+	inserted, err = s.SaveRecoveredSealCard(ctx, changed, 1, capturedAt.Add(time.Hour), recoveredAt.Add(time.Hour))
+	if err != nil || inserted {
+		t.Fatalf("recovery overwrote an existing card: %v, %v", inserted, err)
+	}
+	got, err := s.SealCard(ctx, race.ID)
+	if err != nil || got == nil || got.Name != race.Name {
+		t.Fatalf("stored card changed: %+v, %v", got, err)
+	}
+	var payloadID int64
+	var sourceFetchedAt, recordedAt string
+	if err := s.db.QueryRowContext(ctx, `SELECT source_payload_id, source_fetched_at, recovered_at FROM seal_card_recoveries WHERE race_id = ?`, race.ID).Scan(&payloadID, &sourceFetchedAt, &recordedAt); err != nil {
+		t.Fatal(err)
+	}
+	if payloadID != 1 || sourceFetchedAt != ts(capturedAt) || recordedAt != ts(recoveredAt) {
+		t.Fatalf("recovery provenance changed: payload=%d fetched=%s recovered=%s", payloadID, sourceFetchedAt, recordedAt)
+	}
+}
+
 func TestResultFactsRespectKnownTime(t *testing.T) {
 	ctx := context.Background()
 	s := open(t)

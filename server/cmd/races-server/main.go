@@ -16,7 +16,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"flag"
 	"log/slog"
 	"net/http"
 	"os"
@@ -28,6 +30,7 @@ import (
 	"github.com/bensuskins/races/server/internal/betfair"
 	"github.com/bensuskins/races/server/internal/httpx"
 	"github.com/bensuskins/races/server/internal/racingapi"
+	"github.com/bensuskins/races/server/internal/recovery"
 	"github.com/bensuskins/races/server/internal/service"
 	"github.com/bensuskins/races/server/internal/store"
 )
@@ -44,10 +47,41 @@ func env(name, fallback string) string {
 
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	if err := run(log); err != nil {
+	var err error
+	if len(os.Args) > 1 && os.Args[1] == "recover-seal-cards" {
+		err = runSealCardRecovery(os.Args[2:])
+	} else {
+		err = run(log)
+	}
+	if err != nil {
 		log.Error("fatal", "error", err)
 		os.Exit(1)
 	}
+}
+
+func runSealCardRecovery(args []string) error {
+	flags := flag.NewFlagSet("recover-seal-cards", flag.ContinueOnError)
+	databasePath := flags.String("db", env("RACES_DB_PATH", "/data/races.db"), "SQLite database path")
+	apply := flags.Bool("apply", false, "insert cards that reproduce their stored tips exactly")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() > 0 {
+		return errors.New("recover-seal-cards accepts no positional arguments")
+	}
+	ctx := context.Background()
+	st, err := store.Open(ctx, *databasePath)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+	report, err := recovery.SealCards(ctx, st, *apply, time.Now())
+	if err != nil {
+		return err
+	}
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(report)
 }
 
 func run(log *slog.Logger) error {
