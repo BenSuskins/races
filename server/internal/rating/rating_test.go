@@ -386,6 +386,25 @@ func TestValueAwareSelection(t *testing.T) {
 	}
 }
 
+// v3 tips the most likely winner even where v2 would take the value.
+func TestV3PicksTheMostLikelyWinner(t *testing.T) {
+	if !V3().PicksMostLikelyWinner() || V2().PicksMostLikelyWinner() {
+		t.Fatal("only v3 has the value layer off")
+	}
+	a := synthetic(false, assessed("favourite", 0.40, 2.2), assessed("value", 0.30, 4.5), assessed("longshot", 0.09, 15))
+	a.MinimumValueProbability = V3().MinimumValueProbability
+	if a.Selection().HorseID != "favourite" {
+		t.Fatal("v3 ignores value")
+	}
+	v3 := NewRater(V3()).Rate(fourRunnerHandicap(), fullMarket(), nil, epoch)
+	if v3.Selection().HorseID != v3.Runners[0].HorseID {
+		t.Fatal("v3 tips the top-rated runner")
+	}
+	if v3.WeightsID != "v3" || v3.MinimumValueProbability != 1 {
+		t.Fatal("the assessment carries the thresholds it was picked on")
+	}
+}
+
 func TestWithoutAMarket(t *testing.T) {
 	a := NewRater(V2()).Rate(fourRunnerHandicap(), nil, nil, epoch)
 	if !a.IsFormOnly() || a.MarketCoverage != 0 || a.AgreesWithMarket() != nil || a.TrainingSnapshot != nil {

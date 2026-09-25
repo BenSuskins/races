@@ -232,7 +232,7 @@ public struct ServerStatus: Codable, Hashable, Sendable {
     public init(
         version: String = "test",
         serverTime: Date = Date(timeIntervalSince1970: 0),
-        activeWeightsID: String = "v2",
+        activeWeightsID: String = "v3",
         racingAPI: ServerProviderStatus,
         betfair: ServerProviderStatus,
         jobs: [ServerJobRun] = [],

@@ -186,6 +186,24 @@ final class RaceRaterTests: XCTestCase {
         XCTAssertTrue(assessment.isValuePick)
     }
 
+    /// v3 switches the value layer off: the same field that gives v2 a value
+    /// pick gives v3 its most likely winner.
+    func test_v3AlwaysPicksTheMostLikelyWinner() {
+        let runners = [
+            assessedRunner("likely", probability: 0.35, odds: 2.5),
+            assessedRunner("value", probability: 0.15, odds: 9.0),
+        ]
+        let assessment = syntheticMarketAssessment(
+            runners: runners,
+            minimumValueEdge: RatingWeights.v3.minimumValueEdge,
+            minimumValueProbability: RatingWeights.v3.minimumValueProbability)
+
+        XCTAssertTrue(RatingWeights.v3.picksMostLikelyWinner)
+        XCTAssertFalse(RatingWeights.v2.picksMostLikelyWinner)
+        XCTAssertEqual(assessment.selection?.horseID, "likely")
+        XCTAssertFalse(assessment.isValuePick)
+    }
+
     func test_withNoValueTheSelectionIsTheTopRatedRunner() {
         let assessment = syntheticMarketAssessment(runners: [
             assessedRunner("likely", probability: 0.40, odds: 2.5),

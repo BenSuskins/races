@@ -2,6 +2,23 @@
 
 The probability model and the tip selection are deliberately separate.
 
+## Current policy: the most likely winner (`v3`)
+
+Since `v3` the tip is the runner the model gives the best chance of winning,
+whatever its price. The value layer below is still in the code and still decides
+`v2` tips, but `v3` switches it off through its own threshold:
+`minimumValueProbability = 1`, which no runner in a real field can reach, so
+selection always falls through to the highest probability. That keeps the weights
+and the assessment the same shape instead of adding a flag.
+
+It is a new weights id rather than an edit to `v2` because `weightsID` is stamped
+on every tip: value-era and chance-era tips stay separate populations in the
+record (`GET /v1/record?weightsID=`). The server moves a database still running
+`v2` onto `v3` at boot; a trained set stays as it is, and a set trained from `v3`
+inherits the switched-off threshold.
+
+The rest of this document describes the value policy as `v2` runs it.
+
 ## Why
 
 The rating engine produces a calibrated probability distribution. The previous
