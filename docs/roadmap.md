@@ -262,6 +262,8 @@ that is a decision, not a chore.
 
 ## Not a work item, but the thing the app most needs
 
+The ordered strike-rate plan is in [`docs/strike-rate-plan.md`](strike-rate-plan.md).
+
 Race days. The archive starts empty, so:
 
 - jockey and trainer strike rates contribute nothing until it fills — the Model
