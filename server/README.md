@@ -99,7 +99,29 @@ Every back-test report includes the exact `weightsID`, date range, shared
 `corpusID`, both selection policies, the favourite arm, market log loss, and
 sample counts. Sweep variants use the same race IDs and reject unknown fields.
 Run the standard de-vig and value-gate sweeps with
-`RACES_API_TOKEN=... bash scripts/backtest-sweeps.sh`.
+`RACES_API_TOKEN=... bash scripts/backtest-sweeps.sh`. Set
+`RACES_BACKTEST_WEIGHTS_ID`, `RACES_BACKTEST_FROM`, and `RACES_BACKTEST_TO` to
+pin the weight set and date range. The output prints report ID, weight ID,
+date range, sample count, and metrics for every variant.
+
+Legacy seal-card recovery runs against the server database. After the new
+server version applies its migrations, run the scan without `--apply`:
+
+```bash
+docker exec CONTAINER_NAME /races-server recover-seal-cards
+```
+
+The scan accepts a card only when all retained pre-seal versions are identical
+and rerating it reproduces every stored tip field exactly. Review the payload
+IDs and statuses. Back up the database, then apply only the verified rows with:
+
+```bash
+docker exec CONTAINER_NAME /races-server recover-seal-cards --apply
+```
+
+Recovery inserts missing cards only and records the source payload ID and
+capture time. It never changes an existing seal card. The command uses
+`RACES_DB_PATH`, which defaults to `/data/races.db` in the container.
 
 The nightly baseline replay runs at 02:45 London time, after the final results
 pass and before training. Its report ID and weight ID appear in the job summary

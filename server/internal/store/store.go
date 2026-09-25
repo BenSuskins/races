@@ -151,6 +151,7 @@ func (s *Store) SavePayload(ctx context.Context, provider, method, path, query s
 type Payload struct {
 	ID        int64     `json:"id"`
 	Provider  string    `json:"provider"`
+	Method    string    `json:"method"`
 	Path      string    `json:"path"`
 	Query     string    `json:"query"`
 	Status    int       `json:"status"`
@@ -160,7 +161,7 @@ type Payload struct {
 
 // Payloads returns stored responses for a provider and path, oldest first.
 func (s *Store) Payloads(ctx context.Context, provider, path string) ([]Payload, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id, provider, path, query, status, fetched_at, body FROM raw_payloads WHERE provider = ? AND path = ? ORDER BY id`, provider, path)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, provider, method, path, query, status, fetched_at, body FROM raw_payloads WHERE provider = ? AND path = ? ORDER BY id`, provider, path)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +171,7 @@ func (s *Store) Payloads(ctx context.Context, provider, path string) ([]Payload,
 		var p Payload
 		var at string
 		var body []byte
-		if err := rows.Scan(&p.ID, &p.Provider, &p.Path, &p.Query, &p.Status, &at, &body); err != nil {
+		if err := rows.Scan(&p.ID, &p.Provider, &p.Method, &p.Path, &p.Query, &p.Status, &at, &body); err != nil {
 			return nil, err
 		}
 		p.FetchedAt = parseTS(at)
@@ -461,6 +462,33 @@ func (s *Store) SaveSealedTip(ctx context.Context, t tracking.Tip, race domain.R
 // SealCard returns the immutable race card used at seal time.
 func (s *Store) SealCard(ctx context.Context, raceID string) (*domain.Race, error) {
 	return queryOne[domain.Race](ctx, s.db, `SELECT json FROM seal_cards WHERE race_id = ?`, raceID)
+}
+
+// SaveRecoveredSealCard adds a seal card reconstructed from one retained
+// provider response. It never changes a card that already exists.
+func (s *Store) SaveRecoveredSealCard(ctx context.Context, race domain.Race, payloadID int64, capturedAt, recoveredAt time.Time) (bool, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	result, err := tx.ExecContext(ctx, `INSERT INTO seal_cards (race_id, version, captured_at, json) VALUES (?,1,?,?) ON CONFLICT(race_id) DO NOTHING`, race.ID, ts(capturedAt), mustJSON(race))
+	if err != nil {
+		tx.Rollback()
+		return false, err
+	}
+	inserted, err := result.RowsAffected()
+	if err != nil {
+		tx.Rollback()
+		return false, err
+	}
+	if inserted == 0 {
+		return false, tx.Commit()
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO seal_card_recoveries (race_id, source_payload_id, source_fetched_at, recovered_at) VALUES (?,?,?,?)`, race.ID, payloadID, ts(capturedAt), ts(recoveredAt)); err != nil {
+		tx.Rollback()
+		return false, err
+	}
+	return true, tx.Commit()
 }
 
 type execer interface {

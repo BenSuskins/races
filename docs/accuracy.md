@@ -74,6 +74,35 @@ Each selection uses only tips with that ID. The all-tip model rate is separate
 from the model and favourite rates over the same benchmarked races. The server
 returns a 95% Wilson interval for both rates; the app shows it with the count.
 
+## Back-test report rows
+
+Record one row for each arm or sweep variant. Keep the API report ID, exact
+`weightsID`, date range, and eligible race count with every metric:
+
+| Report ID | Weights ID | From | To | Variant | Races | High SR | Value SR | Favourite SR | Value ROI | Market log loss |
+|---|---|---|---|---|---:|---:|---:|---:|---:|---:|
+| `REPORT_ID` | `v3` | `YYYY-MM-DD` | `YYYY-MM-DD` | `variant` | `n` | `value` | `value` | `value` | `value` | `value` |
+
+Use `scripts/backtest-sweeps.sh` to produce the same columns for the standard
+sweep. Set `RACES_BACKTEST_WEIGHTS_ID`, `RACES_BACKTEST_FROM`, and
+`RACES_BACKTEST_TO` to pin the weight set and date range. A zero race count has
+no strike-rate or log-loss result and cannot support promotion.
+
+### 2026-09-25 — deployed fixed-range replay
+
+The deployed v3 control and standard sweep used the same date range and corpus.
+The run found no eligible replay races, so the measured metrics are unavailable.
+
+| Report ID | Weights ID | From | To | Corpus ID | Model races | Favourite races | Market log loss |
+|---:|---|---|---|---|---:|---:|---:|
+| 4 | v3 | 2026-09-23 | 2026-09-25 | `74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b` | 0 | 0 | — |
+| 5 (sweep) | v3 | 2026-09-23 | 2026-09-25 | `74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b` | 0 in all variants | 0 in all variants | — |
+
+The replay excluded 37 sealed tips without immutable seal cards. It also
+reported 101 frozen training snapshots. Those snapshots form a separate
+diagnostic population and cannot replace the empty sealed-race replay cohort.
+This run does not support a promotion decision.
+
 ## The three figures that keep it honest
 
 **1. The favourite baseline.** What backing the market favourite would have done

@@ -190,7 +190,7 @@ type Report struct {
 	Snapshots             int      `json:"snapshots"`
 	SnapshotLogLoss       *float64 `json:"snapshotLogLoss,omitempty"`
 	SnapshotMarketLogLoss *float64 `json:"snapshotMarketLogLoss,omitempty"`
-	// BeatsMarket applies docs/algorithm.md's bar:
+	// BeatsMarket applies docs/algorithm.md's bar to the replay arms:
 	// logLoss(model) ≤ logLoss(market) + 0.005.
 	BeatsMarket *bool    `json:"beatsMarket,omitempty"`
 	Notes       []string `json:"notes"`
@@ -200,7 +200,7 @@ type Report struct {
 func Run(ctx context.Context, st *store.Store, w rating.Weights, req Request) (Report, error) {
 	rep := Report{WeightsID: w.ID, From: req.From, To: req.To, Notes: []string{
 		"Archive factors use result facts recorded before each tip sealed.",
-		"Legacy server tips without an immutable seal card are excluded; raw-payload recovery is not available yet.",
+		"Legacy server tips without an immutable seal card are excluded; run the recovery scan to identify provable cards.",
 	}}
 	var from, to time.Time
 	if req.From != "" {
@@ -309,9 +309,6 @@ func Run(ctx context.Context, st *store.Store, w rating.Weights, req Request) (R
 	switch {
 	case rep.HighestProbability.LogLoss != nil && rep.MarketLogLoss != nil:
 		b := *rep.HighestProbability.LogLoss <= *rep.MarketLogLoss+0.005
-		rep.BeatsMarket = &b
-	case rep.SnapshotLogLoss != nil && rep.SnapshotMarketLogLoss != nil:
-		b := *rep.SnapshotLogLoss <= *rep.SnapshotMarketLogLoss+0.005
 		rep.BeatsMarket = &b
 	}
 	return rep, nil
