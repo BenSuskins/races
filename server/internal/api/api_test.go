@@ -21,6 +21,7 @@ import (
 	"github.com/bensuskins/races/server/internal/rating"
 	"github.com/bensuskins/races/server/internal/service"
 	"github.com/bensuskins/races/server/internal/store"
+	"github.com/bensuskins/races/server/internal/testutil"
 	"github.com/bensuskins/races/server/internal/tracking"
 )
 
@@ -307,7 +308,8 @@ func TestContractFixtures(t *testing.T) {
 			continue
 		}
 		existing, err := os.ReadFile(dir + name)
-		if err != nil || !bytes.Equal(existing, pretty.Bytes()) {
+		matches, compareErr := testutil.CompareJSON(existing, pretty.Bytes())
+		if err != nil || compareErr != nil || !matches {
 			t.Fatalf("%s no longer matches the committed contract fixture; regenerate with -update and run RacesKit's ServerContractTests", name)
 		}
 	}

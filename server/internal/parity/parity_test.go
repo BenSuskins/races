@@ -9,7 +9,6 @@
 package parity
 
 import (
-	"bytes"
 	"encoding/json"
 	"flag"
 	"os"
@@ -19,6 +18,7 @@ import (
 	"github.com/bensuskins/races/server/internal/domain"
 	"github.com/bensuskins/races/server/internal/racingapi"
 	"github.com/bensuskins/races/server/internal/rating"
+	"github.com/bensuskins/races/server/internal/testutil"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden file")
@@ -101,7 +101,11 @@ func TestGolden(t *testing.T) {
 	if err != nil {
 		t.Fatal("no golden file; run with -update:", err)
 	}
-	if !bytes.Equal(existing, out) {
+	matches, err := testutil.CompareJSON(existing, out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !matches {
 		t.Fatal("the Go rater no longer matches the committed golden file. If the change is intended, regenerate with -update and run RacesKit's ServerParityTests.")
 	}
 }
