@@ -43,7 +43,8 @@
   },
   "weightsInUse": {
     "learned-1757689000-520": 1,
-    "v2": 4
+    "v2": 2,
+    "v3": 2
   },
   "sources": {
     "device:phone": 3,

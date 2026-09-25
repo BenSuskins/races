@@ -166,7 +166,7 @@ func TestImportRecordAndModel(t *testing.T) {
 	code, body = call(t, s, "GET", "/v1/model", nil, true)
 	var m Model
 	json.Unmarshal(body, &m)
-	if code != 200 || m.Active.ID != "v2" || len(m.Factors) != 12 || len(m.Weights) != 4 {
+	if code != 200 || m.Active.ID != "v3" || len(m.Factors) != 12 || len(m.Weights) != 5 {
 		t.Fatal(string(body))
 	}
 }
@@ -192,7 +192,7 @@ func TestBacktestAndJobs(t *testing.T) {
 	code, body = call(t, s, "GET", "/v1/status", nil, true)
 	var st Status
 	json.Unmarshal(body, &st)
-	if code != 200 || !st.RacingAPI.Configured || st.Betfair.Configured || st.ActiveWeights != "v2" || len(st.Jobs) == 0 {
+	if code != 200 || !st.RacingAPI.Configured || st.Betfair.Configured || st.ActiveWeights != "v3" || len(st.Jobs) == 0 {
 		t.Fatal(string(body))
 	}
 }

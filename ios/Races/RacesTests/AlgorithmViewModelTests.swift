@@ -129,6 +129,12 @@ final class AlgorithmViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_theTipRuleFollowsTheActiveWeights() async {
+        XCTAssertEqual(makeModel(weights: .v3).selectionRule, "Most likely winner")
+        XCTAssertEqual(makeModel(weights: .v2).selectionRule, "Best value")
+    }
+
+    @MainActor
     func test_theVersionStampsMatchWhatGoesIntoATip() async {
         let assessment = RaceRater(weights: .v2).rate(
             .fixture(runners: [.fixture(id: "a"), .fixture(id: "b")]))

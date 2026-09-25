@@ -72,7 +72,13 @@ func New(st *store.Store, racing RacingData, markets MarketData, now func() time
 	return &Service{Store: st, Racing: racing, Markets: markets, Now: now, Log: log, Regions: []string{"gb", "ire"}, Training: training.DefaultConfiguration()}
 }
 
-// Bootstrap seeds the preset weights and makes v2 active on a fresh database.
+// Bootstrap seeds the preset weights and makes v3 active on a fresh database,
+// or on one still running v2.
+//
+// v2 was the default while the tip was a value pick; v3 tips the most likely
+// winner. It is a new id rather than an edit to v2 because weightsID is stamped
+// on every tip, so the two populations stay apart in the record. Any other
+// active set was trained or chosen, and is left alone.
 func (s *Service) Bootstrap(ctx context.Context) error {
 	now := s.Now()
 	for _, w := range rating.Presets() {
@@ -82,8 +88,8 @@ func (s *Service) Bootstrap(ctx context.Context) error {
 	}
 	if active, err := s.Store.ActiveWeights(ctx); err != nil {
 		return err
-	} else if active == nil {
-		return s.Store.SetActiveWeights(ctx, rating.V2().ID)
+	} else if active == nil || active.ID == rating.V2().ID {
+		return s.Store.SetActiveWeights(ctx, rating.V3().ID)
 	}
 	return nil
 }
@@ -109,8 +115,8 @@ func (s *Service) activeRater(ctx context.Context) (rating.Rater, error) {
 		return rating.Rater{}, err
 	}
 	if w == nil {
-		v2 := rating.V2()
-		w = &v2
+		v3 := rating.V3()
+		w = &v3
 	}
 	return rating.NewRater(*w), nil
 }

@@ -31,7 +31,7 @@ final class ServerContractTests: XCTestCase {
         XCTAssertNotNil(assessment.selection)
 
         let tip = try XCTUnwrap(card.tips["rac_1001"])
-        XCTAssertEqual(tip.weightsID, "v2")
+        XCTAssertEqual(tip.weightsID, "v3")
         XCTAssertFalse(tip.contributions.isEmpty)
         XCTAssertEqual(
             tip.contributions.first { $0.factor == .draw }?.availability,
@@ -61,7 +61,7 @@ final class ServerContractTests: XCTestCase {
 
     func test_theModelDecodesIntoRatingWeights() throws {
         let model = try decode(ServerModel.self, "server-model.json")
-        XCTAssertEqual(model.active, .v2, "the server's v2 is the kit's v2, number for number")
+        XCTAssertEqual(model.active, .v3, "the server's v3 is the kit's v3, number for number")
         XCTAssertEqual(model.modelVersion, RaceRater.modelVersion)
         XCTAssertTrue(model.weights.contains { $0.weights.id == "market-only" && $0.origin == "preset" })
         XCTAssertTrue(model.weights.contains { $0.origin == "device" })
@@ -72,7 +72,7 @@ final class ServerContractTests: XCTestCase {
         XCTAssertTrue(status.racingAPI.configured)
         XCTAssertFalse(status.betfair.configured)
         XCTAssertFalse(status.jobs.isEmpty)
-        XCTAssertEqual(status.activeWeightsID, "v2")
+        XCTAssertEqual(status.activeWeightsID, "v3")
     }
 
     func test_theImportSummaryAndCoursesDecode() throws {

@@ -71,9 +71,27 @@ func V1() Weights {
 	return w
 }
 
-// V2 is the current configuration: v1's probabilities with a value-aware
-// selection layer.
+// V2 is v1's probabilities with a value-aware selection layer: a priced runner
+// that clears both thresholds is tipped over the most likely winner.
 func V2() Weights { return NewWeights("v2", baseFactorWeights()) }
+
+// V3 is the current configuration: v2's probabilities, and the tip is the
+// runner the model gives the best chance of winning.
+//
+// The value layer is switched off through its own threshold rather than a new
+// field: a value candidate needs a model probability of at least
+// MinimumValueProbability, and at 1 no runner in a real field can clear it — in
+// a one-runner race the only candidate is the top-rated runner anyway. So
+// Selection always falls through to the highest probability, and the weights,
+// the assessment and the app's decoding keep the shape they already have.
+func V3() Weights {
+	w := NewWeights("v3", baseFactorWeights())
+	w.MinimumValueProbability = 1
+	return w
+}
+
+// PicksMostLikelyWinner is true when no runner can qualify as a value pick.
+func (w Weights) PicksMostLikelyWinner() bool { return w.MinimumValueProbability >= 1 }
 
 // MarketOnly is the control arm: the market, unmodified.
 func MarketOnly() Weights {
@@ -83,4 +101,4 @@ func MarketOnly() Weights {
 }
 
 // Presets are the weight sets the server always knows.
-func Presets() []Weights { return []Weights{V1(), V2(), MarketOnly()} }
+func Presets() []Weights { return []Weights{V1(), V2(), V3(), MarketOnly()} }
