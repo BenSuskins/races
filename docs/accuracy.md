@@ -103,6 +103,23 @@ reported 101 frozen training snapshots. Those snapshots form a separate
 diagnostic population and cannot replace the empty sealed-race replay cohort.
 This run does not support a promotion decision.
 
+### 2026-09-25 — deployed corpus after legacy recovery
+
+The recovery command inserted three cards where retained payloads proved the
+exact seal-time card. It left 34 cards ambiguous, so replay still excludes those
+tips. Baseline report `8` and sweep report `9` use the same v3 corpus and range.
+
+| Report ID | Weights ID | From | To | Corpus ID | Eligible races | High-probability wins | Favourite wins | Model log loss | Market log loss |
+|---:|---|---|---|---|---:|---:|---:|---:|---:|
+| 8 | v3 | 2026-01-01 | 2026-09-25 | `43195a6a6b9707732119b155ef165f575de9e1bd4dd42ddfd7a8526cb2c82669` | 10 | 4 | 3 | 2.2448 | 2.1751 |
+| 9 (sweep) | v3 | 2026-01-01 | 2026-09-25 | `43195a6a6b9707732119b155ef165f575de9e1bd4dd42ddfd7a8526cb2c82669` | 10 per variant | 4 per variant | 3 per variant | 2.2448–2.2454 | 2.1751–2.1756 |
+
+Report 8 has high-probability Brier score `0.1846`, favourite Brier score
+`0.1209`, and favourite agreement `7/10`. Every standard variant in report 9
+fails the market log-loss gate. The proportional model is `0.0697` worse than
+the market, above the allowed `0.005` difference. Keep `v3` active. The small
+sample does not support a promotion.
+
 ## The three figures that keep it honest
 
 **1. The favourite baseline.** What backing the market favourite would have done

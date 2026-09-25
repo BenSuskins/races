@@ -15,6 +15,7 @@
       "draw": 0,
       "handicapBandPosition": 0.2,
       "headgear": 0,
+      "horseGoingPlaceRate": 0,
       "jockeyStrikeRate": 0,
       "officialRating": 0.3,
       "recentForm": 0.25,
@@ -127,6 +128,7 @@
           "draw": 0,
           "handicapBandPosition": 0.2,
           "headgear": 0,
+          "horseGoingPlaceRate": 0,
           "jockeyStrikeRate": 0,
           "officialRating": 0.3,
           "recentForm": 0.25,
@@ -175,6 +177,7 @@
           "draw": 0,
           "handicapBandPosition": 0.2,
           "headgear": 0,
+          "horseGoingPlaceRate": 0,
           "jockeyStrikeRate": 0,
           "officialRating": 0.3,
           "recentForm": 0.25,
@@ -223,6 +226,7 @@
           "draw": 0,
           "handicapBandPosition": 0.2,
           "headgear": 0,
+          "horseGoingPlaceRate": 0,
           "jockeyStrikeRate": 0,
           "officialRating": 0.3,
           "recentForm": 0.25,
@@ -321,6 +325,12 @@
       "label": "Trainer strike rate",
       "summary": "The trainer's win rate in the server's own archive, shrunk toward the field average.",
       "rationale": "Legitimate, but derived from an archive that starts empty. It switches on once enough race days have been collected."
+    },
+    {
+      "id": "horseGoingPlaceRate",
+      "label": "Horse record by going",
+      "summary": "The horse's place rate on similar ground, shrunk toward its general record.",
+      "rationale": "The archive needs at least three completed runs in a going bucket. Its default weight is zero until replay supports it."
     }
   ],
   "samples": {

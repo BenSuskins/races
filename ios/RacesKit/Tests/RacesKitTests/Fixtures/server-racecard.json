@@ -305,6 +305,18 @@
                   "_0": "only 2 runs recorded so far"
                 }
               }
+            },
+            {
+              "factor": "horseGoingPlaceRate",
+              "label": "Horse record by going",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no mature horse record; using the field prior"
+                }
+              }
             }
           ]
         },
@@ -449,6 +461,18 @@
               "availability": {
                 "missingData": {
                   "_0": "no record in the archive yet"
+                }
+              }
+            },
+            {
+              "factor": "horseGoingPlaceRate",
+              "label": "Horse record by going",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no mature horse record; using the field prior"
                 }
               }
             }
@@ -602,6 +626,18 @@
                   "_0": "no record in the archive yet"
                 }
               }
+            },
+            {
+              "factor": "horseGoingPlaceRate",
+              "label": "Horse record by going",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no mature horse record; using the field prior"
+                }
+              }
             }
           ]
         },
@@ -746,6 +782,18 @@
               "availability": {
                 "missingData": {
                   "_0": "no record in the archive yet"
+                }
+              }
+            },
+            {
+              "factor": "horseGoingPlaceRate",
+              "label": "Horse record by going",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no mature horse record; using the field prior"
                 }
               }
             }
@@ -908,6 +956,18 @@
                   "_0": "no record in the archive yet"
                 }
               }
+            },
+            {
+              "factor": "horseGoingPlaceRate",
+              "label": "Horse record by going",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no mature horse record; using the field prior"
+                }
+              }
             }
           ]
         },
@@ -1053,6 +1113,18 @@
               "availability": {
                 "missingData": {
                   "_0": "no record in the archive yet"
+                }
+              }
+            },
+            {
+              "factor": "horseGoingPlaceRate",
+              "label": "Horse record by going",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no mature horse record; using the field prior"
                 }
               }
             }
@@ -1217,6 +1289,18 @@
               "_0": "only 2 runs recorded so far"
             }
           }
+        },
+        {
+          "factor": "horseGoingPlaceRate",
+          "label": "Horse record by going",
+          "detail": "—",
+          "weight": 0,
+          "probabilityDelta": 0,
+          "availability": {
+            "missingData": {
+              "_0": "no mature horse record; using the field prior"
+            }
+          }
         }
       ],
       "createdAt": "2026-09-20T09:00:00Z"
@@ -1372,6 +1456,18 @@
           "availability": {
             "missingData": {
               "_0": "no record in the archive yet"
+            }
+          }
+        },
+        {
+          "factor": "horseGoingPlaceRate",
+          "label": "Horse record by going",
+          "detail": "—",
+          "weight": 0,
+          "probabilityDelta": 0,
+          "availability": {
+            "missingData": {
+              "_0": "no mature horse record; using the field prior"
             }
           }
         }

@@ -22,6 +22,30 @@ final class ResultsArchiveTests: XCTestCase {
         XCTAssertEqual(archive.raceCount, 1)
         XCTAssertEqual(archive.totalRuns, 3)
         XCTAssertEqual(archive.totalWins, 1)
+        XCTAssertEqual(archive.horseGoingRate(horseID: "hrs_1", surface: .turf, bucket: .good), HorseGoingPlaceRate(runs: 1, places: 1))
+        XCTAssertEqual(archive.horseOverallPlaceRate(horseID: "hrs_1"), HorseGoingPlaceRate(runs: 1, places: 1))
+    }
+
+    func test_legacyArchiveWithoutHorseGoingDataStillDecodes() throws {
+        let legacy = Data(#"{"jockeys":{},"trainers":{},"ingestedRaceIDs":[],"totalRuns":0,"totalWins":0}"#.utf8)
+        let archive = try JSONDecoder().decode(ResultsArchive.self, from: legacy)
+        XCTAssertTrue(archive.horseGoing.isEmpty)
+    }
+
+    func test_horseGoingFactorUsesGoingHistoryAndKeepsSmallSamplesNeutral() throws {
+        var archive = ResultsArchive()
+        for index in 1...3 {
+            archive.ingest(TestResult.result(
+                id: "soft_\(index)",
+                finishing: [("horse", index == 2 ? "4" : "1"), ("other", "2"), ("third", "3")]
+            ))
+        }
+        let race = TestRace.race(runners: [TestRace.runner("horse"), TestRace.runner("another")])
+        let context = FactorContext(race: race, strikeRates: archive)
+        let reading = HorseGoingFactor().value(for: race.runners[0], in: context)
+        XCTAssertTrue(reading.availability.isAvailable)
+        XCTAssertTrue(reading.display.contains("on similar ground from 3 runs"))
+        XCTAssertNil(HorseGoingFactor().value(for: TestRace.runner("unknown"), in: context).raw)
     }
 
     /// The single most important property of this type. The app re-fetches

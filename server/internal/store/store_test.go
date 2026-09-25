@@ -104,8 +104,8 @@ func TestResultFactsRespectKnownTime(t *testing.T) {
 	firstKnown := time.Date(2026, 9, 20, 12, 0, 0, 0, time.UTC)
 	secondKnown := firstKnown.Add(24 * time.Hour)
 	jockey := "jockey"
-	first := domain.RaceResult{ID: "prior-race", Date: "2026-09-20", Finishers: []domain.Finisher{{HorseID: "first-version", Position: domain.Finished(2), JockeyID: &jockey}}}
-	second := domain.RaceResult{ID: "prior-race", Date: "2026-09-20", Finishers: []domain.Finisher{{HorseID: "second-version", Position: domain.Finished(1), JockeyID: &jockey}, {HorseID: "extra", Position: domain.Finished(2)}}}
+	first := domain.RaceResult{ID: "prior-race", Date: "2026-09-20", Going: domain.GoingSoft, Surface: domain.SurfaceTurf, Finishers: []domain.Finisher{{HorseID: "horse", Position: domain.Finished(4), JockeyID: &jockey}}}
+	second := domain.RaceResult{ID: "prior-race", Date: "2026-09-20", Going: domain.GoingSoft, Surface: domain.SurfaceTurf, Finishers: []domain.Finisher{{HorseID: "horse", Position: domain.Finished(1), JockeyID: &jockey}, {HorseID: "extra", Position: domain.Finished(2)}}}
 	future := domain.RaceResult{ID: "future-race", Date: "2026-09-21", Finishers: []domain.Finisher{{HorseID: "future-winner", Position: domain.Finished(1), JockeyID: &jockey}}}
 	if _, err := s.SaveResults(ctx, []domain.RaceResult{first}, firstKnown); err != nil {
 		t.Fatal(err)
@@ -114,7 +114,7 @@ func TestResultFactsRespectKnownTime(t *testing.T) {
 		t.Fatal(err)
 	}
 	before, err := s.ResultFactsKnownBefore(ctx, firstKnown.Add(time.Hour))
-	if err != nil || len(before) != 1 || before[0].Finishers[0].HorseID != "first-version" {
+	if err != nil || len(before) != 1 || before[0].Finishers[0].HorseID != "horse" {
 		t.Fatalf("as-of query returned later fact: %+v, %v", before, err)
 	}
 	archive := tracking.NewArchive()
@@ -124,14 +124,17 @@ func TestResultFactsRespectKnownTime(t *testing.T) {
 	if rate, _ := archive.JockeyStrikeRate(jockey); rate.Runs != 1 || rate.Wins != 0 {
 		t.Fatalf("future win changed the earlier jockey rate: %+v", rate)
 	}
+	if rate, _ := archive.HorseGoingRate("horse", domain.SurfaceTurf, domain.GoingBucketSoft); rate.Runs != 1 || rate.Places != 0 {
+		t.Fatalf("future placing changed the earlier going record: %+v", rate)
+	}
 	after, err := s.ResultFactsKnownBefore(ctx, secondKnown.Add(time.Second))
-	latestPrior := ""
+	latestPriorPosition := 0
 	for _, result := range after {
 		if result.ID == "prior-race" && len(result.Finishers) > 0 {
-			latestPrior = result.Finishers[0].HorseID
+			latestPriorPosition = result.Finishers[0].Position.Position
 		}
 	}
-	if err != nil || len(after) != 2 || latestPrior != "second-version" {
+	if err != nil || len(after) != 2 || latestPriorPosition != 1 {
 		t.Fatalf("query did not return latest known fact: %+v, %v", after, err)
 	}
 	laterArchive := tracking.NewArchive()
@@ -140,5 +143,8 @@ func TestResultFactsRespectKnownTime(t *testing.T) {
 	}
 	if rate, _ := laterArchive.JockeyStrikeRate(jockey); rate.Runs != 2 || rate.Wins != 2 {
 		t.Fatalf("newer facts were not available after collection: %+v", rate)
+	}
+	if rate, _ := laterArchive.HorseGoingRate("horse", domain.SurfaceTurf, domain.GoingBucketSoft); rate.Runs != 1 || rate.Places != 1 {
+		t.Fatalf("newer going facts were not available after collection: %+v", rate)
 	}
 }

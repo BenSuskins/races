@@ -31,12 +31,13 @@ const (
 	Headgear             FactorID = "headgear"
 	JockeyStrikeRate     FactorID = "jockeyStrikeRate"
 	TrainerStrikeRate    FactorID = "trainerStrikeRate"
+	HorseGoingPlaceRate  FactorID = "horseGoingPlaceRate"
 )
 
 // AllFactors in declaration order, which is also the rater's order.
 var AllFactors = []FactorID{
 	OfficialRating, HandicapBandPosition, RecentForm, WonLastTime, CompletionRate,
-	DaysSinceLastRun, Age, WeightCarried, Draw, Headgear, JockeyStrikeRate, TrainerStrikeRate,
+	DaysSinceLastRun, Age, WeightCarried, Draw, Headgear, JockeyStrikeRate, TrainerStrikeRate, HorseGoingPlaceRate,
 }
 
 // Label is the short name shown on screen.
@@ -66,6 +67,8 @@ func (f FactorID) Label() string {
 		return "Jockey strike rate"
 	case TrainerStrikeRate:
 		return "Trainer strike rate"
+	case HorseGoingPlaceRate:
+		return "Horse record by going"
 	}
 	return string(f)
 }
@@ -97,6 +100,8 @@ func (f FactorID) Summary() string {
 		return "The jockey's win rate in the server's own archive, shrunk toward the field average."
 	case TrainerStrikeRate:
 		return "The trainer's win rate in the server's own archive, shrunk toward the field average."
+	case HorseGoingPlaceRate:
+		return "The horse's place rate on similar ground, shrunk toward its general record."
 	}
 	return ""
 }
@@ -111,6 +116,8 @@ func (f FactorID) Rationale() string {
 		return "The signal is *first-time* headgear, and the free tier has no headgear history to detect it with."
 	case JockeyStrikeRate, TrainerStrikeRate:
 		return "Legitimate, but derived from an archive that starts empty. It switches on once enough race days have been collected."
+	case HorseGoingPlaceRate:
+		return "The archive needs at least three completed runs in a going bucket. Its default weight is zero until replay supports it."
 	case WeightCarried:
 		return "Near zero on purpose: in a handicap, weight is the handicapper's equaliser, so it substantially double-counts the official rating."
 	}
@@ -209,6 +216,20 @@ type StrikeRates interface {
 	JockeyStrikeRate(id string) (StrikeRate, bool)
 	TrainerStrikeRate(id string) (StrikeRate, bool)
 	BaselineStrikeRate() float64
+}
+
+type PlaceRate struct {
+	Runs   int `json:"runs"`
+	Places int `json:"places"`
+}
+
+func (r PlaceRate) Smoothed(prior float64, strength float64) float64 {
+	return (float64(r.Places) + prior*strength) / (float64(r.Runs) + strength)
+}
+
+type HorseGoingProvider interface {
+	HorseGoingRate(horseID string, surface domain.Surface, bucket domain.GoingBucket) (PlaceRate, bool)
+	HorseOverallPlaceRate(horseID string) (PlaceRate, bool)
 }
 
 // Context is everything a factor may look at beyond the runner.

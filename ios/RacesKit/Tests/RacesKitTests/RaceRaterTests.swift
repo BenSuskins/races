@@ -311,7 +311,7 @@ final class RaceRaterTests: XCTestCase {
         let assessment = RaceRater().rate(fourRunnerHandicap(), market: fullMarket)
         let runner = try XCTUnwrap(assessment.runners.first)
 
-        for id in [FactorID.draw, .headgear, .jockeyStrikeRate, .trainerStrikeRate] {
+        for id in [FactorID.draw, .headgear, .jockeyStrikeRate, .trainerStrikeRate, .horseGoingPlaceRate] {
             let contribution = try XCTUnwrap(runner.contributions.first { $0.factor == id })
             XCTAssertEqual(contribution.weight, 0, "\(id)")
             XCTAssertEqual(contribution.probabilityDelta, 0, accuracy: 0.000001, "\(id)")
