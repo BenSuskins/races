@@ -259,7 +259,11 @@ public struct StrikeRateFactor: RatingFactor {
             return .missing("only \(record.runs) runs recorded so far")
         }
 
-        let smoothed = record.smoothed(towards: provider.baselineStrikeRate)
+        let overall = subject == .jockey
+            ? provider.jockeyStrikeRate(id: subjectID)
+            : provider.trainerStrikeRate(id: subjectID)
+        let prior = overall?.smoothed(towards: provider.baselineStrikeRate) ?? provider.baselineStrikeRate
+        let smoothed = record.smoothed(towards: prior)
         let percent = Int((smoothed * 100).rounded())
         return .value(smoothed, "\(percent)% from \(record.runs) runs")
     }
@@ -408,5 +412,37 @@ public struct HorseGoingFactor: RatingFactor {
             return .value(smoothed, "\(Int((smoothed * 100).rounded()))% placed from \(overall.runs) runs")
         }
         return .value(fieldPrior, "Field place prior (\(Int((fieldPrior * 100).rounded()))%)")
+    }
+}
+
+public struct RecentStrikeRateFactor: RatingFactor {
+    public enum Subject: Sendable { case jockey, trainer }
+    public let id: FactorID
+    public let minimumSample: Int
+    private let subject: Subject
+
+    public init(subject: Subject, minimumSample: Int = 30) {
+        self.subject = subject
+        self.minimumSample = minimumSample
+        self.id = subject == .jockey ? .jockeyRecentStrikeRate : .trainerRecentStrikeRate
+    }
+
+    public func value(for runner: Runner, in context: FactorContext) -> FactorValue {
+        guard let provider = context.recentStrikeRates else { return .missing("no recent results archive yet") }
+        let subjectID = subject == .jockey ? runner.jockeyID : runner.trainerID
+        guard let subjectID else { return .missing("not identified") }
+        let record = subject == .jockey
+            ? provider.jockeyRecentStrikeRate(id: subjectID)
+            : provider.trainerRecentStrikeRate(id: subjectID)
+        guard let record else { return .missing("no dated runs in the recent archive yet") }
+        guard record.runs >= minimumSample else {
+            return .missing("only \(record.runs) dated runs in the recent window")
+        }
+        let overall = subject == .jockey
+            ? provider.jockeyStrikeRate(id: subjectID)
+            : provider.trainerStrikeRate(id: subjectID)
+        let prior = overall?.smoothed(towards: provider.baselineStrikeRate) ?? provider.baselineStrikeRate
+        let smoothed = record.smoothed(towards: prior)
+        return .value(smoothed, "\(Int((smoothed * 100).rounded()))% from \(record.runs) recent runs")
     }
 }

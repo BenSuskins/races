@@ -236,6 +236,59 @@ type goingStrikeRate struct {
 	minimumSample int
 }
 
+type recentStrikeRate struct {
+	jockey        bool
+	minimumSample int
+}
+
+func (f recentStrikeRate) ID() FactorID {
+	if f.jockey {
+		return JockeyRecentStrikeRate
+	}
+	return TrainerRecentStrikeRate
+}
+
+func (f recentStrikeRate) Value(r domain.Runner, ctx Context) FactorValue {
+	if ctx.StrikeRates == nil {
+		return missing("no results archive yet")
+	}
+	provider, ok := ctx.StrikeRates.(RecentStrikeRates)
+	if !ok {
+		return missing("no recent results archive yet")
+	}
+	subject := r.TrainerID
+	if f.jockey {
+		subject = r.JockeyID
+	}
+	if subject == nil {
+		return missing("not identified")
+	}
+	var record StrikeRate
+	if f.jockey {
+		record, ok = provider.JockeyRecentStrikeRate(*subject)
+	} else {
+		record, ok = provider.TrainerRecentStrikeRate(*subject)
+	}
+	if !ok {
+		return missing("no dated runs in the recent archive yet")
+	}
+	if record.Runs < f.minimumSample {
+		return missing(fmt.Sprintf("only %d dated runs in the recent window", record.Runs))
+	}
+	prior := ctx.StrikeRates.BaselineStrikeRate()
+	var overall StrikeRate
+	if f.jockey {
+		overall, ok = ctx.StrikeRates.JockeyStrikeRate(*subject)
+	} else {
+		overall, ok = ctx.StrikeRates.TrainerStrikeRate(*subject)
+	}
+	if ok {
+		prior = overall.Smoothed(prior, 20)
+	}
+	smoothed := record.Smoothed(prior, 20)
+	return value(smoothed, fmt.Sprintf("%d%% from %d recent runs", int(math.Round(smoothed*100)), record.Runs))
+}
+
 func (f goingStrikeRate) ID() FactorID {
 	if f.jockey {
 		return JockeyGoingStrikeRate
@@ -439,5 +492,7 @@ func DefaultFactors(w Weights) []Factor {
 		goingStrikeRate{jockey: true, minimumSample: w.MinimumStrikeRateSample},
 		goingStrikeRate{jockey: false, minimumSample: w.MinimumStrikeRateSample},
 		horseGoing{minimumSample: 3},
+		recentStrikeRate{jockey: true, minimumSample: w.MinimumStrikeRateSample},
+		recentStrikeRate{jockey: false, minimumSample: w.MinimumStrikeRateSample},
 	}
 }

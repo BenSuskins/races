@@ -267,6 +267,30 @@
           "availability": {
             "available": {}
           }
+        },
+        {
+          "factor": "jockeyRecentStrikeRate",
+          "label": "Jockey recent strike rate",
+          "detail": "—",
+          "weight": 0,
+          "probabilityDelta": 0,
+          "availability": {
+            "missingData": {
+              "_0": "no dated runs in the recent archive yet"
+            }
+          }
+        },
+        {
+          "factor": "trainerRecentStrikeRate",
+          "label": "Trainer recent strike rate",
+          "detail": "—",
+          "weight": 0,
+          "probabilityDelta": 0,
+          "availability": {
+            "missingData": {
+              "_0": "no dated runs in the recent archive yet"
+            }
+          }
         }
       ],
       "createdAt": "2026-09-20T09:00:00Z",
@@ -506,6 +530,30 @@
           "probabilityDelta": 0,
           "availability": {
             "available": {}
+          }
+        },
+        {
+          "factor": "jockeyRecentStrikeRate",
+          "label": "Jockey recent strike rate",
+          "detail": "—",
+          "weight": 0,
+          "probabilityDelta": 0,
+          "availability": {
+            "missingData": {
+              "_0": "no dated runs in the recent archive yet"
+            }
+          }
+        },
+        {
+          "factor": "trainerRecentStrikeRate",
+          "label": "Trainer recent strike rate",
+          "detail": "—",
+          "weight": 0,
+          "probabilityDelta": 0,
+          "availability": {
+            "missingData": {
+              "_0": "no dated runs in the recent archive yet"
+            }
           }
         }
       ],

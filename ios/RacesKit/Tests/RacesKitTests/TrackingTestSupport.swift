@@ -50,6 +50,7 @@ enum TestResult {
     /// provider would send it, so "PU" and friends are expressible.
     static func result(
         id: String = "rac_1",
+        date: String = "2026-09-20",
         finishing: [(String, String)],
         startingPrices: [String: Double] = [:],
         jockeys: [String: String] = [:],
@@ -61,7 +62,7 @@ enum TestResult {
             id: id,
             courseName: "Ascot",
             name: "Test Handicap",
-            date: "2026-09-20",
+            date: date,
             going: going,
             surface: .turf,
             type: type,

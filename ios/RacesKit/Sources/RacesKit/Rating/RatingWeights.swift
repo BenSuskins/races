@@ -131,6 +131,8 @@ public struct RatingWeights: Codable, Hashable, Sendable {
         FactorID.horseGoingPlaceRate.rawValue: 0.00,
         FactorID.jockeyGoingStrikeRate.rawValue: 0.00,
         FactorID.trainerGoingStrikeRate.rawValue: 0.00,
+        FactorID.jockeyRecentStrikeRate.rawValue: 0.00,
+        FactorID.trainerRecentStrikeRate.rawValue: 0.00,
     ]
 
     /// The original market-anchored configuration, retained for back-test

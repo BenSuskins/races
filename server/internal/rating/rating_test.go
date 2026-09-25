@@ -73,6 +73,7 @@ type fakeStrikeRates struct {
 	jockeySurfaces, trainerSurfaces   map[string]StrikeRate
 	jockeyRaceTypes, trainerRaceTypes map[string]StrikeRate
 	jockeyGoings, trainerGoings       map[string]StrikeRate
+	jockeyRecent, trainerRecent       map[string]StrikeRate
 	horseGoings                       map[string]PlaceRate
 	horseOverall                      map[string]PlaceRate
 	baseline                          float64
@@ -87,6 +88,14 @@ func (f fakeStrikeRates) TrainerStrikeRate(id string) (StrikeRate, bool) {
 	return s, ok
 }
 func (f fakeStrikeRates) BaselineStrikeRate() float64 { return f.baseline }
+func (f fakeStrikeRates) JockeyRecentStrikeRate(id string) (StrikeRate, bool) {
+	rate, ok := f.jockeyRecent[id]
+	return rate, ok
+}
+func (f fakeStrikeRates) TrainerRecentStrikeRate(id string) (StrikeRate, bool) {
+	rate, ok := f.trainerRecent[id]
+	return rate, ok
+}
 func (f fakeStrikeRates) JockeySurfaceStrikeRate(id string, surface domain.Surface) (StrikeRate, bool) {
 	rate, ok := f.jockeySurfaces[id+"|"+string(surface)]
 	return rate, ok
@@ -619,6 +628,25 @@ func TestGoingStrikeRateRequiresThirtyRunsAndShrinksToTheGeneralRecord(t *testin
 	}
 }
 
+func TestRecentStrikeRateRequiresThirtyDatedRunsAndShrinksTowardTheGeneralRate(t *testing.T) {
+	archive := fakeStrikeRates{
+		jockeys:      map[string]StrikeRate{"jockey": {Runs: 100, Wins: 20}},
+		jockeyRecent: map[string]StrikeRate{"jockey": {Runs: 30, Wins: 10}},
+		baseline:     0.125,
+	}
+	factor := recentStrikeRate{jockey: true, minimumSample: 30}
+	r := runner("horse", runnerOpts{jockey: sp("jockey")})
+	reading := factor.Value(r, Context{StrikeRates: archive})
+	if reading.Raw == nil || !near(*reading.Raw, 0.275, 1e-9) || reading.Availability.Kind != Available {
+		t.Fatalf("recent rate was not shrunk to the general record: %#v", reading)
+	}
+	archive.jockeyRecent["jockey"] = StrikeRate{Runs: 29, Wins: 10}
+	reading = factor.Value(r, Context{StrikeRates: archive})
+	if reading.Raw != nil || reading.Availability != (Availability{MissingData, "only 29 dated runs in the recent window"}) {
+		t.Fatalf("recent rate below the sample floor must be missing: %#v", reading)
+	}
+}
+
 // FactorDescriptionTests: every factor has copy, the presets name every
 // factor, and the set of deliberate zeros does not change silently.
 func TestFactorDescriptions(t *testing.T) {
@@ -638,7 +666,7 @@ func TestFactorDescriptions(t *testing.T) {
 			}
 		}
 	}
-	want := map[FactorID]bool{Draw: true, Headgear: true, JockeyStrikeRate: true, TrainerStrikeRate: true, JockeySurfaceStrikeRate: true, TrainerSurfaceStrikeRate: true, JockeyRaceTypeStrikeRate: true, TrainerRaceTypeStrikeRate: true, JockeyGoingStrikeRate: true, TrainerGoingStrikeRate: true, HorseGoingPlaceRate: true}
+	want := map[FactorID]bool{Draw: true, Headgear: true, JockeyStrikeRate: true, TrainerStrikeRate: true, JockeySurfaceStrikeRate: true, TrainerSurfaceStrikeRate: true, JockeyRaceTypeStrikeRate: true, TrainerRaceTypeStrikeRate: true, JockeyGoingStrikeRate: true, TrainerGoingStrikeRate: true, HorseGoingPlaceRate: true, JockeyRecentStrikeRate: true, TrainerRecentStrikeRate: true}
 	if len(zeros) != len(want) {
 		t.Fatal("the set of deliberate zeros changed", zeros)
 	}

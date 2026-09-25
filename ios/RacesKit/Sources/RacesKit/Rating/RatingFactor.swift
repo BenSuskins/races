@@ -22,6 +22,8 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
     case jockeyGoingStrikeRate
     case trainerGoingStrikeRate
     case horseGoingPlaceRate
+    case jockeyRecentStrikeRate
+    case trainerRecentStrikeRate
 
     public var label: String {
         switch self {
@@ -44,6 +46,8 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
         case .jockeyGoingStrikeRate: return "Jockey strike rate by going"
         case .trainerGoingStrikeRate: return "Trainer strike rate by going"
         case .horseGoingPlaceRate: return "Horse record by going"
+        case .jockeyRecentStrikeRate: return "Jockey recent strike rate"
+        case .trainerRecentStrikeRate: return "Trainer recent strike rate"
         }
     }
 
@@ -92,6 +96,10 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
             return "The trainer's win rate on similar ground, shrunk toward the trainer's overall record."
         case .horseGoingPlaceRate:
             return "The horse's place rate on similar ground, shrunk toward its general record."
+        case .jockeyRecentStrikeRate:
+            return "The jockey's win rate from the latest 50 dated rides, shrunk toward the global record."
+        case .trainerRecentStrikeRate:
+            return "The trainer's win rate from the latest 50 dated runners, shrunk toward the global record."
         }
     }
 
@@ -119,6 +127,8 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
             return "Going cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
         case .horseGoingPlaceRate:
             return "The archive needs at least three completed runs in a going bucket. Its default weight is zero until replay supports it."
+        case .jockeyRecentStrikeRate, .trainerRecentStrikeRate:
+            return "The recent window needs at least 30 dated runs. The default weight is zero until walk-forward replay supports it."
         case .weightCarried:
             return "Near zero on purpose: in a handicap, weight is the handicapper's equaliser, so it substantially double-counts the official rating."
         case .officialRating, .handicapBandPosition, .recentForm, .wonLastTime,
@@ -197,14 +207,16 @@ public struct FactorContext: Sendable {
     public let raceTypeStrikeRates: (any RaceTypeStrikeRateProviding)?
     public let goingStrikeRates: (any GoingStrikeRateProviding)?
     public let horseGoingRates: (any HorseGoingProviding)?
+    public let recentStrikeRates: (any RecentStrikeRateProviding)?
 
-    public init(race: Race, strikeRates: (any StrikeRateProviding)? = nil, surfaceStrikeRates: (any SurfaceStrikeRateProviding)? = nil, raceTypeStrikeRates: (any RaceTypeStrikeRateProviding)? = nil, goingStrikeRates: (any GoingStrikeRateProviding)? = nil, horseGoingRates: (any HorseGoingProviding)? = nil) {
+    public init(race: Race, strikeRates: (any StrikeRateProviding)? = nil, surfaceStrikeRates: (any SurfaceStrikeRateProviding)? = nil, raceTypeStrikeRates: (any RaceTypeStrikeRateProviding)? = nil, goingStrikeRates: (any GoingStrikeRateProviding)? = nil, horseGoingRates: (any HorseGoingProviding)? = nil, recentStrikeRates: (any RecentStrikeRateProviding)? = nil) {
         self.race = race
         self.strikeRates = strikeRates
         self.surfaceStrikeRates = surfaceStrikeRates ?? (strikeRates as? any SurfaceStrikeRateProviding)
         self.raceTypeStrikeRates = raceTypeStrikeRates ?? (strikeRates as? any RaceTypeStrikeRateProviding)
         self.goingStrikeRates = goingStrikeRates ?? (strikeRates as? any GoingStrikeRateProviding)
         self.horseGoingRates = horseGoingRates ?? (strikeRates as? any HorseGoingProviding)
+        self.recentStrikeRates = recentStrikeRates ?? (strikeRates as? any RecentStrikeRateProviding)
     }
 }
 
@@ -268,6 +280,11 @@ public protocol RaceTypeStrikeRateProviding: StrikeRateProviding {
 public protocol GoingStrikeRateProviding: StrikeRateProviding {
     func jockeyGoingStrikeRate(id: String, surface: Surface, bucket: HorseGoingBucket) -> StrikeRate?
     func trainerGoingStrikeRate(id: String, surface: Surface, bucket: HorseGoingBucket) -> StrikeRate?
+}
+
+public protocol RecentStrikeRateProviding: StrikeRateProviding {
+    func jockeyRecentStrikeRate(id: String) -> StrikeRate?
+    func trainerRecentStrikeRate(id: String) -> StrikeRate?
 }
 
 public struct HorseGoingPlaceRate: Codable, Hashable, Sendable {

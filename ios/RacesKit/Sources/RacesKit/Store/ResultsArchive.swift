@@ -13,6 +13,13 @@ import Foundation
 /// single most important property of this type.
 public struct ResultsArchive: Codable, Hashable, Sendable {
 
+    public struct RecentRun: Codable, Hashable, Sendable {
+        public let date: String
+        public let raceID: String
+        public let horseID: String
+        public let won: Bool
+    }
+
     public private(set) var jockeys: [String: StrikeRate]
     public private(set) var trainers: [String: StrikeRate]
     public private(set) var jockeySurfaces: [String: StrikeRate]
@@ -23,12 +30,14 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
     public private(set) var trainerGoings: [String: StrikeRate]
     public private(set) var horseGoing: [String: HorseGoingPlaceRate]
     public private(set) var horseOverall: [String: HorseGoingPlaceRate]
+    public private(set) var jockeyRecent: [String: [RecentRun]]
+    public private(set) var trainerRecent: [String: [RecentRun]]
     public private(set) var ingestedRaceIDs: Set<String>
     public private(set) var totalRuns: Int
     public private(set) var totalWins: Int
 
     private enum CodingKeys: String, CodingKey {
-        case jockeys, trainers, jockeySurfaces, trainerSurfaces, jockeyRaceTypes, trainerRaceTypes, jockeyGoings, trainerGoings, horseGoing, horseOverall, ingestedRaceIDs, totalRuns, totalWins
+        case jockeys, trainers, jockeySurfaces, trainerSurfaces, jockeyRaceTypes, trainerRaceTypes, jockeyGoings, trainerGoings, horseGoing, horseOverall, jockeyRecent, trainerRecent, ingestedRaceIDs, totalRuns, totalWins
     }
 
     public init(
@@ -42,6 +51,8 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
         trainerGoings: [String: StrikeRate] = [:],
         horseGoing: [String: HorseGoingPlaceRate] = [:],
         horseOverall: [String: HorseGoingPlaceRate] = [:],
+        jockeyRecent: [String: [RecentRun]] = [:],
+        trainerRecent: [String: [RecentRun]] = [:],
         ingestedRaceIDs: Set<String> = [],
         totalRuns: Int = 0,
         totalWins: Int = 0
@@ -56,6 +67,8 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
         self.trainerGoings = trainerGoings
         self.horseGoing = horseGoing
         self.horseOverall = horseOverall
+        self.jockeyRecent = jockeyRecent
+        self.trainerRecent = trainerRecent
         self.ingestedRaceIDs = ingestedRaceIDs
         self.totalRuns = totalRuns
         self.totalWins = totalWins
@@ -74,6 +87,8 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
             trainerGoings: try values.decodeIfPresent([String: StrikeRate].self, forKey: .trainerGoings) ?? [:],
             horseGoing: try values.decodeIfPresent([String: HorseGoingPlaceRate].self, forKey: .horseGoing) ?? [:],
             horseOverall: try values.decodeIfPresent([String: HorseGoingPlaceRate].self, forKey: .horseOverall) ?? [:],
+            jockeyRecent: try values.decodeIfPresent([String: [RecentRun]].self, forKey: .jockeyRecent) ?? [:],
+            trainerRecent: try values.decodeIfPresent([String: [RecentRun]].self, forKey: .trainerRecent) ?? [:],
             ingestedRaceIDs: try values.decodeIfPresent(Set<String>.self, forKey: .ingestedRaceIDs) ?? [],
             totalRuns: try values.decodeIfPresent(Int.self, forKey: .totalRuns) ?? 0,
             totalWins: try values.decodeIfPresent(Int.self, forKey: .totalWins) ?? 0
@@ -92,6 +107,8 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
         try values.encode(trainerGoings, forKey: .trainerGoings)
         try values.encode(horseGoing, forKey: .horseGoing)
         try values.encode(horseOverall, forKey: .horseOverall)
+        try values.encode(jockeyRecent, forKey: .jockeyRecent)
+        try values.encode(trainerRecent, forKey: .trainerRecent)
         try values.encode(ingestedRaceIDs, forKey: .ingestedRaceIDs)
         try values.encode(totalRuns, forKey: .totalRuns)
         try values.encode(totalWins, forKey: .totalWins)
@@ -128,6 +145,10 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
                     let key = Self.goingKey(id: jockeyID, surface: result.surface, bucket: bucket)
                     jockeyGoings[key] = increment(jockeyGoings[key], won: won)
                 }
+                if Self.isISODate(result.date) {
+                    let run = RecentRun(date: result.date, raceID: result.id, horseID: finisher.horseID, won: won)
+                    jockeyRecent[jockeyID] = Self.appendRecent(jockeyRecent[jockeyID, default: []], run)
+                }
             }
             if let trainerID = finisher.trainerID {
                 trainers[trainerID] = increment(trainers[trainerID], won: won)
@@ -142,6 +163,10 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
                 if let bucket = result.going.bucket(on: result.surface) {
                     let key = Self.goingKey(id: trainerID, surface: result.surface, bucket: bucket)
                     trainerGoings[key] = increment(trainerGoings[key], won: won)
+                }
+                if Self.isISODate(result.date) {
+                    let run = RecentRun(date: result.date, raceID: result.id, horseID: finisher.horseID, won: won)
+                    trainerRecent[trainerID] = Self.appendRecent(trainerRecent[trainerID, default: []], run)
                 }
             }
             if let position = finisher.position.numericPosition {
@@ -193,6 +218,26 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
 
     private static func horseGoingKey(horseID: String, surface: Surface, bucket: HorseGoingBucket) -> String {
         "\(horseID)|\(surface.rawValue)|\(bucket.rawValue)"
+    }
+
+    private static func isISODate(_ value: String) -> Bool {
+        let parts = value.split(separator: "-")
+        guard parts.count == 3, parts[0].count == 4, parts[1].count == 2, parts[2].count == 2,
+              let year = Int(parts[0]), let month = Int(parts[1]), let day = Int(parts[2]) else { return false }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        guard let parsed = calendar.date(from: DateComponents(year: year, month: month, day: day)) else { return false }
+        let components = calendar.dateComponents([.year, .month, .day], from: parsed)
+        return components.year == year && components.month == month && components.day == day
+    }
+
+    private static func appendRecent(_ recentRuns: [RecentRun], _ newRun: RecentRun) -> [RecentRun] {
+        let sorted = (recentRuns + [newRun]).sorted {
+            if $0.date != $1.date { return $0.date < $1.date }
+            if $0.raceID != $1.raceID { return $0.raceID < $1.raceID }
+            return $0.horseID < $1.horseID
+        }
+        return Array(sorted.suffix(50))
     }
 }
 
@@ -255,5 +300,15 @@ extension ResultsArchive: GoingStrikeRateProviding {
 
     public func trainerGoingStrikeRate(id: String, surface: Surface, bucket: HorseGoingBucket) -> StrikeRate? {
         trainerGoings[Self.goingKey(id: id, surface: surface, bucket: bucket)]
+    }
+}
+
+extension ResultsArchive: RecentStrikeRateProviding {
+    public func jockeyRecentStrikeRate(id: String) -> StrikeRate? { Self.rate(jockeyRecent[id]) }
+    public func trainerRecentStrikeRate(id: String) -> StrikeRate? { Self.rate(trainerRecent[id]) }
+
+    private static func rate(_ runs: [RecentRun]?) -> StrikeRate? {
+        guard let runs, !runs.isEmpty else { return nil }
+        return StrikeRate(runs: runs.count, wins: runs.filter(\.won).count)
     }
 }

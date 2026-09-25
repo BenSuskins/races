@@ -2,6 +2,7 @@ package tracking
 
 import (
 	"sort"
+	"time"
 
 	"github.com/bensuskins/races/server/internal/domain"
 	"github.com/bensuskins/races/server/internal/rating"
@@ -23,6 +24,8 @@ type Archive struct {
 	TrainerGoings    map[string]rating.StrikeRate `json:"trainerGoings,omitempty"`
 	HorseGoing       map[string]rating.PlaceRate  `json:"horseGoing,omitempty"`
 	HorseOverall     map[string]rating.PlaceRate  `json:"horseOverall,omitempty"`
+	JockeyRecent     map[string][]RecentRun       `json:"jockeyRecent,omitempty"`
+	TrainerRecent    map[string][]RecentRun       `json:"trainerRecent,omitempty"`
 	IngestedRaceIDs  []string                     `json:"ingestedRaceIDs"`
 	TotalRuns        int                          `json:"totalRuns"`
 	TotalWins        int                          `json:"totalWins"`
@@ -30,8 +33,18 @@ type Archive struct {
 	ingested map[string]bool
 }
 
+// RecentRun is one dated ride retained for the recent-form window.
+type RecentRun struct {
+	Date    string `json:"date"`
+	RaceID  string `json:"raceID"`
+	HorseID string `json:"horseID"`
+	Won     bool   `json:"won"`
+}
+
+const RecentRunWindow = 50
+
 func NewArchive() *Archive {
-	return &Archive{Jockeys: map[string]rating.StrikeRate{}, Trainers: map[string]rating.StrikeRate{}, JockeySurfaces: map[string]rating.StrikeRate{}, TrainerSurfaces: map[string]rating.StrikeRate{}, JockeyRaceTypes: map[string]rating.StrikeRate{}, TrainerRaceTypes: map[string]rating.StrikeRate{}, JockeyGoings: map[string]rating.StrikeRate{}, TrainerGoings: map[string]rating.StrikeRate{}, HorseGoing: map[string]rating.PlaceRate{}, HorseOverall: map[string]rating.PlaceRate{}, ingested: map[string]bool{}}
+	return &Archive{Jockeys: map[string]rating.StrikeRate{}, Trainers: map[string]rating.StrikeRate{}, JockeySurfaces: map[string]rating.StrikeRate{}, TrainerSurfaces: map[string]rating.StrikeRate{}, JockeyRaceTypes: map[string]rating.StrikeRate{}, TrainerRaceTypes: map[string]rating.StrikeRate{}, JockeyGoings: map[string]rating.StrikeRate{}, TrainerGoings: map[string]rating.StrikeRate{}, HorseGoing: map[string]rating.PlaceRate{}, HorseOverall: map[string]rating.PlaceRate{}, JockeyRecent: map[string][]RecentRun{}, TrainerRecent: map[string][]RecentRun{}, ingested: map[string]bool{}}
 }
 
 func (a *Archive) index() {
@@ -73,6 +86,12 @@ func (a *Archive) index() {
 	if a.HorseOverall == nil {
 		a.HorseOverall = map[string]rating.PlaceRate{}
 	}
+	if a.JockeyRecent == nil {
+		a.JockeyRecent = map[string][]RecentRun{}
+	}
+	if a.TrainerRecent == nil {
+		a.TrainerRecent = map[string][]RecentRun{}
+	}
 }
 
 func (a *Archive) Has(raceID string) bool { a.index(); return a.ingested[raceID] }
@@ -85,6 +104,10 @@ func (a *Archive) Ingest(r domain.RaceResult) bool {
 	}
 	a.ingested[r.ID] = true
 	a.IngestedRaceIDs = append(a.IngestedRaceIDs, r.ID)
+	validRecentDate := false
+	if _, err := time.Parse("2006-01-02", r.Date); err == nil {
+		validRecentDate = true
+	}
 	for _, f := range r.Finishers {
 		won := f.Position.IsWinner()
 		a.TotalRuns++
@@ -105,6 +128,9 @@ func (a *Archive) Ingest(r domain.RaceResult) bool {
 				key := goingSubjectKey(*f.JockeyID, r.Surface, bucket)
 				a.JockeyGoings[key] = bump(a.JockeyGoings[key], won)
 			}
+			if validRecentDate {
+				a.JockeyRecent[*f.JockeyID] = appendRecent(a.JockeyRecent[*f.JockeyID], RecentRun{Date: r.Date, RaceID: r.ID, HorseID: f.HorseID, Won: won})
+			}
 		}
 		if f.TrainerID != nil {
 			a.Trainers[*f.TrainerID] = bump(a.Trainers[*f.TrainerID], won)
@@ -119,6 +145,9 @@ func (a *Archive) Ingest(r domain.RaceResult) bool {
 			if bucket := r.Going.Bucket(r.Surface); bucket != "" {
 				key := goingSubjectKey(*f.TrainerID, r.Surface, bucket)
 				a.TrainerGoings[key] = bump(a.TrainerGoings[key], won)
+			}
+			if validRecentDate {
+				a.TrainerRecent[*f.TrainerID] = appendRecent(a.TrainerRecent[*f.TrainerID], RecentRun{Date: r.Date, RaceID: r.ID, HorseID: f.HorseID, Won: won})
 			}
 		}
 		if f.Position.Kind == domain.PositionFinished {
@@ -141,6 +170,36 @@ func (a *Archive) Ingest(r domain.RaceResult) bool {
 		}
 	}
 	return true
+}
+
+func appendRecent(runs []RecentRun, run RecentRun) []RecentRun {
+	runs = append(runs, run)
+	sort.Slice(runs, func(i, j int) bool {
+		if runs[i].Date != runs[j].Date {
+			return runs[i].Date < runs[j].Date
+		}
+		if runs[i].RaceID != runs[j].RaceID {
+			return runs[i].RaceID < runs[j].RaceID
+		}
+		return runs[i].HorseID < runs[j].HorseID
+	})
+	if len(runs) > RecentRunWindow {
+		runs = append([]RecentRun(nil), runs[len(runs)-RecentRunWindow:]...)
+	}
+	return runs
+}
+
+func recentStrikeRate(runs []RecentRun) (rating.StrikeRate, bool) {
+	if len(runs) == 0 {
+		return rating.StrikeRate{}, false
+	}
+	rate := rating.StrikeRate{Runs: len(runs)}
+	for _, run := range runs {
+		if run.Won {
+			rate.Wins++
+		}
+	}
+	return rate, true
 }
 
 func surfaceSubjectKey(id string, surface domain.Surface) string {
@@ -221,6 +280,16 @@ func (a *Archive) Merge(other Archive) int {
 		current := a.HorseOverall[id]
 		a.HorseOverall[id] = rating.PlaceRate{Runs: current.Runs + s.Runs, Places: current.Places + s.Places}
 	}
+	for id, runs := range other.JockeyRecent {
+		for _, run := range runs {
+			a.JockeyRecent[id] = appendRecent(a.JockeyRecent[id], run)
+		}
+	}
+	for id, runs := range other.TrainerRecent {
+		for _, run := range runs {
+			a.TrainerRecent[id] = appendRecent(a.TrainerRecent[id], run)
+		}
+	}
 	a.TotalRuns += other.TotalRuns
 	a.TotalWins += other.TotalWins
 	for _, id := range other.IngestedRaceIDs {
@@ -285,6 +354,16 @@ func (a *Archive) TrainerGoingStrikeRate(id string, surface domain.Surface, buck
 	a.index()
 	record, ok := a.TrainerGoings[goingSubjectKey(id, surface, bucket)]
 	return record, ok
+}
+
+func (a *Archive) JockeyRecentStrikeRate(id string) (rating.StrikeRate, bool) {
+	a.index()
+	return recentStrikeRate(a.JockeyRecent[id])
+}
+
+func (a *Archive) TrainerRecentStrikeRate(id string) (rating.StrikeRate, bool) {
+	a.index()
+	return recentStrikeRate(a.TrainerRecent[id])
 }
 
 func (a *Archive) HorseGoingRate(horseID string, surface domain.Surface, bucket domain.GoingBucket) (rating.PlaceRate, bool) {

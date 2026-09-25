@@ -222,6 +222,47 @@ final class ResultsArchiveTests: XCTestCase {
         XCTAssertEqual(missing.availability, .missingData("going or surface is unknown"))
     }
 
+    func test_recentArchiveKeepsTheLatestFiftyDatedRunsAndAppliesTheThirtyRunFloor() throws {
+        var archive = ResultsArchive()
+        for index in stride(from: 51, through: 1, by: -1) {
+            let month = (index - 1) / 28 + 1
+            let day = (index - 1) % 28 + 1
+            let date = String(format: "2026-%02d-%02d", month, day)
+            let winner = index <= 30
+            archive.ingest(TestResult.result(
+                id: String(format: "race-%02d", index), date: date,
+                finishing: [("a", winner ? "1" : "2"), ("b", winner ? "2" : "1")],
+                jockeys: ["a": "hot"], trainers: ["a": "stable"]
+            ))
+        }
+        XCTAssertEqual(archive.jockeyRecentStrikeRate(id: "hot"), StrikeRate(runs: 50, wins: 29))
+        XCTAssertEqual(archive.trainerRecentStrikeRate(id: "stable"), StrikeRate(runs: 50, wins: 29))
+        archive.ingest(TestResult.result(id: "undated", date: "2026-02-30", finishing: [("a", "1")], jockeys: ["a": "hot"]))
+        XCTAssertEqual(archive.jockeyRecentStrikeRate(id: "hot"), StrikeRate(runs: 50, wins: 29))
+
+        let encoded = try JSONEncoder().encode(archive)
+        let restored = try JSONDecoder().decode(ResultsArchive.self, from: encoded)
+        XCTAssertEqual(restored.jockeyRecentStrikeRate(id: "hot"), StrikeRate(runs: 50, wins: 29))
+        XCTAssertEqual(restored.trainerRecentStrikeRate(id: "stable"), StrikeRate(runs: 50, wins: 29))
+
+        let race = TestRace.race(runners: [TestRace.runner("a", jockeyID: "hot", trainerID: "stable")])
+        let context = FactorContext(race: race, strikeRates: restored)
+        let jockey = RecentStrikeRateFactor(subject: .jockey).value(for: race.runners[0], in: context)
+        let trainer = RecentStrikeRateFactor(subject: .trainer).value(for: race.runners[0], in: context)
+        XCTAssertTrue(jockey.availability.isAvailable)
+        XCTAssertTrue(trainer.availability.isAvailable)
+        XCTAssertTrue(jockey.display.contains("from 50 recent runs"))
+
+        var thin = ResultsArchive()
+        for index in 1...29 {
+            thin.ingest(TestResult.result(id: "thin-\(index)", finishing: [("a", "1")], jockeys: ["a": "hot"]))
+        }
+        let missing = RecentStrikeRateFactor(subject: .jockey).value(
+            for: race.runners[0], in: FactorContext(race: race, strikeRates: thin)
+        )
+        XCTAssertEqual(missing.availability, .missingData("only 29 dated runs in the recent window"))
+    }
+
     // MARK: - Baseline
 
     /// Until there is enough archive to measure it, the baseline is a stated
