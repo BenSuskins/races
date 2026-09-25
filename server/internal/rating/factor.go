@@ -19,24 +19,27 @@ import (
 type FactorID string
 
 const (
-	OfficialRating       FactorID = "officialRating"
-	HandicapBandPosition FactorID = "handicapBandPosition"
-	RecentForm           FactorID = "recentForm"
-	WonLastTime          FactorID = "wonLastTime"
-	CompletionRate       FactorID = "completionRate"
-	DaysSinceLastRun     FactorID = "daysSinceLastRun"
-	Age                  FactorID = "age"
-	WeightCarried        FactorID = "weightCarried"
-	Draw                 FactorID = "draw"
-	Headgear             FactorID = "headgear"
-	JockeyStrikeRate     FactorID = "jockeyStrikeRate"
-	TrainerStrikeRate    FactorID = "trainerStrikeRate"
+	OfficialRating           FactorID = "officialRating"
+	HandicapBandPosition     FactorID = "handicapBandPosition"
+	RecentForm               FactorID = "recentForm"
+	WonLastTime              FactorID = "wonLastTime"
+	CompletionRate           FactorID = "completionRate"
+	DaysSinceLastRun         FactorID = "daysSinceLastRun"
+	Age                      FactorID = "age"
+	WeightCarried            FactorID = "weightCarried"
+	Draw                     FactorID = "draw"
+	Headgear                 FactorID = "headgear"
+	JockeyStrikeRate         FactorID = "jockeyStrikeRate"
+	TrainerStrikeRate        FactorID = "trainerStrikeRate"
+	JockeySurfaceStrikeRate  FactorID = "jockeySurfaceStrikeRate"
+	TrainerSurfaceStrikeRate FactorID = "trainerSurfaceStrikeRate"
 )
 
 // AllFactors in declaration order, which is also the rater's order.
 var AllFactors = []FactorID{
 	OfficialRating, HandicapBandPosition, RecentForm, WonLastTime, CompletionRate,
 	DaysSinceLastRun, Age, WeightCarried, Draw, Headgear, JockeyStrikeRate, TrainerStrikeRate,
+	JockeySurfaceStrikeRate, TrainerSurfaceStrikeRate,
 }
 
 // Label is the short name shown on screen.
@@ -66,6 +69,10 @@ func (f FactorID) Label() string {
 		return "Jockey strike rate"
 	case TrainerStrikeRate:
 		return "Trainer strike rate"
+	case JockeySurfaceStrikeRate:
+		return "Jockey strike rate by surface"
+	case TrainerSurfaceStrikeRate:
+		return "Trainer strike rate by surface"
 	}
 	return string(f)
 }
@@ -97,6 +104,10 @@ func (f FactorID) Summary() string {
 		return "The jockey's win rate in the server's own archive, shrunk toward the field average."
 	case TrainerStrikeRate:
 		return "The trainer's win rate in the server's own archive, shrunk toward the field average."
+	case JockeySurfaceStrikeRate:
+		return "The jockey's win rate on this surface, shrunk toward the jockey's overall record."
+	case TrainerSurfaceStrikeRate:
+		return "The trainer's win rate on this surface, shrunk toward the trainer's overall record."
 	}
 	return ""
 }
@@ -111,6 +122,8 @@ func (f FactorID) Rationale() string {
 		return "The signal is *first-time* headgear, and the free tier has no headgear history to detect it with."
 	case JockeyStrikeRate, TrainerStrikeRate:
 		return "Legitimate, but derived from an archive that starts empty. It switches on once enough race days have been collected."
+	case JockeySurfaceStrikeRate, TrainerSurfaceStrikeRate:
+		return "Surface cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
 	case WeightCarried:
 		return "Near zero on purpose: in a handicap, weight is the handicapper's equaliser, so it substantially double-counts the official rating."
 	}
@@ -209,6 +222,11 @@ type StrikeRates interface {
 	JockeyStrikeRate(id string) (StrikeRate, bool)
 	TrainerStrikeRate(id string) (StrikeRate, bool)
 	BaselineStrikeRate() float64
+}
+
+type SurfaceStrikeRates interface {
+	JockeySurfaceStrikeRate(id string, surface domain.Surface) (StrikeRate, bool)
+	TrainerSurfaceStrikeRate(id string, surface domain.Surface) (StrikeRate, bool)
 }
 
 // Context is everything a factor may look at beyond the runner.

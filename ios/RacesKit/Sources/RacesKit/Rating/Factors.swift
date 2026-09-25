@@ -264,3 +264,41 @@ public struct StrikeRateFactor: RatingFactor {
         return .value(smoothed, "\(percent)% from \(record.runs) runs")
     }
 }
+
+public struct SurfaceStrikeRateFactor: RatingFactor {
+    public enum Subject: Sendable {
+        case jockey
+        case trainer
+    }
+
+    public let id: FactorID
+    public let minimumSample: Int
+    private let subject: Subject
+
+    public init(subject: Subject, minimumSample: Int = 30) {
+        self.subject = subject
+        self.minimumSample = minimumSample
+        self.id = subject == .jockey ? .jockeySurfaceStrikeRate : .trainerSurfaceStrikeRate
+    }
+
+    public func value(for runner: Runner, in context: FactorContext) -> FactorValue {
+        guard let provider = context.surfaceStrikeRates else { return .missing("no surface archive yet") }
+        guard context.race.surface != .unknown else { return .missing("surface is unknown") }
+        let subjectID = subject == .jockey ? runner.jockeyID : runner.trainerID
+        guard let subjectID else { return .missing("not identified") }
+        let record = subject == .jockey
+            ? provider.jockeySurfaceStrikeRate(id: subjectID, surface: context.race.surface)
+            : provider.trainerSurfaceStrikeRate(id: subjectID, surface: context.race.surface)
+        guard let record else { return .missing("no record in this surface archive yet") }
+        guard record.runs >= minimumSample else {
+            return .missing("only \(record.runs) runs recorded on this surface")
+        }
+        let overall = subject == .jockey
+            ? provider.jockeyStrikeRate(id: subjectID)
+            : provider.trainerStrikeRate(id: subjectID)
+        let prior = overall?.smoothed(towards: provider.baselineStrikeRate) ?? provider.baselineStrikeRate
+        let smoothed = record.smoothed(towards: prior)
+        let percent = Int((smoothed * 100).rounded())
+        return .value(smoothed, "\(percent)% from \(record.runs) \(context.race.surface.displayName.lowercased()) runs")
+    }
+}

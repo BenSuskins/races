@@ -104,9 +104,9 @@ func TestResultFactsRespectKnownTime(t *testing.T) {
 	firstKnown := time.Date(2026, 9, 20, 12, 0, 0, 0, time.UTC)
 	secondKnown := firstKnown.Add(24 * time.Hour)
 	jockey := "jockey"
-	first := domain.RaceResult{ID: "prior-race", Date: "2026-09-20", Finishers: []domain.Finisher{{HorseID: "first-version", Position: domain.Finished(2), JockeyID: &jockey}}}
-	second := domain.RaceResult{ID: "prior-race", Date: "2026-09-20", Finishers: []domain.Finisher{{HorseID: "second-version", Position: domain.Finished(1), JockeyID: &jockey}, {HorseID: "extra", Position: domain.Finished(2)}}}
-	future := domain.RaceResult{ID: "future-race", Date: "2026-09-21", Finishers: []domain.Finisher{{HorseID: "future-winner", Position: domain.Finished(1), JockeyID: &jockey}}}
+	first := domain.RaceResult{ID: "prior-race", Date: "2026-09-20", Surface: domain.SurfaceTurf, Finishers: []domain.Finisher{{HorseID: "first-version", Position: domain.Finished(2), JockeyID: &jockey}}}
+	second := domain.RaceResult{ID: "prior-race", Date: "2026-09-20", Surface: domain.SurfaceTurf, Finishers: []domain.Finisher{{HorseID: "second-version", Position: domain.Finished(1), JockeyID: &jockey}, {HorseID: "extra", Position: domain.Finished(2)}}}
+	future := domain.RaceResult{ID: "future-race", Date: "2026-09-21", Surface: domain.SurfaceAllWeather, Finishers: []domain.Finisher{{HorseID: "future-winner", Position: domain.Finished(1), JockeyID: &jockey}}}
 	if _, err := s.SaveResults(ctx, []domain.RaceResult{first}, firstKnown); err != nil {
 		t.Fatal(err)
 	}
@@ -124,6 +124,9 @@ func TestResultFactsRespectKnownTime(t *testing.T) {
 	if rate, _ := archive.JockeyStrikeRate(jockey); rate.Runs != 1 || rate.Wins != 0 {
 		t.Fatalf("future win changed the earlier jockey rate: %+v", rate)
 	}
+	if rate, _ := archive.JockeySurfaceStrikeRate(jockey, domain.SurfaceTurf); rate.Runs != 1 || rate.Wins != 0 {
+		t.Fatalf("future win changed the earlier surface rate: %+v", rate)
+	}
 	after, err := s.ResultFactsKnownBefore(ctx, secondKnown.Add(time.Second))
 	latestPrior := ""
 	for _, result := range after {
@@ -140,5 +143,11 @@ func TestResultFactsRespectKnownTime(t *testing.T) {
 	}
 	if rate, _ := laterArchive.JockeyStrikeRate(jockey); rate.Runs != 2 || rate.Wins != 2 {
 		t.Fatalf("newer facts were not available after collection: %+v", rate)
+	}
+	if rate, _ := laterArchive.JockeySurfaceStrikeRate(jockey, domain.SurfaceTurf); rate.Runs != 1 || rate.Wins != 1 {
+		t.Fatalf("updated surface fact was not available after collection: %+v", rate)
+	}
+	if rate, _ := laterArchive.JockeySurfaceStrikeRate(jockey, domain.SurfaceAllWeather); rate.Runs != 1 || rate.Wins != 1 {
+		t.Fatalf("later all-weather fact was not available after collection: %+v", rate)
 	}
 }

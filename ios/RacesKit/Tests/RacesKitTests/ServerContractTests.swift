@@ -59,6 +59,19 @@ final class ServerContractTests: XCTestCase {
         XCTAssertEqual(record.report.benchmarkedModel?.settled, record.report.favouriteBaseline.settled)
         XCTAssertNil(record.report.modelWilson)
         XCTAssertNil(record.report.favouriteWilson)
+        XCTAssertEqual(record.recentTips?.count, 2)
+        XCTAssertFalse(try XCTUnwrap(record.recentTips?.first).contributions.isEmpty)
+    }
+
+    func test_anOlderCachedRecordWithoutRecentTipsStillDecodes() throws {
+        let original = try Fixture.data("server-record.json")
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: original) as? [String: Any])
+        object.removeValue(forKey: "recentTips")
+        let legacyData = try JSONSerialization.data(withJSONObject: object)
+
+        let record = try RacesServerClient.decoder.decode(ServerRecord.self, from: legacyData)
+
+        XCTAssertNil(record.recentTips)
     }
 
     func test_theModelDecodesIntoRatingWeights() throws {

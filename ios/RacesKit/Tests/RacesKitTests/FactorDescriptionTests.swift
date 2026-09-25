@@ -45,13 +45,13 @@ final class FactorDescriptionTests: XCTestCase {
         }
     }
 
-    func test_theFourDeliberateZerosAreExactlyTheOnesDocumented() {
+    func test_theDeliberateZerosAreExactlyTheOnesDocumented() {
         let weights = RatingWeights.v1
         let zeroed = Set(FactorID.allCases.filter { weights.weight(for: $0) == 0 })
 
         // Pinned, so switching one on is a visible decision rather than a
         // side effect. `weightCarried` is near zero and deliberately not zero.
-        XCTAssertEqual(zeroed, [.draw, .headgear, .jockeyStrikeRate, .trainerStrikeRate])
+        XCTAssertEqual(zeroed, [.draw, .headgear, .jockeyStrikeRate, .trainerStrikeRate, .jockeySurfaceStrikeRate, .trainerSurfaceStrikeRate])
         XCTAssertGreaterThan(weights.weight(for: .weightCarried), 0)
     }
 

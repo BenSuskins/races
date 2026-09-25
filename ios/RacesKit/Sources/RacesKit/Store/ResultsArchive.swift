@@ -15,22 +15,56 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
 
     public private(set) var jockeys: [String: StrikeRate]
     public private(set) var trainers: [String: StrikeRate]
+    public private(set) var jockeySurfaces: [String: StrikeRate]
+    public private(set) var trainerSurfaces: [String: StrikeRate]
     public private(set) var ingestedRaceIDs: Set<String>
     public private(set) var totalRuns: Int
     public private(set) var totalWins: Int
 
+    private enum CodingKeys: String, CodingKey {
+        case jockeys, trainers, jockeySurfaces, trainerSurfaces, ingestedRaceIDs, totalRuns, totalWins
+    }
+
     public init(
         jockeys: [String: StrikeRate] = [:],
         trainers: [String: StrikeRate] = [:],
+        jockeySurfaces: [String: StrikeRate] = [:],
+        trainerSurfaces: [String: StrikeRate] = [:],
         ingestedRaceIDs: Set<String> = [],
         totalRuns: Int = 0,
         totalWins: Int = 0
     ) {
         self.jockeys = jockeys
         self.trainers = trainers
+        self.jockeySurfaces = jockeySurfaces
+        self.trainerSurfaces = trainerSurfaces
         self.ingestedRaceIDs = ingestedRaceIDs
         self.totalRuns = totalRuns
         self.totalWins = totalWins
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            jockeys: try values.decodeIfPresent([String: StrikeRate].self, forKey: .jockeys) ?? [:],
+            trainers: try values.decodeIfPresent([String: StrikeRate].self, forKey: .trainers) ?? [:],
+            jockeySurfaces: try values.decodeIfPresent([String: StrikeRate].self, forKey: .jockeySurfaces) ?? [:],
+            trainerSurfaces: try values.decodeIfPresent([String: StrikeRate].self, forKey: .trainerSurfaces) ?? [:],
+            ingestedRaceIDs: try values.decodeIfPresent(Set<String>.self, forKey: .ingestedRaceIDs) ?? [],
+            totalRuns: try values.decodeIfPresent(Int.self, forKey: .totalRuns) ?? 0,
+            totalWins: try values.decodeIfPresent(Int.self, forKey: .totalWins) ?? 0
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(jockeys, forKey: .jockeys)
+        try values.encode(trainers, forKey: .trainers)
+        try values.encode(jockeySurfaces, forKey: .jockeySurfaces)
+        try values.encode(trainerSurfaces, forKey: .trainerSurfaces)
+        try values.encode(ingestedRaceIDs, forKey: .ingestedRaceIDs)
+        try values.encode(totalRuns, forKey: .totalRuns)
+        try values.encode(totalWins, forKey: .totalWins)
     }
 
     public var raceCount: Int { ingestedRaceIDs.count }
@@ -52,9 +86,17 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
 
             if let jockeyID = finisher.jockeyID {
                 jockeys[jockeyID] = increment(jockeys[jockeyID], won: won)
+                if result.surface != .unknown {
+                    let key = Self.surfaceKey(id: jockeyID, surface: result.surface)
+                    jockeySurfaces[key] = increment(jockeySurfaces[key], won: won)
+                }
             }
             if let trainerID = finisher.trainerID {
                 trainers[trainerID] = increment(trainers[trainerID], won: won)
+                if result.surface != .unknown {
+                    let key = Self.surfaceKey(id: trainerID, surface: result.surface)
+                    trainerSurfaces[key] = increment(trainerSurfaces[key], won: won)
+                }
             }
         }
         return true
@@ -72,6 +114,10 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
             runs: (existing?.runs ?? 0) + 1,
             wins: (existing?.wins ?? 0) + (won ? 1 : 0)
         )
+    }
+
+    private static func surfaceKey(id: String, surface: Surface) -> String {
+        "\(id)|\(surface.rawValue)"
     }
 }
 
@@ -94,5 +140,15 @@ extension ResultsArchive: StrikeRateProviding {
     public var baselineStrikeRate: Double {
         guard totalRuns >= 100 else { return 0.125 }
         return Double(totalWins) / Double(totalRuns)
+    }
+}
+
+extension ResultsArchive: SurfaceStrikeRateProviding {
+    public func jockeySurfaceStrikeRate(id: String, surface: Surface) -> StrikeRate? {
+        jockeySurfaces[Self.surfaceKey(id: id, surface: surface)]
+    }
+
+    public func trainerSurfaceStrikeRate(id: String, surface: Surface) -> StrikeRate? {
+        trainerSurfaces[Self.surfaceKey(id: id, surface: surface)]
     }
 }

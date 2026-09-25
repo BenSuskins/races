@@ -183,6 +183,62 @@ type strikeRate struct {
 	minimumSample int
 }
 
+type surfaceStrikeRate struct {
+	jockey        bool
+	minimumSample int
+}
+
+func (f surfaceStrikeRate) ID() FactorID {
+	if f.jockey {
+		return JockeySurfaceStrikeRate
+	}
+	return TrainerSurfaceStrikeRate
+}
+
+func (f surfaceStrikeRate) Value(r domain.Runner, ctx Context) FactorValue {
+	if ctx.StrikeRates == nil {
+		return missing("no results archive yet")
+	}
+	provider, ok := ctx.StrikeRates.(SurfaceStrikeRates)
+	if !ok {
+		return missing("no surface archive yet")
+	}
+	if ctx.Race.Surface == domain.SurfaceUnknown {
+		return missing("surface is unknown")
+	}
+	subject := r.TrainerID
+	if f.jockey {
+		subject = r.JockeyID
+	}
+	if subject == nil {
+		return missing("not identified")
+	}
+	var record StrikeRate
+	if f.jockey {
+		record, ok = provider.JockeySurfaceStrikeRate(*subject, ctx.Race.Surface)
+	} else {
+		record, ok = provider.TrainerSurfaceStrikeRate(*subject, ctx.Race.Surface)
+	}
+	if !ok {
+		return missing("no record in this surface archive yet")
+	}
+	if record.Runs < f.minimumSample {
+		return missing(fmt.Sprintf("only %d runs recorded on this surface", record.Runs))
+	}
+	prior := ctx.StrikeRates.BaselineStrikeRate()
+	var overall StrikeRate
+	if f.jockey {
+		overall, ok = ctx.StrikeRates.JockeyStrikeRate(*subject)
+	} else {
+		overall, ok = ctx.StrikeRates.TrainerStrikeRate(*subject)
+	}
+	if ok {
+		prior = overall.Smoothed(prior, 20)
+	}
+	smoothed := record.Smoothed(prior, 20)
+	return value(smoothed, fmt.Sprintf("%d%% from %d %s runs", int(math.Round(smoothed*100)), record.Runs, ctx.Race.Surface))
+}
+
 func (s strikeRate) ID() FactorID {
 	if s.jockey {
 		return JockeyStrikeRate
@@ -225,5 +281,7 @@ func DefaultFactors(w Weights) []Factor {
 		completionRate{}, daysSinceLastRun{}, age{}, weightCarried{}, draw{}, headgear{},
 		strikeRate{jockey: true, minimumSample: w.MinimumStrikeRateSample},
 		strikeRate{jockey: false, minimumSample: w.MinimumStrikeRateSample},
+		surfaceStrikeRate{jockey: true, minimumSample: w.MinimumStrikeRateSample},
+		surfaceStrikeRate{jockey: false, minimumSample: w.MinimumStrikeRateSample},
 	}
 }

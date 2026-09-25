@@ -12,6 +12,13 @@ final class ResultsArchiveTests: XCTestCase {
         )
     }
 
+    func test_legacyArchiveWithoutSurfaceRatesStillDecodes() throws {
+        let legacy = Data(#"{"jockeys":{},"trainers":{},"ingestedRaceIDs":[],"totalRuns":0,"totalWins":0}"#.utf8)
+        let archive = try JSONDecoder().decode(ResultsArchive.self, from: legacy)
+        XCTAssertTrue(archive.jockeySurfaces.isEmpty)
+        XCTAssertTrue(archive.trainerSurfaces.isEmpty)
+    }
+
     func test_ingestingBuildsStrikeRates() throws {
         var archive = ResultsArchive()
         XCTAssertTrue(archive.ingest(aRace()))
@@ -68,6 +75,49 @@ final class ResultsArchiveTests: XCTestCase {
 
         XCTAssertNil(archive.jockeyStrikeRate(id: "jky_nobody"))
         XCTAssertNil(archive.trainerStrikeRate(id: "trn_nobody"))
+    }
+
+    func test_archiveTracksJockeyAndTrainerRatesBySurface() {
+        var archive = ResultsArchive()
+        archive.ingest(TestResult.result(
+            id: "turf",
+            finishing: [("a", "1"), ("b", "2")],
+            jockeys: ["a": "jockey", "b": "jockey"],
+            trainers: ["a": "trainer", "b": "trainer"]
+        ))
+        XCTAssertEqual(archive.jockeySurfaceStrikeRate(id: "jockey", surface: .turf), StrikeRate(runs: 2, wins: 1))
+        XCTAssertEqual(archive.trainerSurfaceStrikeRate(id: "trainer", surface: .turf), StrikeRate(runs: 2, wins: 1))
+        XCTAssertNil(archive.jockeySurfaceStrikeRate(id: "jockey", surface: .allWeather))
+    }
+
+    func test_surfaceStrikeRateRequiresThirtyRunsAndShrinksToTheGeneralRecord() throws {
+        var archive = ResultsArchive()
+        for index in 1...30 {
+            let first = index <= 10 ? "1" : "2"
+            archive.ingest(TestResult.result(
+                id: "surface_\(index)",
+                finishing: [("a", first), ("b", index <= 10 ? "2" : "1")],
+                jockeys: ["a": "hot"],
+                trainers: ["a": "stable"]
+            ))
+        }
+        let race = TestRace.race(surface: .turf, runners: [
+            TestRace.runner("a", jockeyID: "hot", trainerID: "stable"),
+            TestRace.runner("b"),
+        ])
+        let context = FactorContext(race: race, strikeRates: archive)
+        let jockey = SurfaceStrikeRateFactor(subject: .jockey).value(for: race.runners[0], in: context)
+        let trainer = SurfaceStrikeRateFactor(subject: .trainer).value(for: race.runners[0], in: context)
+        XCTAssertTrue(jockey.availability.isAvailable)
+        XCTAssertEqual(jockey.raw, trainer.raw)
+        XCTAssertTrue(jockey.display.contains("from 30 turf runs"))
+
+        let allWeather = TestRace.race(surface: .allWeather, runners: race.runners)
+        let missing = SurfaceStrikeRateFactor(subject: .jockey).value(
+            for: allWeather.runners[0],
+            in: FactorContext(race: allWeather, strikeRates: archive)
+        )
+        XCTAssertEqual(missing.availability, .missingData("no record in this surface archive yet"))
     }
 
     // MARK: - Baseline

@@ -255,6 +255,30 @@
                 "_0": "only 2 runs recorded so far"
               }
             }
+          },
+          {
+            "factor": "jockeySurfaceStrikeRate",
+            "label": "Jockey strike rate by surface",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this surface archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerSurfaceStrikeRate",
+            "label": "Trainer strike rate by surface",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this surface archive yet"
+              }
+            }
           }
         ]
       },
@@ -399,6 +423,30 @@
             "availability": {
               "missingData": {
                 "_0": "no record in the archive yet"
+              }
+            }
+          },
+          {
+            "factor": "jockeySurfaceStrikeRate",
+            "label": "Jockey strike rate by surface",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this surface archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerSurfaceStrikeRate",
+            "label": "Trainer strike rate by surface",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this surface archive yet"
               }
             }
           }
@@ -552,6 +600,30 @@
                 "_0": "no record in the archive yet"
               }
             }
+          },
+          {
+            "factor": "jockeySurfaceStrikeRate",
+            "label": "Jockey strike rate by surface",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this surface archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerSurfaceStrikeRate",
+            "label": "Trainer strike rate by surface",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this surface archive yet"
+              }
+            }
           }
         ]
       },
@@ -696,6 +768,30 @@
             "availability": {
               "missingData": {
                 "_0": "no record in the archive yet"
+              }
+            }
+          },
+          {
+            "factor": "jockeySurfaceStrikeRate",
+            "label": "Jockey strike rate by surface",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this surface archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerSurfaceStrikeRate",
+            "label": "Trainer strike rate by surface",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this surface archive yet"
               }
             }
           }
@@ -856,6 +952,30 @@
         "availability": {
           "missingData": {
             "_0": "only 2 runs recorded so far"
+          }
+        }
+      },
+      {
+        "factor": "jockeySurfaceStrikeRate",
+        "label": "Jockey strike rate by surface",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "no record in this surface archive yet"
+          }
+        }
+      },
+      {
+        "factor": "trainerSurfaceStrikeRate",
+        "label": "Trainer strike rate by surface",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "no record in this surface archive yet"
           }
         }
       }

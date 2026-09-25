@@ -120,6 +120,8 @@ public struct ServerRecord: Codable, Hashable, Sendable {
     public let activeWeightsID: String?
     public let commission: Double
     public let report: AccuracyReport
+    /// The 30 newest tips in this weight-set population, with their frozen rating details.
+    public let recentTips: [TipRecord]?
     public let weightsInUse: [String: Int]
     /// Tips by where they came from: `server`, or `device:<name>`.
     public let sources: [String: Int]
@@ -130,6 +132,7 @@ public struct ServerRecord: Codable, Hashable, Sendable {
         activeWeightsID: String? = nil,
         commission: Double = AccuracyCalculator.defaultCommission,
         report: AccuracyReport,
+        recentTips: [TipRecord]? = nil,
         weightsInUse: [String: Int] = [:],
         sources: [String: Int] = [:],
         archivedRaces: Int = 0
@@ -138,6 +141,7 @@ public struct ServerRecord: Codable, Hashable, Sendable {
         self.activeWeightsID = activeWeightsID
         self.commission = commission
         self.report = report
+        self.recentTips = recentTips
         self.weightsInUse = weightsInUse
         self.sources = sources
         self.archivedRaces = archivedRaces

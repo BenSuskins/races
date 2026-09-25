@@ -164,13 +164,23 @@ func TestImportRecordAndModel(t *testing.T) {
 	}
 	_, body = call(t, s, "GET", "/v1/record?weightsID=v2", nil, true)
 	json.Unmarshal(body, &rec)
-	if rec.Report.Settled != 1 || rec.Sources["device:phone"] != 2 || rec.Report.BenchmarkedModel.Settled != 1 {
+	if rec.Report.Settled != 1 || rec.Sources["device:phone"] != 2 || rec.Report.BenchmarkedModel.Settled != 1 || len(rec.RecentTips) != 2 {
 		t.Fatalf("the record splits by weight id: %s", string(body))
+	}
+	hasFrozenContributions := false
+	for _, tip := range rec.RecentTips {
+		if tip.WeightsID != "v2" || tip.RaceID == "" {
+			t.Fatalf("recent details must use the selected weight set: %+v", tip)
+		}
+		hasFrozenContributions = hasFrozenContributions || len(tip.Contributions) > 0
+	}
+	if !hasFrozenContributions {
+		t.Fatalf("recent record details must keep the frozen tip and rating: %s", string(body))
 	}
 	code, body = call(t, s, "GET", "/v1/model", nil, true)
 	var m Model
 	json.Unmarshal(body, &m)
-	if code != 200 || m.Active.ID != "v3" || len(m.Factors) != 12 || len(m.Weights) != 5 {
+	if code != 200 || m.Active.ID != "v3" || len(m.Factors) != 14 || len(m.Weights) != 5 {
 		t.Fatal(string(body))
 	}
 }
