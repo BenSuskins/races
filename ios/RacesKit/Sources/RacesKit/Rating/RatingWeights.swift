@@ -135,15 +135,34 @@ public struct RatingWeights: Codable, Hashable, Sendable {
         minimumValueProbability: 0.00
     )
 
-    /// Current configuration. The probability model remains unchanged from v1;
-    /// the new selection layer requires a meaningful positive EV and an 8% model
-    /// win probability before preferring a non-favourite.
+    /// v1's probabilities with a value-aware selection layer: a meaningful
+    /// positive EV and an 8% model win probability before preferring a
+    /// non-favourite. Kept for the tips it stamped and for back-tests.
     public static let v2 = RatingWeights(
         id: "v2",
         factorWeights: baseFactorWeights,
         minimumValueEdge: 0.05,
         minimumValueProbability: 0.08
     )
+
+    /// Current configuration: v2's probabilities, and the tip is the runner the
+    /// model gives the best chance of winning.
+    ///
+    /// The value layer is off through its own threshold rather than a new field:
+    /// a value candidate needs a model probability of at least
+    /// `minimumValueProbability`, and at 1 no runner in a real field clears it,
+    /// so `selection` always falls through to the highest probability. The
+    /// server's `rating.V3` is the same numbers.
+    public static let v3 = RatingWeights(
+        id: "v3",
+        factorWeights: baseFactorWeights,
+        minimumValueEdge: 0.05,
+        minimumValueProbability: 1
+    )
+
+    /// True when no runner can qualify as a value pick, so the tip is always
+    /// the most likely winner.
+    public var picksMostLikelyWinner: Bool { minimumValueProbability >= 1 }
 
     /// The market, unmodified. Not a real configuration — it is the control the
     /// back-test measures everything else against.

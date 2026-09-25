@@ -1,7 +1,7 @@
 {
   "version": "test",
   "serverTime": "2026-09-20T09:00:00Z",
-  "activeWeightsID": "v2",
+  "activeWeightsID": "v3",
   "racingAPI": {
     "configured": true,
     "healthy": true

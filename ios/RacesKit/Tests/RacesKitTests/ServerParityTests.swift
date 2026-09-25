@@ -49,6 +49,7 @@ final class ServerParityTests: XCTestCase {
     private let presets: [String: RatingWeights] = [
         RatingWeights.v1.id: .v1,
         RatingWeights.v2.id: .v2,
+        RatingWeights.v3.id: .v3,
         RatingWeights.marketOnly.id: .marketOnly,
     ]
 

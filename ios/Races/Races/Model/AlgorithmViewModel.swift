@@ -44,12 +44,12 @@ final class AlgorithmViewModel {
     /// Why the server's model could not be loaded, when it could not.
     private(set) var loadFailure: APIError?
 
-    /// The weights the server is running. Starts as the kit's v2 so the
+    /// The weights the server is running. Starts as the kit's v3 so the
     /// screen has something true to show before the first response.
     private(set) var weights: RatingWeights
     private let link: ServerLink
 
-    init(link: ServerLink, weights: RatingWeights = .v2) {
+    init(link: ServerLink, weights: RatingWeights = .v3) {
         self.link = link
         self.weights = weights
     }
@@ -86,6 +86,21 @@ final class AlgorithmViewModel {
     /// exactly. Not the shipped configuration, but it is the back-test's control
     /// and the screen should not quietly misreport it if it ever is.
     var isMarketOnly: Bool { formInfluence == 0 }
+
+    // MARK: - Selection
+
+    var selectionRule: String {
+        weights.picksMostLikelyWinner ? "Most likely winner" : "Best value"
+    }
+
+    var selectionDetail: String {
+        if weights.picksMostLikelyWinner {
+            return "The tip is the runner with the highest percentage, whatever its price."
+        }
+        let edge = weights.minimumValueEdge.formatted(.percent.precision(.fractionLength(0)))
+        let chance = weights.minimumValueProbability.formatted(.percent.precision(.fractionLength(0)))
+        return "Once a race is priced, a runner whose price beats its chance by at least \(edge), with at least a \(chance) chance, is tipped over the most likely winner."
+    }
 
     // MARK: - Guardrails
 

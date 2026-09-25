@@ -129,8 +129,13 @@ struct RunnerView: View {
             LabeledContent("Model") {
                 ProbabilityBadge(probability: assessment.winProbability)
             }
-            LabeledContent("Fair odds", value: assessment.fairOdds.formatted(
-                .number.precision(.fractionLength(2))))
+            if let fairOdds = FractionalOdds.display(decimal: assessment.fairOdds) {
+                LabeledContent("Fair odds", value: fairOdds)
+            }
+            if let backPrice = assessment.marketBackPrice,
+               let odds = FractionalOdds.display(decimal: backPrice) {
+                LabeledContent("Betfair price", value: odds)
+            }
             if let marketProbability = assessment.marketProbability {
                 LabeledContent(
                     "Market",

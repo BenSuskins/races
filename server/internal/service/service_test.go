@@ -269,3 +269,41 @@ func TestPlanTimetable(t *testing.T) {
 		t.Fatal("seal every minute, cards every quarter")
 	}
 }
+
+// A server that was running v2 moves onto v3 at boot, because v2 was only ever
+// the default; a trained set was promoted on evidence and stays.
+func TestBootstrapMovesV2OntoV3AndLeavesTrainedSetsAlone(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	s := New(st, &fakeRacing{}, nil, time.Now, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	if err := s.Bootstrap(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if w, _ := st.ActiveWeights(ctx); w == nil || w.ID != "v3" {
+		t.Fatal("a fresh database runs v3", w)
+	}
+
+	st.SetActiveWeights(ctx, "v2")
+	if err := s.Bootstrap(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if w, _ := st.ActiveWeights(ctx); w == nil || w.ID != "v3" || !w.PicksMostLikelyWinner() {
+		t.Fatal("v2 moves onto v3", w)
+	}
+
+	learned := rating.V2().Clone()
+	learned.ID = "learned-1-150"
+	st.EnsureWeights(ctx, learned, "trained", time.Now())
+	st.SetActiveWeights(ctx, learned.ID)
+	if err := s.Bootstrap(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if w, _ := st.ActiveWeights(ctx); w == nil || w.ID != learned.ID {
+		t.Fatal("a trained set stays active", w)
+	}
+}

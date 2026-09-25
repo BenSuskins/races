@@ -97,7 +97,13 @@ private struct TipRow: View {
         if selection.assessment.isFormOnly {
             parts.append("Form only — no market")
         }
-        parts.append(selection.assessment.confidence.displayName.lowercased() + " confidence")
+        if selection.assessment.isValuePick {
+            // Otherwise a 15% pick reads as a mistake beside a 35% runner.
+            let odds = selection.selection?.marketBackPrice
+                .flatMap { FractionalOdds.display(decimal: $0) }
+            parts.append(odds.map { "value pick at \($0)" } ?? "value pick")
+        }
+        parts.append(selection.assessment.confidence.displayName.lowercased())
         parts.append("\(selection.race.runnerCount) runners")
         return parts.joined(separator: " · ")
     }

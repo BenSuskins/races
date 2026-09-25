@@ -87,6 +87,11 @@ struct AlgorithmView: View {
     private var guardrailSection: some View {
         Section {
             ParameterRow(
+                name: "Tip",
+                value: model.selectionRule,
+                detail: model.selectionDetail)
+
+            ParameterRow(
                 name: "Z-score clip",
                 value: "±\(model.clip.formatted(.number.precision(.fractionLength(1))))",
                 detail: "One freak reading cannot dominate a race.")
