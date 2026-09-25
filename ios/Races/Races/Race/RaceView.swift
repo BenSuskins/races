@@ -50,7 +50,9 @@ struct RaceView: View {
                 Section {
                     SelectionCard(assessment: assessment, selection: selection)
                 } header: {
-                    Text("The model fancies")
+                    // A value pick is not the model's most likely winner, and a
+                    // header claiming it was would contradict the list below.
+                    Text(assessment.isValuePick ? "The model's value pick" : "The model fancies")
                 } footer: {
                     Text(marketFooter(for: assessment))
                 }
@@ -99,7 +101,7 @@ struct RaceView: View {
             } footer: {
                 // Racecard order, always. A list that looks ranked is a tip, and
                 // the ranking belongs in the card above where it is labelled.
-                Text("In racecard order. The percentage is the model's chance for each runner.")
+                Text("In racecard order. The percentage is the model's chance for each runner; the odds are the Betfair back price, shown as the nearest fractional price.")
             }
         }
         .navigationTitle("\(RaceTime.display(race)) \(race.courseName)")
@@ -126,12 +128,18 @@ private struct SelectionCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(selection.horseName)
                         .font(.title3.weight(.semibold))
-                    Text("\(assessment.confidence.displayName) confidence")
+                    Text(assessment.confidence.displayName)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 8)
                 ProbabilityBadge(probability: selection.winProbability)
+            }
+
+            if let backPrice = selection.marketBackPrice,
+               let odds = FractionalOdds.display(decimal: backPrice) {
+                LabeledContent("Price", value: odds)
+                    .font(.caption)
             }
 
             if let marketProbability = selection.marketProbability {
@@ -140,8 +148,25 @@ private struct SelectionCard: View {
                     value: marketProbability.formatted(.percent.precision(.fractionLength(0))))
                     .font(.caption)
             }
+
+            if let note = valuePickNote {
+                Text(note)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.vertical, 2)
+    }
+
+    /// Why the pick is not the runner with the highest percentage in the list.
+    private var valuePickNote: String? {
+        guard assessment.isValuePick, let topRated = assessment.topRated else { return nil }
+        let chance = selection.winProbability.formatted(.percent.precision(.fractionLength(0)))
+        let topChance = topRated.winProbability.formatted(.percent.precision(.fractionLength(0)))
+        let price = selection.marketBackPrice
+            .flatMap { FractionalOdds.display(decimal: $0) }
+            .map { " at \($0)" } ?? ""
+        return "Picked on value, not on chance. The model's most likely winner is \(topRated.horseName) (\(topChance)), but it thinks the market has underrated this one: \(chance)\(price) is a bigger price than that chance deserves."
     }
 }
 
@@ -184,8 +209,9 @@ private struct RunnerRow: View {
                             .monospacedDigit()
                             .foregroundStyle(.tint)
                     }
-                    if let backPrice = assessment?.marketBackPrice {
-                        Text(backPrice.formatted(.number.precision(.fractionLength(0...2))))
+                    if let backPrice = assessment?.marketBackPrice,
+                       let odds = FractionalOdds.display(decimal: backPrice) {
+                        Text(odds)
                             .monospacedDigit()
                     }
                     if let officialRating = runner.officialRating {
