@@ -196,11 +196,13 @@ const (
 // Matching happens before this is built, so the rater never learns that two
 // providers exist.
 type MarketSnapshot struct {
-	MarketID   *string                `json:"marketID,omitempty"`
-	Source     MarketSource           `json:"source"`
-	CapturedAt Instant                `json:"capturedAt"`
-	IsDelayed  bool                   `json:"isDelayed"`
-	Prices     map[string]RunnerPrice `json:"prices"`
+	MarketID            *string                `json:"marketID,omitempty"`
+	Source              MarketSource           `json:"source"`
+	CapturedAt          Instant                `json:"capturedAt"`
+	IsDelayed           bool                   `json:"isDelayed"`
+	Prices              map[string]RunnerPrice `json:"prices"`
+	FirstObservedAt     *Instant               `json:"firstObservedAt,omitempty"`
+	FirstObservedPrices map[string]RunnerPrice `json:"firstObservedPrices,omitempty"`
 }
 
 func (m MarketSnapshot) Price(horseID string) (RunnerPrice, bool) {

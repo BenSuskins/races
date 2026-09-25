@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/bensuskins/races/server/internal/domain"
 )
@@ -255,6 +256,34 @@ func (f classAdjustedForm) Value(r domain.Runner, ctx Context) FactorValue {
 	}
 	smoothed := (record.Score*float64(record.Runs) + 0.5*3) / (float64(record.Runs) + 3)
 	return value(smoothed, fmt.Sprintf("%d%% class-adjusted form from %d runs", int(math.Round(smoothed*100)), record.Runs))
+}
+
+type marketMovement struct{}
+
+func (marketMovement) ID() FactorID { return MarketMovement }
+func (marketMovement) Value(r domain.Runner, ctx Context) FactorValue {
+	if ctx.Market == nil {
+		return missing("no market prices for this race")
+	}
+	if ctx.Market.Source != domain.SourceLiveExchange {
+		return notApplicable("market movement needs exchange prices")
+	}
+	if ctx.Now.IsZero() || ctx.Market.CapturedAt.After(ctx.Now) || ctx.Market.FirstObservedAt != nil && ctx.Market.FirstObservedAt.After(ctx.Now) {
+		return missing("market movement includes prices after the rating time")
+	}
+	if ctx.Market.FirstObservedAt == nil {
+		return missing("no first observed market prices")
+	}
+	if ctx.Market.CapturedAt.Sub(ctx.Market.FirstObservedAt.Time) < 5*time.Minute {
+		return missing("market movement needs at least five minutes of prices")
+	}
+	first, hasFirst := ctx.Market.FirstObservedPrices[r.ID]
+	current, hasCurrent := ctx.Market.Prices[r.ID]
+	if !hasFirst || !hasCurrent || !first.IsActive || !current.IsActive || first.BackPrice == nil || current.BackPrice == nil || *first.BackPrice <= 1 || *current.BackPrice <= 1 || math.IsNaN(*first.BackPrice) || math.IsNaN(*current.BackPrice) || math.IsInf(*first.BackPrice, 0) || math.IsInf(*current.BackPrice, 0) {
+		return missing("no comparable exchange prices for this runner")
+	}
+	change := 1 / *current.BackPrice - 1 / *first.BackPrice
+	return value(change, fmt.Sprintf("%+.1f percentage points since first seen", change*100))
 }
 
 func fieldPlacePrior(fieldSize *int) float64 {
@@ -567,5 +596,6 @@ func DefaultFactors(w Weights) []Factor {
 		recentStrikeRate{jockey: false, minimumSample: w.MinimumStrikeRateSample},
 		jockeyTrainerStrikeRate{minimumSample: w.MinimumStrikeRateSample},
 		classAdjustedForm{minimumSample: 3},
+		marketMovement{},
 	}
 }

@@ -84,6 +84,41 @@ final class FactorsTests: XCTestCase {
         XCTAssertNil(factor.value(for: TestRace.runner("c", form: nil), in: context()).raw)
     }
 
+    func test_marketMovementUsesOnlyComparablePreSealExchangePrices() throws {
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let finish = start.addingTimeInterval(6 * 60)
+        let snapshot = MarketSnapshot(
+            source: .liveExchange,
+            capturedAt: finish,
+            prices: ["horse": RunnerPrice(backPrice: 1.8)],
+            firstObservedAt: start,
+            firstObservedPrices: ["horse": RunnerPrice(backPrice: 2.0)]
+        )
+        let race = TestRace.race(runners: [TestRace.runner("horse")])
+        let factor = MarketMovementFactor()
+        let reading = factor.value(
+            for: race.runners[0], in: FactorContext(race: race, market: snapshot, now: finish)
+        )
+        XCTAssertTrue(reading.availability.isAvailable)
+        XCTAssertEqual(try XCTUnwrap(reading.raw), 1 / 1.8 - 0.5, accuracy: 0.000001)
+
+        let tooEarly = factor.value(
+            for: race.runners[0], in: FactorContext(race: race, market: MarketSnapshot(
+                source: .liveExchange,
+                capturedAt: start.addingTimeInterval(4 * 60),
+                prices: snapshot.prices,
+                firstObservedAt: start,
+                firstObservedPrices: snapshot.firstObservedPrices
+            ), now: finish)
+        )
+        XCTAssertEqual(tooEarly.availability, .missingData("market movement needs at least five minutes of prices"))
+
+        let afterSeal = factor.value(
+            for: race.runners[0], in: FactorContext(race: race, market: snapshot, now: start.addingTimeInterval(5 * 60))
+        )
+        XCTAssertEqual(afterSeal.availability, .missingData("market movement includes prices after the rating time"))
+    }
+
     /// Almost everything completes on the Flat, so the factor would be noise there.
     func test_completionRateAppliesOnlyOverObstacles() {
         let factor = CompletionRateFactor()

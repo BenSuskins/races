@@ -54,11 +54,12 @@ func (f *fakeRacing) TodaysResults(ctx context.Context) ([]domain.RaceResult, er
 }
 
 type fakeMarkets struct {
-	markets  []matching.ExchangeMarket
-	prices   map[string]map[int64]float64
-	sps      map[string]map[int64]float64
-	spErr    error
-	priceHit int
+	markets    []matching.ExchangeMarket
+	prices     map[string]map[int64]float64
+	sps        map[string]map[int64]float64
+	spErr      error
+	priceHit   int
+	capturedAt *time.Time
 }
 
 func (f *fakeMarkets) Markets(ctx context.Context, day string, c ...string) ([]matching.ExchangeMarket, error) {
@@ -68,7 +69,11 @@ func (f *fakeMarkets) Prices(ctx context.Context, ids []string) ([]matching.Exch
 	f.priceHit++
 	var out []matching.ExchangePrices
 	for _, id := range ids {
-		p := matching.ExchangePrices{MarketID: id, IsDelayed: true, CapturedAt: time.Now(), Prices: map[int64]domain.RunnerPrice{}}
+		capturedAt := time.Now()
+		if f.capturedAt != nil {
+			capturedAt = *f.capturedAt
+		}
+		p := matching.ExchangePrices{MarketID: id, IsDelayed: true, CapturedAt: capturedAt, Prices: map[int64]domain.RunnerPrice{}}
 		for sel, back := range f.prices[id] {
 			p.Prices[sel] = domain.RunnerPrice{BackPrice: fp(back), IsActive: true}
 		}
@@ -206,6 +211,57 @@ func TestADayEndToEnd(t *testing.T) {
 	}
 	if rep, _ := backtest.Run(ctx, s.Store, rating.V2(), backtest.Request{From: "2026-09-21"}); rep.Rerated.Races != 0 {
 		t.Fatal("the date range is applied")
+	}
+}
+
+func TestMarketMovementFreezesFirstObservedPricesAtSeal(t *testing.T) {
+	ctx := context.Background()
+	s, _, markets, _, race, _ := setup(t)
+	if err := s.Store.SaveRaces(ctx, []domain.Race{race}, race.OffDateTime.Add(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.RefreshMarkets(ctx, domain.Today); err != nil {
+		t.Fatal(err)
+	}
+	openingAt := race.OffDateTime.Add(-30 * time.Minute)
+	markets.capturedAt = &openingAt
+	selectionID := markets.markets[0].Runners[0].ID
+	if _, err := s.rateAndRecord(ctx, []domain.Race{race}, "display", openingAt); err != nil {
+		t.Fatal(err)
+	}
+	markets.prices["1.1"][selectionID] = 2.0
+	latestAt := race.OffDateTime.Add(-10 * time.Minute)
+	markets.capturedAt = &latestAt
+	if _, err := s.rateAndRecord(ctx, []domain.Race{race}, "display", latestAt); err != nil {
+		t.Fatal(err)
+	}
+	assessment, err := s.Store.Assessment(ctx, race.ID)
+	if err != nil || assessment == nil {
+		t.Fatalf("latest assessment missing: %v", err)
+	}
+	var movement *rating.Contribution
+	for _, runner := range assessment.Runners {
+		if runner.HorseID != race.Runners[0].ID {
+			continue
+		}
+		for index := range runner.Contributions {
+			if runner.Contributions[index].Factor == rating.MarketMovement {
+				movement = &runner.Contributions[index]
+			}
+		}
+	}
+	if movement == nil || movement.Availability.Kind != rating.Available || !strings.Contains(movement.Detail, "+10.0") {
+		t.Fatalf("market movement was not available before seal: %+v", movement)
+	}
+	sealAt := race.OffDateTime.Add(-3 * time.Minute)
+	markets.prices["1.1"][selectionID] = 1.67
+	markets.capturedAt = &sealAt
+	if _, err := s.rateAndRecord(ctx, []domain.Race{race}, "seal", sealAt); err != nil {
+		t.Fatal(err)
+	}
+	sealed, err := s.Store.LatestSnapshot(ctx, race.ID, "seal")
+	if err != nil || sealed == nil || sealed.FirstObservedAt == nil || !sealed.FirstObservedAt.Equal(openingAt) || *sealed.FirstObservedPrices[race.Runners[0].ID].BackPrice != 2.5 {
+		t.Fatalf("seal snapshot did not freeze the first observed prices: %+v, %v", sealed, err)
 	}
 }
 

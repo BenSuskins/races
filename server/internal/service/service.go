@@ -358,6 +358,14 @@ func (s *Service) rateAndRecord(ctx context.Context, races []domain.Race, kind s
 	for _, race := range races {
 		var market *domain.MarketSnapshot
 		if snap, ok := snapshots[race.ID]; ok {
+			opening, openingErr := s.Store.LatestSnapshot(ctx, race.ID, "display-opening")
+			if openingErr != nil {
+				return stored, openingErr
+			}
+			if opening != nil {
+				snap.FirstObservedAt = &opening.CapturedAt
+				snap.FirstObservedPrices = opening.Prices
+			}
 			market = &snap
 			if err := s.Store.SaveSnapshot(ctx, race.ID, kind, snap); err != nil {
 				return stored, err

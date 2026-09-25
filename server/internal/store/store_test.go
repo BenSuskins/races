@@ -65,6 +65,34 @@ func TestSealCardIsImmutableAndStoredWithTip(t *testing.T) {
 	}
 }
 
+func TestDisplaySnapshotsKeepFirstAndLatestPricesForMovement(t *testing.T) {
+	ctx := context.Background()
+	s := open(t)
+	firstAt := time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC)
+	first := domain.MarketSnapshot{Source: domain.SourceLiveExchange, CapturedAt: domain.At(firstAt), Prices: map[string]domain.RunnerPrice{"horse": {BackPrice: floatPointer(3), IsActive: true}}}
+	if err := s.SaveSnapshot(ctx, "race", "display", first); err != nil {
+		t.Fatal(err)
+	}
+	latest := first
+	latest.CapturedAt = domain.At(firstAt.Add(10 * time.Minute))
+	latest.Prices = map[string]domain.RunnerPrice{"horse": {BackPrice: floatPointer(2), IsActive: true}}
+	latest.FirstObservedAt = &first.CapturedAt
+	latest.FirstObservedPrices = first.Prices
+	if err := s.SaveSnapshot(ctx, "race", "display", latest); err != nil {
+		t.Fatal(err)
+	}
+	opening, err := s.LatestSnapshot(ctx, "race", "display-opening")
+	if err != nil || opening == nil || opening.CapturedAt.Time != firstAt || *opening.Prices["horse"].BackPrice != 3 {
+		t.Fatalf("first observed prices changed: %+v, %v", opening, err)
+	}
+	display, err := s.LatestSnapshot(ctx, "race", "display")
+	if err != nil || display == nil || display.CapturedAt.Time != firstAt.Add(10*time.Minute) || *display.FirstObservedPrices["horse"].BackPrice != 3 {
+		t.Fatalf("latest display snapshot lost its movement base: %+v, %v", display, err)
+	}
+}
+
+func floatPointer(value float64) *float64 { return &value }
+
 func TestSaveRecoveredSealCardIsInsertOnlyAndAudited(t *testing.T) {
 	ctx := context.Background()
 	s := open(t)

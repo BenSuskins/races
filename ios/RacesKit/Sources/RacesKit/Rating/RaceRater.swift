@@ -42,6 +42,7 @@ public struct RaceRater: Sendable {
             RecentStrikeRateFactor(subject: .trainer, minimumSample: weights.minimumStrikeRateSample),
             JockeyTrainerStrikeRateFactor(minimumSample: weights.minimumStrikeRateSample),
             ClassAdjustedFormFactor(),
+            MarketMovementFactor(),
         ]
     }
 
@@ -62,7 +63,7 @@ public struct RaceRater: Sendable {
             )
         }
 
-        let context = FactorContext(race: race, strikeRates: strikeRates)
+        let context = FactorContext(race: race, strikeRates: strikeRates, market: market, now: now)
         let readings = factors.map { factor -> FactorReading in
             let values = runners.map { factor.value(for: $0, in: context) }
             return FactorReading(

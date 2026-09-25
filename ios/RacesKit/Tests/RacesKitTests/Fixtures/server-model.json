@@ -23,6 +23,7 @@
       "jockeyStrikeRate": 0,
       "jockeySurfaceStrikeRate": 0,
       "jockeyTrainerStrikeRate": 0,
+      "marketMovement": 0,
       "officialRating": 0.3,
       "recentForm": 0.25,
       "trainerGoingStrikeRate": 0,
@@ -146,6 +147,7 @@
           "jockeyStrikeRate": 0,
           "jockeySurfaceStrikeRate": 0,
           "jockeyTrainerStrikeRate": 0,
+          "marketMovement": 0,
           "officialRating": 0.3,
           "recentForm": 0.25,
           "trainerGoingStrikeRate": 0,
@@ -205,6 +207,7 @@
           "jockeyStrikeRate": 0,
           "jockeySurfaceStrikeRate": 0,
           "jockeyTrainerStrikeRate": 0,
+          "marketMovement": 0,
           "officialRating": 0.3,
           "recentForm": 0.25,
           "trainerGoingStrikeRate": 0,
@@ -264,6 +267,7 @@
           "jockeyStrikeRate": 0,
           "jockeySurfaceStrikeRate": 0,
           "jockeyTrainerStrikeRate": 0,
+          "marketMovement": 0,
           "officialRating": 0.3,
           "recentForm": 0.25,
           "trainerGoingStrikeRate": 0,
@@ -431,6 +435,12 @@
       "label": "Class-adjusted horse form",
       "summary": "The horse's recent finishing performance, adjusted for the class of each race.",
       "rationale": "The archive needs three classified runs with known race classes. Its default weight is zero until walk-forward evidence supports it."
+    },
+    {
+      "id": "marketMovement",
+      "label": "Market movement",
+      "summary": "The change in the horse's implied chance since the first observed exchange price.",
+      "rationale": "The first and current live exchange prices must span at least five minutes before seal. The default weight is zero until replay supports it."
     }
   ],
   "samples": {

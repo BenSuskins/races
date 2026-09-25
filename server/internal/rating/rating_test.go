@@ -725,6 +725,34 @@ func TestClassAdjustedFormUsesHistoryOnlyAboveThreeRuns(t *testing.T) {
 	}
 }
 
+func TestMarketMovementRequiresFiveMinutesOfPreSealExchangePrices(t *testing.T) {
+	start := time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC)
+	finish := start.Add(6 * time.Minute)
+	firstObserved := domain.At(start)
+	current := domain.MarketSnapshot{
+		Source: domain.SourceLiveExchange, CapturedAt: domain.At(finish),
+		FirstObservedAt:     &firstObserved,
+		FirstObservedPrices: map[string]domain.RunnerPrice{"horse": {BackPrice: fp(2.0), IsActive: true}},
+		Prices:              map[string]domain.RunnerPrice{"horse": {BackPrice: fp(1.8), IsActive: true}},
+	}
+	factor := marketMovement{}
+	r := runner("horse", runnerOpts{})
+	reading := factor.Value(r, Context{Market: &current, Now: finish})
+	if reading.Raw == nil || !near(*reading.Raw, 1.0/1.8-0.5, 1e-9) || reading.Availability.Kind != Available {
+		t.Fatalf("market movement was not the change in implied chance: %#v", reading)
+	}
+	tooEarly := current
+	tooEarly.CapturedAt = domain.At(start.Add(4 * time.Minute))
+	reading = factor.Value(r, Context{Market: &tooEarly, Now: finish})
+	if reading.Raw != nil || reading.Availability.Reason != "market movement needs at least five minutes of prices" {
+		t.Fatalf("short market window must be missing: %#v", reading)
+	}
+	reading = factor.Value(r, Context{Market: &current, Now: start.Add(5 * time.Minute)})
+	if reading.Raw != nil || reading.Availability.Reason != "market movement includes prices after the rating time" {
+		t.Fatalf("post-seal prices must not be used: %#v", reading)
+	}
+}
+
 // FactorDescriptionTests: every factor has copy, the presets name every
 // factor, and the set of deliberate zeros does not change silently.
 func TestFactorDescriptions(t *testing.T) {
@@ -744,7 +772,7 @@ func TestFactorDescriptions(t *testing.T) {
 			}
 		}
 	}
-	want := map[FactorID]bool{Draw: true, Headgear: true, JockeyStrikeRate: true, TrainerStrikeRate: true, JockeySurfaceStrikeRate: true, TrainerSurfaceStrikeRate: true, JockeyRaceTypeStrikeRate: true, TrainerRaceTypeStrikeRate: true, JockeyGoingStrikeRate: true, TrainerGoingStrikeRate: true, HorseGoingPlaceRate: true, JockeyRecentStrikeRate: true, TrainerRecentStrikeRate: true, JockeyTrainerStrikeRate: true, ClassAdjustedForm: true}
+	want := map[FactorID]bool{Draw: true, Headgear: true, JockeyStrikeRate: true, TrainerStrikeRate: true, JockeySurfaceStrikeRate: true, TrainerSurfaceStrikeRate: true, JockeyRaceTypeStrikeRate: true, TrainerRaceTypeStrikeRate: true, JockeyGoingStrikeRate: true, TrainerGoingStrikeRate: true, HorseGoingPlaceRate: true, JockeyRecentStrikeRate: true, TrainerRecentStrikeRate: true, JockeyTrainerStrikeRate: true, ClassAdjustedForm: true, MarketMovement: true}
 	if len(zeros) != len(want) {
 		t.Fatal("the set of deliberate zeros changed", zeros)
 	}

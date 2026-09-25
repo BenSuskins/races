@@ -386,6 +386,18 @@
                 "_0": "no classed race history for this horse"
               }
             }
+          },
+          {
+            "factor": "marketMovement",
+            "label": "Market movement",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no market prices for this race"
+              }
+            }
           }
         ]
       },
@@ -661,6 +673,18 @@
             "availability": {
               "missingData": {
                 "_0": "no classed race history for this horse"
+              }
+            }
+          },
+          {
+            "factor": "marketMovement",
+            "label": "Market movement",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no market prices for this race"
               }
             }
           }
@@ -945,6 +969,18 @@
                 "_0": "no classed race history for this horse"
               }
             }
+          },
+          {
+            "factor": "marketMovement",
+            "label": "Market movement",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no market prices for this race"
+              }
+            }
           }
         ]
       },
@@ -1220,6 +1256,18 @@
             "availability": {
               "missingData": {
                 "_0": "no classed race history for this horse"
+              }
+            }
+          },
+          {
+            "factor": "marketMovement",
+            "label": "Market movement",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no market prices for this race"
               }
             }
           }
@@ -1511,6 +1559,18 @@
         "availability": {
           "missingData": {
             "_0": "no classed race history for this horse"
+          }
+        }
+      },
+      {
+        "factor": "marketMovement",
+        "label": "Market movement",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "no market prices for this race"
           }
         }
       }

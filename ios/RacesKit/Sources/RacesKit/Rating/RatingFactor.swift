@@ -26,6 +26,7 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
     case trainerRecentStrikeRate
     case jockeyTrainerStrikeRate
     case classAdjustedForm
+    case marketMovement
 
     public var label: String {
         switch self {
@@ -52,6 +53,7 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
         case .trainerRecentStrikeRate: return "Trainer recent strike rate"
         case .jockeyTrainerStrikeRate: return "Jockey and trainer record together"
         case .classAdjustedForm: return "Class-adjusted horse form"
+        case .marketMovement: return "Market movement"
         }
     }
 
@@ -108,6 +110,8 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
             return "The win rate when this jockey rides for this trainer, adjusted toward their individual records."
         case .classAdjustedForm:
             return "The horse's recent finishing performance, adjusted for the class of each race."
+        case .marketMovement:
+            return "The change in the horse's implied chance since the first observed exchange price."
         }
     }
 
@@ -141,6 +145,8 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
             return "The pair needs 30 runs and both individual records need enough history. Its default weight is zero until coverage and walk-forward evidence support it."
         case .classAdjustedForm:
             return "The archive needs three classified runs with known race classes. Its default weight is zero until walk-forward evidence supports it."
+        case .marketMovement:
+            return "The first and current live exchange prices must span at least five minutes before seal. The default weight is zero until replay supports it."
         case .weightCarried:
             return "Near zero on purpose: in a handicap, weight is the handicapper's equaliser, so it substantially double-counts the official rating."
         case .officialRating, .handicapBandPosition, .recentForm, .wonLastTime,
@@ -223,8 +229,10 @@ public struct FactorContext: Sendable {
     public let jockeyTrainerStrikeRates: (any JockeyTrainerStrikeRateProviding)?
     public let drawBiasRates: (any DrawBiasProviding)?
     public let classAdjustedFormRates: (any ClassAdjustedFormProviding)?
+    public let market: MarketSnapshot?
+    public let now: Date
 
-    public init(race: Race, strikeRates: (any StrikeRateProviding)? = nil, surfaceStrikeRates: (any SurfaceStrikeRateProviding)? = nil, raceTypeStrikeRates: (any RaceTypeStrikeRateProviding)? = nil, goingStrikeRates: (any GoingStrikeRateProviding)? = nil, horseGoingRates: (any HorseGoingProviding)? = nil, recentStrikeRates: (any RecentStrikeRateProviding)? = nil, jockeyTrainerStrikeRates: (any JockeyTrainerStrikeRateProviding)? = nil, drawBiasRates: (any DrawBiasProviding)? = nil, classAdjustedFormRates: (any ClassAdjustedFormProviding)? = nil) {
+    public init(race: Race, strikeRates: (any StrikeRateProviding)? = nil, surfaceStrikeRates: (any SurfaceStrikeRateProviding)? = nil, raceTypeStrikeRates: (any RaceTypeStrikeRateProviding)? = nil, goingStrikeRates: (any GoingStrikeRateProviding)? = nil, horseGoingRates: (any HorseGoingProviding)? = nil, recentStrikeRates: (any RecentStrikeRateProviding)? = nil, jockeyTrainerStrikeRates: (any JockeyTrainerStrikeRateProviding)? = nil, drawBiasRates: (any DrawBiasProviding)? = nil, classAdjustedFormRates: (any ClassAdjustedFormProviding)? = nil, market: MarketSnapshot? = nil, now: Date = Date()) {
         self.race = race
         self.strikeRates = strikeRates
         self.surfaceStrikeRates = surfaceStrikeRates ?? (strikeRates as? any SurfaceStrikeRateProviding)
@@ -235,6 +243,8 @@ public struct FactorContext: Sendable {
         self.jockeyTrainerStrikeRates = jockeyTrainerStrikeRates ?? (strikeRates as? any JockeyTrainerStrikeRateProviding)
         self.drawBiasRates = drawBiasRates ?? (strikeRates as? any DrawBiasProviding)
         self.classAdjustedFormRates = classAdjustedFormRates ?? (strikeRates as? any ClassAdjustedFormProviding)
+        self.market = market
+        self.now = now
     }
 }
 

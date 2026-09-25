@@ -185,10 +185,11 @@ type Report struct {
 	// Favourite: backing the market favourite in those same races.
 	Favourite Arm `json:"favourite"`
 	// MarketLogLoss: the de-vigged market's own log loss on those races.
-	MarketLogLoss         *float64       `json:"marketLogLoss,omitempty"`
-	JockeyTrainerCoverage FactorCoverage `json:"jockeyTrainerCoverage"`
-	DrawBiasCoverage      FactorCoverage `json:"drawBiasCoverage"`
-	ClassFormCoverage     FactorCoverage `json:"classAdjustedFormCoverage"`
+	MarketLogLoss          *float64       `json:"marketLogLoss,omitempty"`
+	JockeyTrainerCoverage  FactorCoverage `json:"jockeyTrainerCoverage"`
+	DrawBiasCoverage       FactorCoverage `json:"drawBiasCoverage"`
+	ClassFormCoverage      FactorCoverage `json:"classAdjustedFormCoverage"`
+	MarketMovementCoverage FactorCoverage `json:"marketMovementCoverage"`
 	// Snapshots: log loss over every frozen snapshot, device ones included.
 	Snapshots             int      `json:"snapshots"`
 	SnapshotLogLoss       *float64 `json:"snapshotLogLoss,omitempty"`
@@ -255,6 +256,7 @@ func Run(ctx context.Context, st *store.Store, w rating.Weights, req Request) (R
 	var jockeyTrainerCoverage factorCoverageAccumulator
 	var drawBiasCoverage factorCoverageAccumulator
 	var classFormCoverage factorCoverageAccumulator
+	var marketMovementCoverage factorCoverageAccumulator
 	var corpus []string
 	var raceDates []string
 	missingSealCards := 0
@@ -295,6 +297,7 @@ func Run(ctx context.Context, st *store.Store, w rating.Weights, req Request) (R
 		jockeyTrainerCoverage.add(a, rating.JockeyTrainerStrikeRate)
 		drawBiasCoverage.add(a, rating.Draw)
 		classFormCoverage.add(a, rating.ClassAdjustedForm)
+		marketMovementCoverage.add(a, rating.MarketMovement)
 		corpus = append(corpus, t.RaceID)
 		raceDates = append(raceDates, t.RaceDate)
 		winner := result.Winner().HorseID
@@ -325,6 +328,7 @@ func Run(ctx context.Context, st *store.Store, w rating.Weights, req Request) (R
 	rep.JockeyTrainerCoverage = jockeyTrainerCoverage.report()
 	rep.DrawBiasCoverage = drawBiasCoverage.report()
 	rep.ClassFormCoverage = classFormCoverage.report()
+	rep.MarketMovementCoverage = marketMovementCoverage.report()
 	rep.Rerated, rep.Favourite = rep.HighestProbability, fav.arm()
 	rep.MarketLogLoss = market.logLoss()
 	sort.Strings(corpus)

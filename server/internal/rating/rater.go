@@ -175,7 +175,7 @@ func (rt Rater) Rate(race domain.Race, market *domain.MarketSnapshot, strikeRate
 		}
 	}
 
-	ctx := Context{Race: race, StrikeRates: strikeRates}
+	ctx := Context{Race: race, StrikeRates: strikeRates, Market: market, Now: now}
 	readings := make([]reading, len(rt.Factors))
 	for i, f := range rt.Factors {
 		values := make([]FactorValue, len(runners))

@@ -440,6 +440,42 @@ public struct ClassAdjustedFormFactor: RatingFactor {
     }
 }
 
+public struct MarketMovementFactor: RatingFactor {
+    public let id = FactorID.marketMovement
+    public let minimumElapsed: TimeInterval
+
+    public init(minimumElapsed: TimeInterval = 5 * 60) {
+        self.minimumElapsed = minimumElapsed
+    }
+
+    public func value(for runner: Runner, in context: FactorContext) -> FactorValue {
+        guard let market = context.market else { return .missing("no market prices for this race") }
+        guard market.source == .liveExchange else { return .notApplicable("market movement needs exchange prices") }
+        guard market.capturedAt <= context.now,
+              let firstObservedAt = market.firstObservedAt,
+              firstObservedAt <= context.now else {
+            return .missing("market movement includes prices after the rating time")
+        }
+        guard market.capturedAt.timeIntervalSince(firstObservedAt) >= minimumElapsed else {
+            return .missing("market movement needs at least five minutes of prices")
+        }
+        guard let first = market.firstObservedPrices?[runner.id], let current = market.price(for: runner.id),
+              first.isActive, current.isActive,
+              let firstPrice = first.backPrice, let currentPrice = current.backPrice,
+              firstPrice.isFinite, currentPrice.isFinite,
+              firstPrice > 1, currentPrice > 1 else {
+            return .missing("no comparable exchange prices for this runner")
+        }
+        let change = 1 / currentPrice - 1 / firstPrice
+        let display = String(
+            format: "%+.1f percentage points since first seen",
+            locale: Locale(identifier: "en_US_POSIX"),
+            change * 100
+        )
+        return .value(change, display)
+    }
+}
+
 public struct RecentStrikeRateFactor: RatingFactor {
     public enum Subject: Sendable { case jockey, trainer }
     public let id: FactorID

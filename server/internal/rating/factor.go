@@ -11,6 +11,7 @@ package rating
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/bensuskins/races/server/internal/domain"
 )
@@ -42,13 +43,14 @@ const (
 	TrainerRecentStrikeRate   FactorID = "trainerRecentStrikeRate"
 	JockeyTrainerStrikeRate   FactorID = "jockeyTrainerStrikeRate"
 	ClassAdjustedForm         FactorID = "classAdjustedForm"
+	MarketMovement            FactorID = "marketMovement"
 )
 
 // AllFactors in declaration order, which is also the rater's order.
 var AllFactors = []FactorID{
 	OfficialRating, HandicapBandPosition, RecentForm, WonLastTime, CompletionRate,
 	DaysSinceLastRun, Age, WeightCarried, Draw, Headgear, JockeyStrikeRate, TrainerStrikeRate,
-	JockeySurfaceStrikeRate, TrainerSurfaceStrikeRate, JockeyRaceTypeStrikeRate, TrainerRaceTypeStrikeRate, JockeyGoingStrikeRate, TrainerGoingStrikeRate, HorseGoingPlaceRate, JockeyRecentStrikeRate, TrainerRecentStrikeRate, JockeyTrainerStrikeRate, ClassAdjustedForm,
+	JockeySurfaceStrikeRate, TrainerSurfaceStrikeRate, JockeyRaceTypeStrikeRate, TrainerRaceTypeStrikeRate, JockeyGoingStrikeRate, TrainerGoingStrikeRate, HorseGoingPlaceRate, JockeyRecentStrikeRate, TrainerRecentStrikeRate, JockeyTrainerStrikeRate, ClassAdjustedForm, MarketMovement,
 }
 
 // Label is the short name shown on screen.
@@ -100,6 +102,8 @@ func (f FactorID) Label() string {
 		return "Jockey and trainer record together"
 	case ClassAdjustedForm:
 		return "Class-adjusted horse form"
+	case MarketMovement:
+		return "Market movement"
 	}
 	return string(f)
 }
@@ -153,6 +157,8 @@ func (f FactorID) Summary() string {
 		return "The win rate when this jockey rides for this trainer, adjusted toward their individual records."
 	case ClassAdjustedForm:
 		return "The horse's recent finishing performance, adjusted for the class of each race."
+	case MarketMovement:
+		return "The change in the horse's implied chance since the first observed exchange price."
 	}
 	return ""
 }
@@ -181,6 +187,8 @@ func (f FactorID) Rationale() string {
 		return "The pair needs 30 runs and both individual records need enough history. Its default weight is zero until coverage and walk-forward evidence support it."
 	case ClassAdjustedForm:
 		return "The archive needs three classified runs with known race classes. Its default weight is zero until walk-forward evidence supports it."
+	case MarketMovement:
+		return "The first and current live exchange prices must span at least five minutes before seal. The default weight is zero until replay supports it."
 	case WeightCarried:
 		return "Near zero on purpose: in a handicap, weight is the handicapper's equaliser, so it substantially double-counts the official rating."
 	}
@@ -342,6 +350,8 @@ type HorseGoingProvider interface {
 type Context struct {
 	Race        domain.Race
 	StrikeRates StrikeRates
+	Market      *domain.MarketSnapshot
+	Now         time.Time
 }
 
 // Factor is a single, independently testable input to the rating.
