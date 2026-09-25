@@ -446,3 +446,34 @@ public struct RecentStrikeRateFactor: RatingFactor {
         return .value(smoothed, "\(Int((smoothed * 100).rounded()))% from \(record.runs) recent runs")
     }
 }
+
+public struct JockeyTrainerStrikeRateFactor: RatingFactor {
+    public let id: FactorID = .jockeyTrainerStrikeRate
+    public let minimumSample: Int
+
+    public init(minimumSample: Int = 30) {
+        self.minimumSample = minimumSample
+    }
+
+    public func value(for runner: Runner, in context: FactorContext) -> FactorValue {
+        guard let provider = context.jockeyTrainerStrikeRates else { return .missing("no jockey-trainer archive yet") }
+        guard let jockeyID = runner.jockeyID, let trainerID = runner.trainerID else {
+            return .missing("jockey and trainer must both be identified")
+        }
+        guard let pair = provider.jockeyTrainerStrikeRate(jockeyID: jockeyID, trainerID: trainerID) else {
+            return .missing("no record for this jockey-trainer pair yet")
+        }
+        guard pair.runs >= minimumSample else {
+            return .missing("only \(pair.runs) runs for this jockey-trainer pair")
+        }
+        guard let jockey = provider.jockeyStrikeRate(id: jockeyID), jockey.runs >= minimumSample,
+              let trainer = provider.trainerStrikeRate(id: trainerID), trainer.runs >= minimumSample else {
+            return .missing("jockey and trainer need enough individual runs")
+        }
+        let jockeyPrior = jockey.smoothed(towards: provider.baselineStrikeRate)
+        let trainerPrior = trainer.smoothed(towards: provider.baselineStrikeRate)
+        let prior = (jockeyPrior + trainerPrior) / 2
+        let smoothed = pair.smoothed(towards: prior)
+        return .value(smoothed, "\(Int((smoothed * 100).rounded()))% from \(pair.runs) runs together")
+    }
+}

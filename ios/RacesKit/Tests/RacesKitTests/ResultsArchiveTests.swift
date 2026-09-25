@@ -263,6 +263,38 @@ final class ResultsArchiveTests: XCTestCase {
         XCTAssertEqual(missing.availability, .missingData("only 29 dated runs in the recent window"))
     }
 
+    func test_jockeyTrainerArchiveAndFactorRequireMatureRecords() {
+        var archive = ResultsArchive()
+        for index in 1...30 {
+            archive.ingest(TestResult.result(
+                id: "pair-\(index)",
+                finishing: [("a", index <= 12 ? "1" : "2"), ("b", index <= 12 ? "2" : "1")],
+                jockeys: ["a": "jockey"], trainers: ["a": "trainer"]
+            ))
+        }
+        XCTAssertEqual(archive.jockeyTrainerStrikeRate(jockeyID: "jockey", trainerID: "trainer"), StrikeRate(runs: 30, wins: 12))
+
+        let race = TestRace.race(runners: [TestRace.runner("a", jockeyID: "jockey", trainerID: "trainer")])
+        let reading = JockeyTrainerStrikeRateFactor().value(
+            for: race.runners[0], in: FactorContext(race: race, strikeRates: archive)
+        )
+        XCTAssertTrue(reading.availability.isAvailable)
+        XCTAssertEqual(reading.raw ?? 0, 0.356, accuracy: 0.000001)
+        XCTAssertTrue(reading.display.contains("from 30 runs together"))
+
+        var thin = ResultsArchive()
+        for index in 1...29 {
+            thin.ingest(TestResult.result(
+                id: "thin-pair-\(index)", finishing: [("a", "1")],
+                jockeys: ["a": "jockey"], trainers: ["a": "trainer"]
+            ))
+        }
+        let missing = JockeyTrainerStrikeRateFactor().value(
+            for: race.runners[0], in: FactorContext(race: race, strikeRates: thin)
+        )
+        XCTAssertEqual(missing.availability, .missingData("only 29 runs for this jockey-trainer pair"))
+    }
+
     // MARK: - Baseline
 
     /// Until there is enough archive to measure it, the baseline is a stated

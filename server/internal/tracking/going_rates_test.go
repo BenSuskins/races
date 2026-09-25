@@ -48,6 +48,9 @@ func TestArchiveTracksJockeyAndTrainerByGoingBucket(t *testing.T) {
 			}
 		}
 	}
+	if rate, ok := a.JockeyTrainerStrikeRate(jockey, trainer); !ok || rate.Runs != 3 || rate.Wins != 2 {
+		t.Fatalf("jockey-trainer interaction rate = %+v, %v", rate, ok)
+	}
 }
 
 func TestArchiveKeepsTheLatestFiftyDatedRunsInChronologicalOrder(t *testing.T) {

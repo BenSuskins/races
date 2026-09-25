@@ -21,6 +21,7 @@
       "jockeyRecentStrikeRate": 0,
       "jockeyStrikeRate": 0,
       "jockeySurfaceStrikeRate": 0,
+      "jockeyTrainerStrikeRate": 0,
       "officialRating": 0.3,
       "recentForm": 0.25,
       "trainerGoingStrikeRate": 0,
@@ -142,6 +143,7 @@
           "jockeyRecentStrikeRate": 0,
           "jockeyStrikeRate": 0,
           "jockeySurfaceStrikeRate": 0,
+          "jockeyTrainerStrikeRate": 0,
           "officialRating": 0.3,
           "recentForm": 0.25,
           "trainerGoingStrikeRate": 0,
@@ -199,6 +201,7 @@
           "jockeyRecentStrikeRate": 0,
           "jockeyStrikeRate": 0,
           "jockeySurfaceStrikeRate": 0,
+          "jockeyTrainerStrikeRate": 0,
           "officialRating": 0.3,
           "recentForm": 0.25,
           "trainerGoingStrikeRate": 0,
@@ -256,6 +259,7 @@
           "jockeyRecentStrikeRate": 0,
           "jockeyStrikeRate": 0,
           "jockeySurfaceStrikeRate": 0,
+          "jockeyTrainerStrikeRate": 0,
           "officialRating": 0.3,
           "recentForm": 0.25,
           "trainerGoingStrikeRate": 0,
@@ -411,6 +415,12 @@
       "label": "Trainer recent strike rate",
       "summary": "The trainer's win rate from the latest 50 dated runners, shrunk toward the global record.",
       "rationale": "The recent window needs at least 30 dated runs. The default weight is zero until walk-forward replay supports it."
+    },
+    {
+      "id": "jockeyTrainerStrikeRate",
+      "label": "Jockey and trainer record together",
+      "summary": "The win rate when this jockey rides for this trainer, adjusted toward their individual records.",
+      "rationale": "The pair needs 30 runs and both individual records need enough history. Its default weight is zero until coverage and walk-forward evidence support it."
     }
   ],
   "samples": {

@@ -3,6 +3,7 @@ package backtest
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"testing"
 	"time"
 
@@ -26,6 +27,20 @@ func TestApplyOverridesClonesAndRejectsUnknownFields(t *testing.T) {
 	}
 	if _, err := ApplyOverrides(base, SweepVariant{Name: "bad", Overrides: map[string]json.RawMessage{"newThreshold": json.RawMessage("0.5")}}); err == nil {
 		t.Fatal("unknown field was accepted")
+	}
+}
+
+func TestFactorCoverageReportsAvailableJockeyTrainerValues(t *testing.T) {
+	assessment := rating.Assessment{Runners: []rating.RunnerAssessment{
+		{Contributions: []rating.Contribution{{Factor: rating.JockeyTrainerStrikeRate, Availability: rating.Availability{Kind: rating.Available}}}},
+		{Contributions: []rating.Contribution{{Factor: rating.JockeyTrainerStrikeRate, Availability: rating.Availability{Kind: rating.MissingData}}}},
+		{Contributions: []rating.Contribution{{Factor: rating.JockeyTrainerStrikeRate, Availability: rating.Availability{Kind: rating.Available}}}},
+	}}
+	var accumulator factorCoverageAccumulator
+	accumulator.add(assessment, rating.JockeyTrainerStrikeRate)
+	coverage := accumulator.report()
+	if coverage.EligibleRunners != 3 || coverage.AvailableRunners != 2 || coverage.Rate == nil || math.Abs(*coverage.Rate-2.0/3.0) > 1e-12 {
+		t.Fatalf("wrong factor coverage: %+v", coverage)
 	}
 }
 

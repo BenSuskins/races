@@ -40,13 +40,14 @@ const (
 	HorseGoingPlaceRate       FactorID = "horseGoingPlaceRate"
 	JockeyRecentStrikeRate    FactorID = "jockeyRecentStrikeRate"
 	TrainerRecentStrikeRate   FactorID = "trainerRecentStrikeRate"
+	JockeyTrainerStrikeRate   FactorID = "jockeyTrainerStrikeRate"
 )
 
 // AllFactors in declaration order, which is also the rater's order.
 var AllFactors = []FactorID{
 	OfficialRating, HandicapBandPosition, RecentForm, WonLastTime, CompletionRate,
 	DaysSinceLastRun, Age, WeightCarried, Draw, Headgear, JockeyStrikeRate, TrainerStrikeRate,
-	JockeySurfaceStrikeRate, TrainerSurfaceStrikeRate, JockeyRaceTypeStrikeRate, TrainerRaceTypeStrikeRate, JockeyGoingStrikeRate, TrainerGoingStrikeRate, HorseGoingPlaceRate, JockeyRecentStrikeRate, TrainerRecentStrikeRate,
+	JockeySurfaceStrikeRate, TrainerSurfaceStrikeRate, JockeyRaceTypeStrikeRate, TrainerRaceTypeStrikeRate, JockeyGoingStrikeRate, TrainerGoingStrikeRate, HorseGoingPlaceRate, JockeyRecentStrikeRate, TrainerRecentStrikeRate, JockeyTrainerStrikeRate,
 }
 
 // Label is the short name shown on screen.
@@ -94,6 +95,8 @@ func (f FactorID) Label() string {
 		return "Jockey recent strike rate"
 	case TrainerRecentStrikeRate:
 		return "Trainer recent strike rate"
+	case JockeyTrainerStrikeRate:
+		return "Jockey and trainer record together"
 	}
 	return string(f)
 }
@@ -143,6 +146,8 @@ func (f FactorID) Summary() string {
 		return "The jockey's win rate from the latest 50 dated rides, shrunk toward the global record."
 	case TrainerRecentStrikeRate:
 		return "The trainer's win rate from the latest 50 dated runners, shrunk toward the global record."
+	case JockeyTrainerStrikeRate:
+		return "The win rate when this jockey rides for this trainer, adjusted toward their individual records."
 	}
 	return ""
 }
@@ -167,6 +172,8 @@ func (f FactorID) Rationale() string {
 		return "The archive needs at least three completed runs in a going bucket. Its default weight is zero until replay supports it."
 	case JockeyRecentStrikeRate, TrainerRecentStrikeRate:
 		return "The recent window needs at least 30 dated runs. The default weight is zero until walk-forward replay supports it."
+	case JockeyTrainerStrikeRate:
+		return "The pair needs 30 runs and both individual records need enough history. Its default weight is zero until coverage and walk-forward evidence support it."
 	case WeightCarried:
 		return "Near zero on purpose: in a handicap, weight is the handicapper's equaliser, so it substantially double-counts the official rating."
 	}
@@ -285,6 +292,10 @@ type GoingStrikeRates interface {
 type RecentStrikeRates interface {
 	JockeyRecentStrikeRate(id string) (StrikeRate, bool)
 	TrainerRecentStrikeRate(id string) (StrikeRate, bool)
+}
+
+type JockeyTrainerStrikeRates interface {
+	JockeyTrainerStrikeRate(jockeyID, trainerID string) (StrikeRate, bool)
 }
 
 type PlaceRate struct {

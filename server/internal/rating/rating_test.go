@@ -74,6 +74,7 @@ type fakeStrikeRates struct {
 	jockeyRaceTypes, trainerRaceTypes map[string]StrikeRate
 	jockeyGoings, trainerGoings       map[string]StrikeRate
 	jockeyRecent, trainerRecent       map[string]StrikeRate
+	jockeyTrainer                     map[string]StrikeRate
 	horseGoings                       map[string]PlaceRate
 	horseOverall                      map[string]PlaceRate
 	baseline                          float64
@@ -94,6 +95,10 @@ func (f fakeStrikeRates) JockeyRecentStrikeRate(id string) (StrikeRate, bool) {
 }
 func (f fakeStrikeRates) TrainerRecentStrikeRate(id string) (StrikeRate, bool) {
 	rate, ok := f.trainerRecent[id]
+	return rate, ok
+}
+func (f fakeStrikeRates) JockeyTrainerStrikeRate(jockeyID, trainerID string) (StrikeRate, bool) {
+	rate, ok := f.jockeyTrainer[jockeyID+"|"+trainerID]
 	return rate, ok
 }
 func (f fakeStrikeRates) JockeySurfaceStrikeRate(id string, surface domain.Surface) (StrikeRate, bool) {
@@ -647,6 +652,32 @@ func TestRecentStrikeRateRequiresThirtyDatedRunsAndShrinksTowardTheGeneralRate(t
 	}
 }
 
+func TestJockeyTrainerInteractionNeedsMaturePairAndIndividualRecords(t *testing.T) {
+	factor := jockeyTrainerStrikeRate{minimumSample: 30}
+	r := runner("horse", runnerOpts{jockey: sp("jockey"), trainer: sp("trainer")})
+	archive := fakeStrikeRates{
+		jockeys:       map[string]StrikeRate{"jockey": {Runs: 100, Wins: 20}},
+		trainers:      map[string]StrikeRate{"trainer": {Runs: 100, Wins: 30}},
+		jockeyTrainer: map[string]StrikeRate{"jockey|trainer": {Runs: 30, Wins: 12}},
+		baseline:      0.125,
+	}
+	reading := factor.Value(r, Context{StrikeRates: archive})
+	if reading.Raw == nil || reading.Availability.Kind != Available || !near(*reading.Raw, 0.33166666666666667, 1e-9) {
+		t.Fatalf("mature interaction did not use the individual prior: %#v", reading)
+	}
+	archive.jockeyTrainer["jockey|trainer"] = StrikeRate{Runs: 29, Wins: 12}
+	reading = factor.Value(r, Context{StrikeRates: archive})
+	if reading.Raw != nil || reading.Availability.Kind != MissingData {
+		t.Fatalf("thin interaction must be missing: %#v", reading)
+	}
+	archive.jockeyTrainer["jockey|trainer"] = StrikeRate{Runs: 30, Wins: 12}
+	archive.trainers["trainer"] = StrikeRate{Runs: 29, Wins: 10}
+	reading = factor.Value(r, Context{StrikeRates: archive})
+	if reading.Raw != nil || reading.Availability.Reason != "jockey and trainer need enough individual runs" {
+		t.Fatalf("interaction must require mature individual records: %#v", reading)
+	}
+}
+
 // FactorDescriptionTests: every factor has copy, the presets name every
 // factor, and the set of deliberate zeros does not change silently.
 func TestFactorDescriptions(t *testing.T) {
@@ -666,7 +697,7 @@ func TestFactorDescriptions(t *testing.T) {
 			}
 		}
 	}
-	want := map[FactorID]bool{Draw: true, Headgear: true, JockeyStrikeRate: true, TrainerStrikeRate: true, JockeySurfaceStrikeRate: true, TrainerSurfaceStrikeRate: true, JockeyRaceTypeStrikeRate: true, TrainerRaceTypeStrikeRate: true, JockeyGoingStrikeRate: true, TrainerGoingStrikeRate: true, HorseGoingPlaceRate: true, JockeyRecentStrikeRate: true, TrainerRecentStrikeRate: true}
+	want := map[FactorID]bool{Draw: true, Headgear: true, JockeyStrikeRate: true, TrainerStrikeRate: true, JockeySurfaceStrikeRate: true, TrainerSurfaceStrikeRate: true, JockeyRaceTypeStrikeRate: true, TrainerRaceTypeStrikeRate: true, JockeyGoingStrikeRate: true, TrainerGoingStrikeRate: true, HorseGoingPlaceRate: true, JockeyRecentStrikeRate: true, TrainerRecentStrikeRate: true, JockeyTrainerStrikeRate: true}
 	if len(zeros) != len(want) {
 		t.Fatal("the set of deliberate zeros changed", zeros)
 	}

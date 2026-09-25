@@ -241,6 +241,39 @@ type recentStrikeRate struct {
 	minimumSample int
 }
 
+type jockeyTrainerStrikeRate struct{ minimumSample int }
+
+func (jockeyTrainerStrikeRate) ID() FactorID { return JockeyTrainerStrikeRate }
+
+func (f jockeyTrainerStrikeRate) Value(r domain.Runner, ctx Context) FactorValue {
+	if ctx.StrikeRates == nil {
+		return missing("no results archive yet")
+	}
+	provider, ok := ctx.StrikeRates.(JockeyTrainerStrikeRates)
+	if !ok {
+		return missing("no jockey-trainer archive yet")
+	}
+	if r.JockeyID == nil || r.TrainerID == nil {
+		return missing("jockey and trainer must both be identified")
+	}
+	pair, ok := provider.JockeyTrainerStrikeRate(*r.JockeyID, *r.TrainerID)
+	if !ok {
+		return missing("no record for this jockey-trainer pair yet")
+	}
+	if pair.Runs < f.minimumSample {
+		return missing(fmt.Sprintf("only %d runs for this jockey-trainer pair", pair.Runs))
+	}
+	jockey, jockeyOK := ctx.StrikeRates.JockeyStrikeRate(*r.JockeyID)
+	trainer, trainerOK := ctx.StrikeRates.TrainerStrikeRate(*r.TrainerID)
+	if !jockeyOK || jockey.Runs < f.minimumSample || !trainerOK || trainer.Runs < f.minimumSample {
+		return missing("jockey and trainer need enough individual runs")
+	}
+	baseline := ctx.StrikeRates.BaselineStrikeRate()
+	prior := (jockey.Smoothed(baseline, 20) + trainer.Smoothed(baseline, 20)) / 2
+	smoothed := pair.Smoothed(prior, 20)
+	return value(smoothed, fmt.Sprintf("%d%% from %d runs together", int(math.Round(smoothed*100)), pair.Runs))
+}
+
 func (f recentStrikeRate) ID() FactorID {
 	if f.jockey {
 		return JockeyRecentStrikeRate
@@ -494,5 +527,6 @@ func DefaultFactors(w Weights) []Factor {
 		horseGoing{minimumSample: 3},
 		recentStrikeRate{jockey: true, minimumSample: w.MinimumStrikeRateSample},
 		recentStrikeRate{jockey: false, minimumSample: w.MinimumStrikeRateSample},
+		jockeyTrainerStrikeRate{minimumSample: w.MinimumStrikeRateSample},
 	}
 }

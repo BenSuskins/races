@@ -140,6 +140,9 @@ func TestResultFactsRespectKnownTime(t *testing.T) {
 	if rate, _ := archive.TrainerRecentStrikeRate(trainer); rate.Runs != 1 || rate.Wins != 0 {
 		t.Fatalf("future win changed the earlier recent trainer rate: %+v", rate)
 	}
+	if rate, _ := archive.JockeyTrainerStrikeRate(jockey, trainer); rate.Runs != 1 || rate.Wins != 0 {
+		t.Fatalf("future win changed the earlier interaction rate: %+v", rate)
+	}
 	after, err := s.ResultFactsKnownBefore(ctx, secondKnown.Add(time.Second))
 	latestPrior := ""
 	for _, result := range after {
@@ -162,6 +165,9 @@ func TestResultFactsRespectKnownTime(t *testing.T) {
 	}
 	if rate, _ := laterArchive.TrainerRecentStrikeRate(trainer); rate.Runs != 2 || rate.Wins != 2 {
 		t.Fatalf("later facts were not available to the recent trainer rate: %+v", rate)
+	}
+	if rate, _ := laterArchive.JockeyTrainerStrikeRate(jockey, trainer); rate.Runs != 2 || rate.Wins != 2 {
+		t.Fatalf("later facts were not available to the interaction rate: %+v", rate)
 	}
 	if rate, _ := laterArchive.JockeySurfaceStrikeRate(jockey, domain.SurfaceTurf); rate.Runs != 1 || rate.Wins != 1 {
 		t.Fatalf("updated surface fact was not available after collection: %+v", rate)

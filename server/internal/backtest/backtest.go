@@ -185,7 +185,8 @@ type Report struct {
 	// Favourite: backing the market favourite in those same races.
 	Favourite Arm `json:"favourite"`
 	// MarketLogLoss: the de-vigged market's own log loss on those races.
-	MarketLogLoss *float64 `json:"marketLogLoss,omitempty"`
+	MarketLogLoss         *float64       `json:"marketLogLoss,omitempty"`
+	JockeyTrainerCoverage FactorCoverage `json:"jockeyTrainerCoverage"`
 	// Snapshots: log loss over every frozen snapshot, device ones included.
 	Snapshots             int      `json:"snapshots"`
 	SnapshotLogLoss       *float64 `json:"snapshotLogLoss,omitempty"`
@@ -194,6 +195,38 @@ type Report struct {
 	// logLoss(model) ≤ logLoss(market) + 0.005.
 	BeatsMarket *bool    `json:"beatsMarket,omitempty"`
 	Notes       []string `json:"notes"`
+}
+
+// FactorCoverage counts rated runners for which a factor has a usable value.
+type FactorCoverage struct {
+	EligibleRunners  int      `json:"eligibleRunners"`
+	AvailableRunners int      `json:"availableRunners"`
+	Rate             *float64 `json:"rate,omitempty"`
+}
+
+type factorCoverageAccumulator struct{ eligible, available int }
+
+func (c *factorCoverageAccumulator) add(assessment rating.Assessment, factor rating.FactorID) {
+	for _, runner := range assessment.Runners {
+		for _, contribution := range runner.Contributions {
+			if contribution.Factor != factor {
+				continue
+			}
+			c.eligible++
+			if contribution.Availability.Kind == rating.Available {
+				c.available++
+			}
+			break
+		}
+	}
+}
+
+func (c factorCoverageAccumulator) report() FactorCoverage {
+	coverage := FactorCoverage{EligibleRunners: c.eligible, AvailableRunners: c.available}
+	if c.eligible > 0 {
+		coverage.Rate = finite(float64(c.available) / float64(c.eligible))
+	}
+	return coverage
 }
 
 // Run replays the stored history.
@@ -217,6 +250,7 @@ func Run(ctx context.Context, st *store.Store, w rating.Weights, req Request) (R
 	archive := tracking.NewArchive()
 	rater := rating.NewRater(w)
 	var highest, value, fav, market acc
+	var jockeyTrainerCoverage factorCoverageAccumulator
 	var corpus []string
 	var raceDates []string
 	missingSealCards := 0
@@ -254,6 +288,7 @@ func Run(ctx context.Context, st *store.Store, w rating.Weights, req Request) (R
 		if highestSelection == nil || valueSelection == nil {
 			continue
 		}
+		jockeyTrainerCoverage.add(a, rating.JockeyTrainerStrikeRate)
 		corpus = append(corpus, t.RaceID)
 		raceDates = append(raceDates, t.RaceDate)
 		winner := result.Winner().HorseID
@@ -281,6 +316,7 @@ func Run(ctx context.Context, st *store.Store, w rating.Weights, req Request) (R
 		rep.Notes = append(rep.Notes, fmt.Sprintf("Excluded %d sealed tips without a stored seal card.", missingSealCards))
 	}
 	rep.HighestProbability, rep.ValueSelection = highest.arm(), value.arm()
+	rep.JockeyTrainerCoverage = jockeyTrainerCoverage.report()
 	rep.Rerated, rep.Favourite = rep.HighestProbability, fav.arm()
 	rep.MarketLogLoss = market.logLoss()
 	sort.Strings(corpus)

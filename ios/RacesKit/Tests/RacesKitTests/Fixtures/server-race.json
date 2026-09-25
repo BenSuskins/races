@@ -362,6 +362,18 @@
                 "_0": "no dated runs in the recent archive yet"
               }
             }
+          },
+          {
+            "factor": "jockeyTrainerStrikeRate",
+            "label": "Jockey and trainer record together",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record for this jockey-trainer pair yet"
+              }
+            }
           }
         ]
       },
@@ -613,6 +625,18 @@
             "availability": {
               "missingData": {
                 "_0": "no dated runs in the recent archive yet"
+              }
+            }
+          },
+          {
+            "factor": "jockeyTrainerStrikeRate",
+            "label": "Jockey and trainer record together",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record for this jockey-trainer pair yet"
               }
             }
           }
@@ -873,6 +897,18 @@
                 "_0": "no dated runs in the recent archive yet"
               }
             }
+          },
+          {
+            "factor": "jockeyTrainerStrikeRate",
+            "label": "Jockey and trainer record together",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record for this jockey-trainer pair yet"
+              }
+            }
           }
         ]
       },
@@ -1124,6 +1160,18 @@
             "availability": {
               "missingData": {
                 "_0": "no dated runs in the recent archive yet"
+              }
+            }
+          },
+          {
+            "factor": "jockeyTrainerStrikeRate",
+            "label": "Jockey and trainer record together",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record for this jockey-trainer pair yet"
               }
             }
           }
@@ -1391,6 +1439,18 @@
         "availability": {
           "missingData": {
             "_0": "no dated runs in the recent archive yet"
+          }
+        }
+      },
+      {
+        "factor": "jockeyTrainerStrikeRate",
+        "label": "Jockey and trainer record together",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "no record for this jockey-trainer pair yet"
           }
         }
       }
