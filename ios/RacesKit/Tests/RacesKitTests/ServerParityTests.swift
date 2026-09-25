@@ -64,7 +64,7 @@ final class ServerParityTests: XCTestCase {
                 .compactMap(RacingAPIMapping.race(from:))
                 .map { ($0.id, $0) })
 
-        XCTAssertEqual(golden.cases.count, 12, "three presets × two races × with and without a market")
+        XCTAssertEqual(golden.cases.count, presets.count * 2 * 2, "every preset × two races × with and without a market")
 
         for expected in golden.cases {
             let label = "\(expected.raceID) \(expected.weightsID) market=\(expected.withMarket)"
