@@ -1,6 +1,7 @@
 package tracking
 
 import (
+	"math"
 	"sort"
 	"time"
 
@@ -28,6 +29,7 @@ type Archive struct {
 	TrainerRecent    map[string][]RecentRun         `json:"trainerRecent,omitempty"`
 	JockeyTrainer    map[string]rating.StrikeRate   `json:"jockeyTrainerPairs,omitempty"`
 	DrawBias         map[string]rating.DrawBiasRate `json:"drawBias,omitempty"`
+	HorseClass       map[string][]ClassRun          `json:"horseClass,omitempty"`
 	IngestedRaceIDs  []string                       `json:"ingestedRaceIDs"`
 	TotalRuns        int                            `json:"totalRuns"`
 	TotalWins        int                            `json:"totalWins"`
@@ -43,10 +45,17 @@ type RecentRun struct {
 	Won     bool   `json:"won"`
 }
 
+type ClassRun struct {
+	Date      string  `json:"date"`
+	RaceID    string  `json:"raceID"`
+	RaceClass int     `json:"raceClass"`
+	Score     float64 `json:"score"`
+}
+
 const RecentRunWindow = 50
 
 func NewArchive() *Archive {
-	return &Archive{Jockeys: map[string]rating.StrikeRate{}, Trainers: map[string]rating.StrikeRate{}, JockeySurfaces: map[string]rating.StrikeRate{}, TrainerSurfaces: map[string]rating.StrikeRate{}, JockeyRaceTypes: map[string]rating.StrikeRate{}, TrainerRaceTypes: map[string]rating.StrikeRate{}, JockeyGoings: map[string]rating.StrikeRate{}, TrainerGoings: map[string]rating.StrikeRate{}, HorseGoing: map[string]rating.PlaceRate{}, HorseOverall: map[string]rating.PlaceRate{}, JockeyRecent: map[string][]RecentRun{}, TrainerRecent: map[string][]RecentRun{}, JockeyTrainer: map[string]rating.StrikeRate{}, DrawBias: map[string]rating.DrawBiasRate{}, ingested: map[string]bool{}}
+	return &Archive{Jockeys: map[string]rating.StrikeRate{}, Trainers: map[string]rating.StrikeRate{}, JockeySurfaces: map[string]rating.StrikeRate{}, TrainerSurfaces: map[string]rating.StrikeRate{}, JockeyRaceTypes: map[string]rating.StrikeRate{}, TrainerRaceTypes: map[string]rating.StrikeRate{}, JockeyGoings: map[string]rating.StrikeRate{}, TrainerGoings: map[string]rating.StrikeRate{}, HorseGoing: map[string]rating.PlaceRate{}, HorseOverall: map[string]rating.PlaceRate{}, JockeyRecent: map[string][]RecentRun{}, TrainerRecent: map[string][]RecentRun{}, JockeyTrainer: map[string]rating.StrikeRate{}, DrawBias: map[string]rating.DrawBiasRate{}, HorseClass: map[string][]ClassRun{}, ingested: map[string]bool{}}
 }
 
 func (a *Archive) index() {
@@ -100,6 +109,9 @@ func (a *Archive) index() {
 	if a.DrawBias == nil {
 		a.DrawBias = map[string]rating.DrawBiasRate{}
 	}
+	if a.HorseClass == nil {
+		a.HorseClass = map[string][]ClassRun{}
+	}
 }
 
 func (a *Archive) Has(raceID string) bool { a.index(); return a.ingested[raceID] }
@@ -117,6 +129,13 @@ func (a *Archive) Ingest(r domain.RaceResult) bool {
 		validRecentDate = true
 	}
 	for _, f := range r.Finishers {
+		if validRecentDate && r.RaceClass != nil && *r.RaceClass >= 1 && *r.RaceClass <= 7 && len(r.Finishers) >= 2 {
+			score := 0.0
+			if position := f.Position.NumericPosition(); position != nil && *position >= 1 && *position <= len(r.Finishers) {
+				score = 1 - float64(*position-1)/float64(len(r.Finishers)-1)
+			}
+			a.HorseClass[f.HorseID] = appendClassRun(a.HorseClass[f.HorseID], ClassRun{Date: r.Date, RaceID: r.ID, RaceClass: *r.RaceClass, Score: score})
+		}
 		won := f.Position.IsWinner()
 		a.TotalRuns++
 		if won {
@@ -323,6 +342,11 @@ func (a *Archive) Merge(other Archive) int {
 		current := a.DrawBias[key]
 		a.DrawBias[key] = rating.DrawBiasRate{Runs: current.Runs + record.Runs, Wins: current.Wins + record.Wins, ExpectedWins: current.ExpectedWins + record.ExpectedWins}
 	}
+	for key, record := range other.HorseClass {
+		for _, run := range record {
+			a.HorseClass[key] = appendClassRun(a.HorseClass[key], run)
+		}
+	}
 	a.TotalRuns += other.TotalRuns
 	a.TotalWins += other.TotalWins
 	for _, id := range other.IngestedRaceIDs {
@@ -420,6 +444,37 @@ func (a *Archive) DrawBiasRate(race domain.Race, runner domain.Runner) (rating.D
 	}
 	record, ok := a.DrawBias[key]
 	return record, ok
+}
+
+func (a *Archive) HorseClassFormRate(horseID string, targetClass int) (rating.ClassAdjustedFormRate, bool) {
+	a.index()
+	if targetClass < 1 || targetClass > 7 {
+		return rating.ClassAdjustedFormRate{}, false
+	}
+	runs := a.HorseClass[horseID]
+	if len(runs) == 0 {
+		return rating.ClassAdjustedFormRate{}, false
+	}
+	scoreTotal := 0.0
+	for _, run := range runs {
+		adjustment := float64(targetClass-run.RaceClass) * 0.04
+		scoreTotal += math.Max(0, math.Min(1, run.Score+adjustment))
+	}
+	return rating.ClassAdjustedFormRate{Runs: len(runs), Score: scoreTotal / float64(len(runs))}, true
+}
+
+func appendClassRun(runs []ClassRun, run ClassRun) []ClassRun {
+	runs = append(runs, run)
+	sort.Slice(runs, func(i, j int) bool {
+		if runs[i].Date != runs[j].Date {
+			return runs[i].Date < runs[j].Date
+		}
+		return runs[i].RaceID < runs[j].RaceID
+	})
+	if len(runs) > RecentRunWindow {
+		runs = append([]ClassRun(nil), runs[len(runs)-RecentRunWindow:]...)
+	}
+	return runs
 }
 
 func (a *Archive) HorseGoingRate(horseID string, surface domain.Surface, bucket domain.GoingBucket) (rating.PlaceRate, bool) {

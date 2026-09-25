@@ -235,6 +235,28 @@ func (f horseGoing) Value(r domain.Runner, ctx Context) FactorValue {
 	return value(prior, fmt.Sprintf("Field place prior (%d%%)", int(math.Round(prior*100))))
 }
 
+type classAdjustedForm struct{ minimumSample int }
+
+func (classAdjustedForm) ID() FactorID { return ClassAdjustedForm }
+func (f classAdjustedForm) Value(r domain.Runner, ctx Context) FactorValue {
+	if ctx.Race.RaceClass == nil || *ctx.Race.RaceClass < 1 || *ctx.Race.RaceClass > 7 {
+		return missing("race class is unknown")
+	}
+	provider, ok := ctx.StrikeRates.(ClassAdjustedFormRates)
+	if !ok {
+		return missing("no class-adjusted form archive yet")
+	}
+	record, ok := provider.HorseClassFormRate(r.ID, *ctx.Race.RaceClass)
+	if !ok {
+		return missing("no classed race history for this horse")
+	}
+	if record.Runs < f.minimumSample {
+		return missing(fmt.Sprintf("only %d classed runs for this horse", record.Runs))
+	}
+	smoothed := (record.Score*float64(record.Runs) + 0.5*3) / (float64(record.Runs) + 3)
+	return value(smoothed, fmt.Sprintf("%d%% class-adjusted form from %d runs", int(math.Round(smoothed*100)), record.Runs))
+}
+
 func fieldPlacePrior(fieldSize *int) float64 {
 	if fieldSize == nil || *fieldSize < 3 {
 		return 0.25
@@ -544,5 +566,6 @@ func DefaultFactors(w Weights) []Factor {
 		recentStrikeRate{jockey: true, minimumSample: w.MinimumStrikeRateSample},
 		recentStrikeRate{jockey: false, minimumSample: w.MinimumStrikeRateSample},
 		jockeyTrainerStrikeRate{minimumSample: w.MinimumStrikeRateSample},
+		classAdjustedForm{minimumSample: 3},
 	}
 }

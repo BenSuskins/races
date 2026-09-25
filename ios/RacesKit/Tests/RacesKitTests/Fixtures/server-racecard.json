@@ -424,6 +424,18 @@
                   "_0": "no record for this jockey-trainer pair yet"
                 }
               }
+            },
+            {
+              "factor": "classAdjustedForm",
+              "label": "Class-adjusted horse form",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no classed race history for this horse"
+                }
+              }
             }
           ]
         },
@@ -687,6 +699,18 @@
               "availability": {
                 "missingData": {
                   "_0": "no record for this jockey-trainer pair yet"
+                }
+              }
+            },
+            {
+              "factor": "classAdjustedForm",
+              "label": "Class-adjusted horse form",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no classed race history for this horse"
                 }
               }
             }
@@ -959,6 +983,18 @@
                   "_0": "no record for this jockey-trainer pair yet"
                 }
               }
+            },
+            {
+              "factor": "classAdjustedForm",
+              "label": "Class-adjusted horse form",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no classed race history for this horse"
+                }
+              }
             }
           ]
         },
@@ -1222,6 +1258,18 @@
               "availability": {
                 "missingData": {
                   "_0": "no record for this jockey-trainer pair yet"
+                }
+              }
+            },
+            {
+              "factor": "classAdjustedForm",
+              "label": "Class-adjusted horse form",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no classed race history for this horse"
                 }
               }
             }
@@ -1503,6 +1551,18 @@
                   "_0": "no record for this jockey-trainer pair yet"
                 }
               }
+            },
+            {
+              "factor": "classAdjustedForm",
+              "label": "Class-adjusted horse form",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no classed race history for this horse"
+                }
+              }
             }
           ]
         },
@@ -1767,6 +1827,18 @@
               "availability": {
                 "missingData": {
                   "_0": "no record for this jockey-trainer pair yet"
+                }
+              }
+            },
+            {
+              "factor": "classAdjustedForm",
+              "label": "Class-adjusted horse form",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no classed race history for this horse"
                 }
               }
             }
@@ -2050,6 +2122,18 @@
               "_0": "no record for this jockey-trainer pair yet"
             }
           }
+        },
+        {
+          "factor": "classAdjustedForm",
+          "label": "Class-adjusted horse form",
+          "detail": "—",
+          "weight": 0,
+          "probabilityDelta": 0,
+          "availability": {
+            "missingData": {
+              "_0": "no classed race history for this horse"
+            }
+          }
         }
       ],
       "createdAt": "2026-09-20T09:00:00Z"
@@ -2324,6 +2408,18 @@
           "availability": {
             "missingData": {
               "_0": "no record for this jockey-trainer pair yet"
+            }
+          }
+        },
+        {
+          "factor": "classAdjustedForm",
+          "label": "Class-adjusted horse form",
+          "detail": "—",
+          "weight": 0,
+          "probabilityDelta": 0,
+          "availability": {
+            "missingData": {
+              "_0": "no classed race history for this horse"
             }
           }
         }

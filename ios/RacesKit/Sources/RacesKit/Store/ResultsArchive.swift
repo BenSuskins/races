@@ -34,12 +34,13 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
     public private(set) var trainerRecent: [String: [RecentRun]]
     public private(set) var jockeyTrainerPairs: [String: StrikeRate]
     public private(set) var drawBias: [String: DrawBiasRate]
+    public private(set) var horseClass: [String: [ClassRun]]
     public private(set) var ingestedRaceIDs: Set<String>
     public private(set) var totalRuns: Int
     public private(set) var totalWins: Int
 
     private enum CodingKeys: String, CodingKey {
-        case jockeys, trainers, jockeySurfaces, trainerSurfaces, jockeyRaceTypes, trainerRaceTypes, jockeyGoings, trainerGoings, horseGoing, horseOverall, jockeyRecent, trainerRecent, jockeyTrainerPairs, drawBias, ingestedRaceIDs, totalRuns, totalWins
+        case jockeys, trainers, jockeySurfaces, trainerSurfaces, jockeyRaceTypes, trainerRaceTypes, jockeyGoings, trainerGoings, horseGoing, horseOverall, jockeyRecent, trainerRecent, jockeyTrainerPairs, drawBias, horseClass, ingestedRaceIDs, totalRuns, totalWins
     }
 
     public init(
@@ -57,6 +58,7 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
         trainerRecent: [String: [RecentRun]] = [:],
         jockeyTrainerPairs: [String: StrikeRate] = [:],
         drawBias: [String: DrawBiasRate] = [:],
+        horseClass: [String: [ClassRun]] = [:],
         ingestedRaceIDs: Set<String> = [],
         totalRuns: Int = 0,
         totalWins: Int = 0
@@ -75,6 +77,7 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
         self.trainerRecent = trainerRecent
         self.jockeyTrainerPairs = jockeyTrainerPairs
         self.drawBias = drawBias
+        self.horseClass = horseClass
         self.ingestedRaceIDs = ingestedRaceIDs
         self.totalRuns = totalRuns
         self.totalWins = totalWins
@@ -97,6 +100,7 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
             trainerRecent: try values.decodeIfPresent([String: [RecentRun]].self, forKey: .trainerRecent) ?? [:],
             jockeyTrainerPairs: try values.decodeIfPresent([String: StrikeRate].self, forKey: .jockeyTrainerPairs) ?? [:],
             drawBias: try values.decodeIfPresent([String: DrawBiasRate].self, forKey: .drawBias) ?? [:],
+            horseClass: try values.decodeIfPresent([String: [ClassRun]].self, forKey: .horseClass) ?? [:],
             ingestedRaceIDs: try values.decodeIfPresent(Set<String>.self, forKey: .ingestedRaceIDs) ?? [],
             totalRuns: try values.decodeIfPresent(Int.self, forKey: .totalRuns) ?? 0,
             totalWins: try values.decodeIfPresent(Int.self, forKey: .totalWins) ?? 0
@@ -119,6 +123,7 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
         try values.encode(trainerRecent, forKey: .trainerRecent)
         try values.encode(jockeyTrainerPairs, forKey: .jockeyTrainerPairs)
         try values.encode(drawBias, forKey: .drawBias)
+        try values.encode(horseClass, forKey: .horseClass)
         try values.encode(ingestedRaceIDs, forKey: .ingestedRaceIDs)
         try values.encode(totalRuns, forKey: .totalRuns)
         try values.encode(totalWins, forKey: .totalWins)
@@ -135,6 +140,16 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
         ingestedRaceIDs.insert(result.id)
 
         for finisher in result.finishers {
+            if let raceClass = result.raceClass, (1...7).contains(raceClass), result.finishers.count >= 2, Self.isISODate(result.date) {
+                let score: Double
+                if let position = finisher.position.numericPosition, (1...result.finishers.count).contains(position) {
+                    score = 1 - Double(position - 1) / Double(result.finishers.count - 1)
+                } else {
+                    score = 0
+                }
+                let run = ClassRun(date: result.date, raceID: result.id, raceClass: raceClass, score: score)
+                horseClass[finisher.horseID] = Self.appendClassRun(horseClass[finisher.horseID, default: []], run)
+            }
             // A horse that pulled up still ran. Only actual participants are
             // counted, which is exactly what the finishers list holds.
             let won = finisher.position.isWinner
@@ -292,6 +307,14 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
         }
         return Array(sorted.suffix(50))
     }
+
+    private static func appendClassRun(_ classRuns: [ClassRun], _ newRun: ClassRun) -> [ClassRun] {
+        let sorted = (classRuns + [newRun]).sorted {
+            if $0.date != $1.date { return $0.date < $1.date }
+            return $0.raceID < $1.raceID
+        }
+        return Array(sorted.suffix(50))
+    }
 }
 
 extension ResultsArchive: StrikeRateProviding {
@@ -378,5 +401,20 @@ extension ResultsArchive: DrawBiasProviding {
         let fieldSize = race.fieldSize.flatMap { $0 > 0 ? $0 : nil } ?? race.runners.count
         guard let key = Self.drawBiasCellKey(courseName: race.courseName, distance: race.distance, surface: race.surface, going: race.going, fieldSize: fieldSize, draw: draw) else { return nil }
         return drawBias[key]
+    }
+}
+
+extension ResultsArchive: ClassAdjustedFormProviding {
+    public func horseClassFormRate(horseID: String, targetClass: Int) -> ClassAdjustedFormRate? {
+        guard (1...7).contains(targetClass) else { return nil }
+        var runs = 0
+        var scoreTotal = 0.0
+        for run in horseClass[horseID, default: []] {
+            let adjustment = Double(targetClass - run.raceClass) * 0.04
+            scoreTotal += min(1, max(0, run.score + adjustment))
+            runs += 1
+        }
+        guard runs > 0 else { return nil }
+        return ClassAdjustedFormRate(runs: runs, score: scoreTotal / Double(runs))
     }
 }

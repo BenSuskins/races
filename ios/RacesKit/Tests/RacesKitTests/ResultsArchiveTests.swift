@@ -330,6 +330,47 @@ final class ResultsArchiveTests: XCTestCase {
         XCTAssertEqual(thin.availability, .missingData("only 96 comparable starters for this draw"))
     }
 
+    func test_classAdjustedFormUsesKnownRaceClassesAndRequiresThreeRuns() throws {
+        var archive = ResultsArchive()
+        for result in [
+            TestResult.result(id: "class-1", finishing: [("horse", "1"), ("a", "2"), ("b", "3"), ("c", "4")], raceClass: 1),
+            TestResult.result(id: "class-3", finishing: [("x", "1"), ("horse", "2"), ("b", "3"), ("c", "4")], raceClass: 3),
+            TestResult.result(id: "class-5", finishing: [("x", "1"), ("a", "2"), ("b", "3"), ("horse", "4")], raceClass: 5)
+        ] {
+            archive.ingest(result)
+        }
+        let race = TestRace.race(raceClass: 3, runners: [TestRace.runner("horse")])
+        let reading = ClassAdjustedFormFactor().value(
+            for: race.runners[0], in: FactorContext(race: race, strikeRates: archive)
+        )
+        XCTAssertTrue(reading.availability.isAvailable)
+        XCTAssertEqual(reading.raw ?? 0, 0.5277777777777778, accuracy: 0.000001)
+        let roundTrip = try JSONDecoder().decode(ResultsArchive.self, from: JSONEncoder().encode(archive))
+        XCTAssertEqual(roundTrip.horseClass, archive.horseClass)
+
+        var thin = ResultsArchive()
+        for index in 1...2 {
+            thin.ingest(TestResult.result(id: "thin-class-\(index)", finishing: [("horse", "1"), ("a", "2"), ("b", "3")], raceClass: 3))
+        }
+        let missing = ClassAdjustedFormFactor().value(
+            for: race.runners[0], in: FactorContext(race: race, strikeRates: thin)
+        )
+        XCTAssertEqual(missing.availability, .missingData("only 2 classed runs for this horse"))
+
+        var window = ResultsArchive()
+        for index in 1...51 {
+            let month = index <= 31 ? 3 : 4
+            let day = index <= 31 ? index : index - 31
+            let date = String(format: "2025-%02d-%02d", month, day)
+            window.ingest(TestResult.result(
+                id: "class-window-\(index)", date: date,
+                finishing: [("horse", index.isMultiple(of: 2) ? "1" : "2"), ("other", "3")],
+                raceClass: 3
+            ))
+        }
+        XCTAssertEqual(window.horseClass["horse"]?.count, 50)
+    }
+
     // MARK: - Baseline
 
     /// Until there is enough archive to measure it, the baseline is a stated

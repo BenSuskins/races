@@ -77,6 +77,8 @@ type fakeStrikeRates struct {
 	jockeyTrainer                     map[string]StrikeRate
 	drawBiasRecord                    DrawBiasRate
 	drawBiasExists                    bool
+	horseClassRate                    ClassAdjustedFormRate
+	horseClassExists                  bool
 	horseGoings                       map[string]PlaceRate
 	horseOverall                      map[string]PlaceRate
 	baseline                          float64
@@ -105,6 +107,9 @@ func (f fakeStrikeRates) JockeyTrainerStrikeRate(jockeyID, trainerID string) (St
 }
 func (f fakeStrikeRates) DrawBiasRate(domain.Race, domain.Runner) (DrawBiasRate, bool) {
 	return f.drawBiasRecord, f.drawBiasExists
+}
+func (f fakeStrikeRates) HorseClassFormRate(string, int) (ClassAdjustedFormRate, bool) {
+	return f.horseClassRate, f.horseClassExists
 }
 func (f fakeStrikeRates) JockeySurfaceStrikeRate(id string, surface domain.Surface) (StrikeRate, bool) {
 	rate, ok := f.jockeySurfaces[id+"|"+string(surface)]
@@ -702,6 +707,24 @@ func TestDrawBiasUsesComparableStartsAndRequiresOneHundred(t *testing.T) {
 	}
 }
 
+func TestClassAdjustedFormUsesHistoryOnlyAboveThreeRuns(t *testing.T) {
+	factor := classAdjustedForm{minimumSample: 3}
+	context := Context{Race: domain.Race{RaceClass: ip(3)}, StrikeRates: fakeStrikeRates{
+		horseClassRate: ClassAdjustedFormRate{Runs: 3, Score: 0.6}, horseClassExists: true,
+	}}
+	reading := factor.Value(runner("horse", runnerOpts{}), context)
+	if reading.Raw == nil || !near(*reading.Raw, 0.55, 1e-9) || reading.Availability.Kind != Available {
+		t.Fatalf("class-adjusted form did not shrink to neutral: %#v", reading)
+	}
+	archive := context.StrikeRates.(fakeStrikeRates)
+	archive.horseClassRate.Runs = 2
+	context.StrikeRates = archive
+	reading = factor.Value(runner("horse", runnerOpts{}), context)
+	if reading.Raw != nil || reading.Availability.Reason != "only 2 classed runs for this horse" {
+		t.Fatalf("thin class history must be missing: %#v", reading)
+	}
+}
+
 // FactorDescriptionTests: every factor has copy, the presets name every
 // factor, and the set of deliberate zeros does not change silently.
 func TestFactorDescriptions(t *testing.T) {
@@ -721,7 +744,7 @@ func TestFactorDescriptions(t *testing.T) {
 			}
 		}
 	}
-	want := map[FactorID]bool{Draw: true, Headgear: true, JockeyStrikeRate: true, TrainerStrikeRate: true, JockeySurfaceStrikeRate: true, TrainerSurfaceStrikeRate: true, JockeyRaceTypeStrikeRate: true, TrainerRaceTypeStrikeRate: true, JockeyGoingStrikeRate: true, TrainerGoingStrikeRate: true, HorseGoingPlaceRate: true, JockeyRecentStrikeRate: true, TrainerRecentStrikeRate: true, JockeyTrainerStrikeRate: true}
+	want := map[FactorID]bool{Draw: true, Headgear: true, JockeyStrikeRate: true, TrainerStrikeRate: true, JockeySurfaceStrikeRate: true, TrainerSurfaceStrikeRate: true, JockeyRaceTypeStrikeRate: true, TrainerRaceTypeStrikeRate: true, JockeyGoingStrikeRate: true, TrainerGoingStrikeRate: true, HorseGoingPlaceRate: true, JockeyRecentStrikeRate: true, TrainerRecentStrikeRate: true, JockeyTrainerStrikeRate: true, ClassAdjustedForm: true}
 	if len(zeros) != len(want) {
 		t.Fatal("the set of deliberate zeros changed", zeros)
 	}

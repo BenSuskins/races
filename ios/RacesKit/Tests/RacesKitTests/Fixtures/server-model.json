@@ -10,6 +10,7 @@
     "minimumMarketCoverage": 0.8,
     "factorWeights": {
       "age": 0.04,
+      "classAdjustedForm": 0,
       "completionRate": 0.08,
       "daysSinceLastRun": 0.06,
       "draw": 0,
@@ -132,6 +133,7 @@
         "minimumMarketCoverage": 0.8,
         "factorWeights": {
           "age": 0.04,
+          "classAdjustedForm": 0,
           "completionRate": 0.08,
           "daysSinceLastRun": 0.06,
           "draw": 0,
@@ -190,6 +192,7 @@
         "minimumMarketCoverage": 0.8,
         "factorWeights": {
           "age": 0.04,
+          "classAdjustedForm": 0,
           "completionRate": 0.08,
           "daysSinceLastRun": 0.06,
           "draw": 0,
@@ -248,6 +251,7 @@
         "minimumMarketCoverage": 0.8,
         "factorWeights": {
           "age": 0.04,
+          "classAdjustedForm": 0,
           "completionRate": 0.08,
           "daysSinceLastRun": 0.06,
           "draw": 0,
@@ -421,6 +425,12 @@
       "label": "Jockey and trainer record together",
       "summary": "The win rate when this jockey rides for this trainer, adjusted toward their individual records.",
       "rationale": "The pair needs 30 runs and both individual records need enough history. Its default weight is zero until coverage and walk-forward evidence support it."
+    },
+    {
+      "id": "classAdjustedForm",
+      "label": "Class-adjusted horse form",
+      "summary": "The horse's recent finishing performance, adjusted for the class of each race.",
+      "rationale": "The archive needs three classified runs with known race classes. Its default weight is zero until walk-forward evidence supports it."
     }
   ],
   "samples": {

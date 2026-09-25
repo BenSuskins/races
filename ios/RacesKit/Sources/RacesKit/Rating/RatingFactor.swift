@@ -25,6 +25,7 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
     case jockeyRecentStrikeRate
     case trainerRecentStrikeRate
     case jockeyTrainerStrikeRate
+    case classAdjustedForm
 
     public var label: String {
         switch self {
@@ -50,6 +51,7 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
         case .jockeyRecentStrikeRate: return "Jockey recent strike rate"
         case .trainerRecentStrikeRate: return "Trainer recent strike rate"
         case .jockeyTrainerStrikeRate: return "Jockey and trainer record together"
+        case .classAdjustedForm: return "Class-adjusted horse form"
         }
     }
 
@@ -78,8 +80,6 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
             return "Pounds carried, negated so less is better."
         case .draw:
             return "Historical win rate for the draw band in this course, distance, going, and field-size context."
-        case .draw:
-            return "Stall number."
         case .headgear:
             return "Blinkers, a visor, a hood, cheekpieces."
         case .jockeyStrikeRate:
@@ -106,6 +106,8 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
             return "The trainer's win rate from the latest 50 dated runners, shrunk toward the global record."
         case .jockeyTrainerStrikeRate:
             return "The win rate when this jockey rides for this trainer, adjusted toward their individual records."
+        case .classAdjustedForm:
+            return "The horse's recent finishing performance, adjusted for the class of each race."
         }
     }
 
@@ -120,7 +122,7 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
     public var rationale: String? {
         switch self {
         case .draw:
-            return "Draw bias is real, but it is a course × distance × going × field-size interaction. Without a bias table it is noise, so the code ships switched off."
+            return "The archive needs at least 100 comparable starters. The default weight is zero until replay supports it."
         case .headgear:
             return "The signal is *first-time* headgear, and the free tier has no headgear history to detect it with."
         case .jockeyStrikeRate, .trainerStrikeRate:
@@ -137,6 +139,8 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
             return "The recent window needs at least 30 dated runs. The default weight is zero until walk-forward replay supports it."
         case .jockeyTrainerStrikeRate:
             return "The pair needs 30 runs and both individual records need enough history. Its default weight is zero until coverage and walk-forward evidence support it."
+        case .classAdjustedForm:
+            return "The archive needs three classified runs with known race classes. Its default weight is zero until walk-forward evidence supports it."
         case .weightCarried:
             return "Near zero on purpose: in a handicap, weight is the handicapper's equaliser, so it substantially double-counts the official rating."
         case .officialRating, .handicapBandPosition, .recentForm, .wonLastTime,
@@ -218,8 +222,9 @@ public struct FactorContext: Sendable {
     public let recentStrikeRates: (any RecentStrikeRateProviding)?
     public let jockeyTrainerStrikeRates: (any JockeyTrainerStrikeRateProviding)?
     public let drawBiasRates: (any DrawBiasProviding)?
+    public let classAdjustedFormRates: (any ClassAdjustedFormProviding)?
 
-    public init(race: Race, strikeRates: (any StrikeRateProviding)? = nil, surfaceStrikeRates: (any SurfaceStrikeRateProviding)? = nil, raceTypeStrikeRates: (any RaceTypeStrikeRateProviding)? = nil, goingStrikeRates: (any GoingStrikeRateProviding)? = nil, horseGoingRates: (any HorseGoingProviding)? = nil, recentStrikeRates: (any RecentStrikeRateProviding)? = nil, jockeyTrainerStrikeRates: (any JockeyTrainerStrikeRateProviding)? = nil, drawBiasRates: (any DrawBiasProviding)? = nil) {
+    public init(race: Race, strikeRates: (any StrikeRateProviding)? = nil, surfaceStrikeRates: (any SurfaceStrikeRateProviding)? = nil, raceTypeStrikeRates: (any RaceTypeStrikeRateProviding)? = nil, goingStrikeRates: (any GoingStrikeRateProviding)? = nil, horseGoingRates: (any HorseGoingProviding)? = nil, recentStrikeRates: (any RecentStrikeRateProviding)? = nil, jockeyTrainerStrikeRates: (any JockeyTrainerStrikeRateProviding)? = nil, drawBiasRates: (any DrawBiasProviding)? = nil, classAdjustedFormRates: (any ClassAdjustedFormProviding)? = nil) {
         self.race = race
         self.strikeRates = strikeRates
         self.surfaceStrikeRates = surfaceStrikeRates ?? (strikeRates as? any SurfaceStrikeRateProviding)
@@ -229,6 +234,7 @@ public struct FactorContext: Sendable {
         self.recentStrikeRates = recentStrikeRates ?? (strikeRates as? any RecentStrikeRateProviding)
         self.jockeyTrainerStrikeRates = jockeyTrainerStrikeRates ?? (strikeRates as? any JockeyTrainerStrikeRateProviding)
         self.drawBiasRates = drawBiasRates ?? (strikeRates as? any DrawBiasProviding)
+        self.classAdjustedFormRates = classAdjustedFormRates ?? (strikeRates as? any ClassAdjustedFormProviding)
     }
 }
 
@@ -316,6 +322,34 @@ public struct DrawBiasRate: Codable, Hashable, Sendable {
         self.runs = runs
         self.wins = wins
         self.expectedWins = expectedWins
+    }
+}
+
+public protocol ClassAdjustedFormProviding: Sendable {
+    func horseClassFormRate(horseID: String, targetClass: Int) -> ClassAdjustedFormRate?
+}
+
+public struct ClassRun: Codable, Hashable, Sendable {
+    public let date: String
+    public let raceID: String
+    public let raceClass: Int
+    public let score: Double
+
+    public init(date: String, raceID: String, raceClass: Int, score: Double) {
+        self.date = date
+        self.raceID = raceID
+        self.raceClass = raceClass
+        self.score = score
+    }
+}
+
+public struct ClassAdjustedFormRate: Codable, Hashable, Sendable {
+    public let runs: Int
+    public let score: Double
+
+    public init(runs: Int, score: Double) {
+        self.runs = runs
+        self.score = score
     }
 }
 

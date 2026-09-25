@@ -103,3 +103,33 @@ func TestArchiveTracksDrawBandOutcomesAcrossComparableRaces(t *testing.T) {
 		t.Fatalf("unexpected comparable draw record: %+v, %v", record, ok)
 	}
 }
+
+func TestArchiveTracksClassAdjustedHorseForm(t *testing.T) {
+	archive := NewArchive()
+	for _, race := range []domain.RaceResult{
+		{ID: "class-1", Date: "2026-09-20", RaceClass: intPointer(1), Finishers: []domain.Finisher{{HorseID: "horse", Position: domain.Finished(1)}, {HorseID: "a", Position: domain.Finished(2)}, {HorseID: "b", Position: domain.Finished(3)}, {HorseID: "c", Position: domain.Finished(4)}}},
+		{ID: "class-3", Date: "2026-09-21", RaceClass: intPointer(3), Finishers: []domain.Finisher{{HorseID: "x", Position: domain.Finished(1)}, {HorseID: "horse", Position: domain.Finished(2)}, {HorseID: "b", Position: domain.Finished(3)}, {HorseID: "c", Position: domain.Finished(4)}}},
+		{ID: "class-5", Date: "2026-09-22", RaceClass: intPointer(5), Finishers: []domain.Finisher{{HorseID: "x", Position: domain.Finished(1)}, {HorseID: "a", Position: domain.Finished(2)}, {HorseID: "b", Position: domain.Finished(3)}, {HorseID: "horse", Position: domain.Finished(4)}}},
+	} {
+		archive.Ingest(race)
+	}
+	rate, ok := archive.HorseClassFormRate("horse", 3)
+	if !ok || rate.Runs != 3 || rate.Score < 0.555 || rate.Score > 0.556 {
+		t.Fatalf("class-adjusted horse form = %+v, %v", rate, ok)
+	}
+	window := NewArchive()
+	for index := 1; index <= RecentRunWindow+1; index++ {
+		position := 2
+		if index%2 == 0 {
+			position = 1
+		}
+		date := time.Date(2025, time.January, index, 0, 0, 0, 0, time.UTC).Format("2006-01-02")
+		window.Ingest(domain.RaceResult{ID: fmt.Sprintf("window-%02d", index), Date: date, RaceClass: intPointer(3), Finishers: []domain.Finisher{{HorseID: "horse", Position: domain.Finished(position)}, {HorseID: "other", Position: domain.Finished(3)}}})
+	}
+	windowRate, ok := window.HorseClassFormRate("horse", 3)
+	if !ok || windowRate.Runs != RecentRunWindow {
+		t.Fatalf("class form did not retain its latest dated runs: %+v, %v", windowRate, ok)
+	}
+}
+
+func intPointer(value int) *int { return &value }

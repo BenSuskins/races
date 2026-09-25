@@ -414,6 +414,32 @@ public struct HorseGoingFactor: RatingFactor {
     }
 }
 
+public struct ClassAdjustedFormFactor: RatingFactor {
+    public let id = FactorID.classAdjustedForm
+    public let minimumSample: Int
+
+    public init(minimumSample: Int = 3) {
+        self.minimumSample = minimumSample
+    }
+
+    public func value(for runner: Runner, in context: FactorContext) -> FactorValue {
+        guard let targetClass = context.race.raceClass, (1...7).contains(targetClass) else {
+            return .missing("race class is unknown")
+        }
+        guard let provider = context.classAdjustedFormRates else {
+            return .missing("no class-adjusted form archive yet")
+        }
+        guard let record = provider.horseClassFormRate(horseID: runner.id, targetClass: targetClass) else {
+            return .missing("no classed race history for this horse")
+        }
+        guard record.runs >= minimumSample else {
+            return .missing("only \(record.runs) classed runs for this horse")
+        }
+        let smoothed = (record.score * Double(record.runs) + 0.5 * 3) / (Double(record.runs) + 3)
+        return .value(smoothed, "\(Int((smoothed * 100).rounded()))% class-adjusted form from \(record.runs) runs")
+    }
+}
+
 public struct RecentStrikeRateFactor: RatingFactor {
     public enum Subject: Sendable { case jockey, trainer }
     public let id: FactorID
