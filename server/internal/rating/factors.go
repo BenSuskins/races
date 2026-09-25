@@ -231,6 +231,63 @@ type raceTypeStrikeRate struct {
 	minimumSample int
 }
 
+type goingStrikeRate struct {
+	jockey        bool
+	minimumSample int
+}
+
+func (f goingStrikeRate) ID() FactorID {
+	if f.jockey {
+		return JockeyGoingStrikeRate
+	}
+	return TrainerGoingStrikeRate
+}
+
+func (f goingStrikeRate) Value(r domain.Runner, ctx Context) FactorValue {
+	if ctx.StrikeRates == nil {
+		return missing("no results archive yet")
+	}
+	provider, ok := ctx.StrikeRates.(GoingStrikeRates)
+	if !ok {
+		return missing("no going archive yet")
+	}
+	bucket := ctx.Race.Going.Bucket(ctx.Race.Surface)
+	if bucket == "" {
+		return missing("going or surface is unknown")
+	}
+	subject := r.TrainerID
+	if f.jockey {
+		subject = r.JockeyID
+	}
+	if subject == nil {
+		return missing("not identified")
+	}
+	var record StrikeRate
+	if f.jockey {
+		record, ok = provider.JockeyGoingStrikeRate(*subject, ctx.Race.Surface, bucket)
+	} else {
+		record, ok = provider.TrainerGoingStrikeRate(*subject, ctx.Race.Surface, bucket)
+	}
+	if !ok {
+		return missing("no record in this going archive yet")
+	}
+	if record.Runs < f.minimumSample {
+		return missing(fmt.Sprintf("only %d runs on similar ground", record.Runs))
+	}
+	prior := ctx.StrikeRates.BaselineStrikeRate()
+	var overall StrikeRate
+	if f.jockey {
+		overall, ok = ctx.StrikeRates.JockeyStrikeRate(*subject)
+	} else {
+		overall, ok = ctx.StrikeRates.TrainerStrikeRate(*subject)
+	}
+	if ok {
+		prior = overall.Smoothed(prior, 20)
+	}
+	smoothed := record.Smoothed(prior, 20)
+	return value(smoothed, fmt.Sprintf("%d%% from %d %s going runs", int(math.Round(smoothed*100)), record.Runs, bucket))
+}
+
 func (f raceTypeStrikeRate) ID() FactorID {
 	if f.jockey {
 		return JockeyRaceTypeStrikeRate
@@ -379,6 +436,8 @@ func DefaultFactors(w Weights) []Factor {
 		surfaceStrikeRate{jockey: false, minimumSample: w.MinimumStrikeRateSample},
 		raceTypeStrikeRate{jockey: true, minimumSample: w.MinimumStrikeRateSample},
 		raceTypeStrikeRate{jockey: false, minimumSample: w.MinimumStrikeRateSample},
+		goingStrikeRate{jockey: true, minimumSample: w.MinimumStrikeRateSample},
+		goingStrikeRate{jockey: false, minimumSample: w.MinimumStrikeRateSample},
 		horseGoing{minimumSample: 3},
 	}
 }

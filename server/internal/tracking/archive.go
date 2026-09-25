@@ -19,6 +19,8 @@ type Archive struct {
 	TrainerSurfaces  map[string]rating.StrikeRate `json:"trainerSurfaces,omitempty"`
 	JockeyRaceTypes  map[string]rating.StrikeRate `json:"jockeyRaceTypes,omitempty"`
 	TrainerRaceTypes map[string]rating.StrikeRate `json:"trainerRaceTypes,omitempty"`
+	JockeyGoings     map[string]rating.StrikeRate `json:"jockeyGoings,omitempty"`
+	TrainerGoings    map[string]rating.StrikeRate `json:"trainerGoings,omitempty"`
 	HorseGoing       map[string]rating.PlaceRate  `json:"horseGoing,omitempty"`
 	HorseOverall     map[string]rating.PlaceRate  `json:"horseOverall,omitempty"`
 	IngestedRaceIDs  []string                     `json:"ingestedRaceIDs"`
@@ -29,7 +31,7 @@ type Archive struct {
 }
 
 func NewArchive() *Archive {
-	return &Archive{Jockeys: map[string]rating.StrikeRate{}, Trainers: map[string]rating.StrikeRate{}, JockeySurfaces: map[string]rating.StrikeRate{}, TrainerSurfaces: map[string]rating.StrikeRate{}, JockeyRaceTypes: map[string]rating.StrikeRate{}, TrainerRaceTypes: map[string]rating.StrikeRate{}, HorseGoing: map[string]rating.PlaceRate{}, HorseOverall: map[string]rating.PlaceRate{}, ingested: map[string]bool{}}
+	return &Archive{Jockeys: map[string]rating.StrikeRate{}, Trainers: map[string]rating.StrikeRate{}, JockeySurfaces: map[string]rating.StrikeRate{}, TrainerSurfaces: map[string]rating.StrikeRate{}, JockeyRaceTypes: map[string]rating.StrikeRate{}, TrainerRaceTypes: map[string]rating.StrikeRate{}, JockeyGoings: map[string]rating.StrikeRate{}, TrainerGoings: map[string]rating.StrikeRate{}, HorseGoing: map[string]rating.PlaceRate{}, HorseOverall: map[string]rating.PlaceRate{}, ingested: map[string]bool{}}
 }
 
 func (a *Archive) index() {
@@ -58,6 +60,12 @@ func (a *Archive) index() {
 	}
 	if a.TrainerRaceTypes == nil {
 		a.TrainerRaceTypes = map[string]rating.StrikeRate{}
+	}
+	if a.JockeyGoings == nil {
+		a.JockeyGoings = map[string]rating.StrikeRate{}
+	}
+	if a.TrainerGoings == nil {
+		a.TrainerGoings = map[string]rating.StrikeRate{}
 	}
 	if a.HorseGoing == nil {
 		a.HorseGoing = map[string]rating.PlaceRate{}
@@ -93,6 +101,10 @@ func (a *Archive) Ingest(r domain.RaceResult) bool {
 				key := raceTypeSubjectKey(*f.JockeyID, r.Type)
 				a.JockeyRaceTypes[key] = bump(a.JockeyRaceTypes[key], won)
 			}
+			if bucket := r.Going.Bucket(r.Surface); bucket != "" {
+				key := goingSubjectKey(*f.JockeyID, r.Surface, bucket)
+				a.JockeyGoings[key] = bump(a.JockeyGoings[key], won)
+			}
 		}
 		if f.TrainerID != nil {
 			a.Trainers[*f.TrainerID] = bump(a.Trainers[*f.TrainerID], won)
@@ -103,6 +115,10 @@ func (a *Archive) Ingest(r domain.RaceResult) bool {
 			if r.Type != domain.RaceTypeUnknown {
 				key := raceTypeSubjectKey(*f.TrainerID, r.Type)
 				a.TrainerRaceTypes[key] = bump(a.TrainerRaceTypes[key], won)
+			}
+			if bucket := r.Going.Bucket(r.Surface); bucket != "" {
+				key := goingSubjectKey(*f.TrainerID, r.Surface, bucket)
+				a.TrainerGoings[key] = bump(a.TrainerGoings[key], won)
 			}
 		}
 		if f.Position.Kind == domain.PositionFinished {
@@ -137,6 +153,10 @@ func raceTypeSubjectKey(id string, raceType domain.RaceType) string {
 
 func horseGoingKey(horseID string, surface domain.Surface, bucket domain.GoingBucket) string {
 	return horseID + "|" + string(surface) + "|" + string(bucket)
+}
+
+func goingSubjectKey(id string, surface domain.Surface, bucket domain.GoingBucket) string {
+	return id + "|" + string(surface) + "|" + string(bucket)
 }
 
 // Merge adds another archive's counts for races this one has not seen. Used
@@ -184,6 +204,14 @@ func (a *Archive) Merge(other Archive) int {
 	for id, s := range other.TrainerRaceTypes {
 		current := a.TrainerRaceTypes[id]
 		a.TrainerRaceTypes[id] = rating.StrikeRate{Runs: current.Runs + s.Runs, Wins: current.Wins + s.Wins}
+	}
+	for id, s := range other.JockeyGoings {
+		current := a.JockeyGoings[id]
+		a.JockeyGoings[id] = rating.StrikeRate{Runs: current.Runs + s.Runs, Wins: current.Wins + s.Wins}
+	}
+	for id, s := range other.TrainerGoings {
+		current := a.TrainerGoings[id]
+		a.TrainerGoings[id] = rating.StrikeRate{Runs: current.Runs + s.Runs, Wins: current.Wins + s.Wins}
 	}
 	for id, s := range other.HorseGoing {
 		current := a.HorseGoing[id]
@@ -244,6 +272,18 @@ func (a *Archive) JockeyRaceTypeStrikeRate(id string, raceType domain.RaceType) 
 func (a *Archive) TrainerRaceTypeStrikeRate(id string, raceType domain.RaceType) (rating.StrikeRate, bool) {
 	a.index()
 	record, ok := a.TrainerRaceTypes[raceTypeSubjectKey(id, raceType)]
+	return record, ok
+}
+
+func (a *Archive) JockeyGoingStrikeRate(id string, surface domain.Surface, bucket domain.GoingBucket) (rating.StrikeRate, bool) {
+	a.index()
+	record, ok := a.JockeyGoings[goingSubjectKey(id, surface, bucket)]
+	return record, ok
+}
+
+func (a *Archive) TrainerGoingStrikeRate(id string, surface domain.Surface, bucket domain.GoingBucket) (rating.StrikeRate, bool) {
+	a.index()
+	record, ok := a.TrainerGoings[goingSubjectKey(id, surface, bucket)]
 	return record, ok
 }
 

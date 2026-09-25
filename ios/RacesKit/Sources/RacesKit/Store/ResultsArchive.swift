@@ -19,6 +19,8 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
     public private(set) var trainerSurfaces: [String: StrikeRate]
     public private(set) var jockeyRaceTypes: [String: StrikeRate]
     public private(set) var trainerRaceTypes: [String: StrikeRate]
+    public private(set) var jockeyGoings: [String: StrikeRate]
+    public private(set) var trainerGoings: [String: StrikeRate]
     public private(set) var horseGoing: [String: HorseGoingPlaceRate]
     public private(set) var horseOverall: [String: HorseGoingPlaceRate]
     public private(set) var ingestedRaceIDs: Set<String>
@@ -26,7 +28,7 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
     public private(set) var totalWins: Int
 
     private enum CodingKeys: String, CodingKey {
-        case jockeys, trainers, jockeySurfaces, trainerSurfaces, jockeyRaceTypes, trainerRaceTypes, horseGoing, horseOverall, ingestedRaceIDs, totalRuns, totalWins
+        case jockeys, trainers, jockeySurfaces, trainerSurfaces, jockeyRaceTypes, trainerRaceTypes, jockeyGoings, trainerGoings, horseGoing, horseOverall, ingestedRaceIDs, totalRuns, totalWins
     }
 
     public init(
@@ -36,6 +38,8 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
         trainerSurfaces: [String: StrikeRate] = [:],
         jockeyRaceTypes: [String: StrikeRate] = [:],
         trainerRaceTypes: [String: StrikeRate] = [:],
+        jockeyGoings: [String: StrikeRate] = [:],
+        trainerGoings: [String: StrikeRate] = [:],
         horseGoing: [String: HorseGoingPlaceRate] = [:],
         horseOverall: [String: HorseGoingPlaceRate] = [:],
         ingestedRaceIDs: Set<String> = [],
@@ -48,6 +52,8 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
         self.trainerSurfaces = trainerSurfaces
         self.jockeyRaceTypes = jockeyRaceTypes
         self.trainerRaceTypes = trainerRaceTypes
+        self.jockeyGoings = jockeyGoings
+        self.trainerGoings = trainerGoings
         self.horseGoing = horseGoing
         self.horseOverall = horseOverall
         self.ingestedRaceIDs = ingestedRaceIDs
@@ -64,6 +70,8 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
             trainerSurfaces: try values.decodeIfPresent([String: StrikeRate].self, forKey: .trainerSurfaces) ?? [:],
             jockeyRaceTypes: try values.decodeIfPresent([String: StrikeRate].self, forKey: .jockeyRaceTypes) ?? [:],
             trainerRaceTypes: try values.decodeIfPresent([String: StrikeRate].self, forKey: .trainerRaceTypes) ?? [:],
+            jockeyGoings: try values.decodeIfPresent([String: StrikeRate].self, forKey: .jockeyGoings) ?? [:],
+            trainerGoings: try values.decodeIfPresent([String: StrikeRate].self, forKey: .trainerGoings) ?? [:],
             horseGoing: try values.decodeIfPresent([String: HorseGoingPlaceRate].self, forKey: .horseGoing) ?? [:],
             horseOverall: try values.decodeIfPresent([String: HorseGoingPlaceRate].self, forKey: .horseOverall) ?? [:],
             ingestedRaceIDs: try values.decodeIfPresent(Set<String>.self, forKey: .ingestedRaceIDs) ?? [],
@@ -80,6 +88,8 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
         try values.encode(trainerSurfaces, forKey: .trainerSurfaces)
         try values.encode(jockeyRaceTypes, forKey: .jockeyRaceTypes)
         try values.encode(trainerRaceTypes, forKey: .trainerRaceTypes)
+        try values.encode(jockeyGoings, forKey: .jockeyGoings)
+        try values.encode(trainerGoings, forKey: .trainerGoings)
         try values.encode(horseGoing, forKey: .horseGoing)
         try values.encode(horseOverall, forKey: .horseOverall)
         try values.encode(ingestedRaceIDs, forKey: .ingestedRaceIDs)
@@ -114,6 +124,10 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
                     let key = Self.raceTypeKey(id: jockeyID, raceType: result.type)
                     jockeyRaceTypes[key] = increment(jockeyRaceTypes[key], won: won)
                 }
+                if let bucket = result.going.bucket(on: result.surface) {
+                    let key = Self.goingKey(id: jockeyID, surface: result.surface, bucket: bucket)
+                    jockeyGoings[key] = increment(jockeyGoings[key], won: won)
+                }
             }
             if let trainerID = finisher.trainerID {
                 trainers[trainerID] = increment(trainers[trainerID], won: won)
@@ -124,6 +138,10 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
                 if result.type != .unknown {
                     let key = Self.raceTypeKey(id: trainerID, raceType: result.type)
                     trainerRaceTypes[key] = increment(trainerRaceTypes[key], won: won)
+                }
+                if let bucket = result.going.bucket(on: result.surface) {
+                    let key = Self.goingKey(id: trainerID, surface: result.surface, bucket: bucket)
+                    trainerGoings[key] = increment(trainerGoings[key], won: won)
                 }
             }
             if let position = finisher.position.numericPosition {
@@ -167,6 +185,10 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
 
     private static func raceTypeKey(id: String, raceType: RaceType) -> String {
         "\(id)|\(raceType.rawValue)"
+    }
+
+    private static func goingKey(id: String, surface: Surface, bucket: HorseGoingBucket) -> String {
+        "\(id)|\(surface.rawValue)|\(bucket.rawValue)"
     }
 
     private static func horseGoingKey(horseID: String, surface: Surface, bucket: HorseGoingBucket) -> String {
@@ -223,5 +245,15 @@ extension ResultsArchive: HorseGoingProviding {
 
     public func horseOverallPlaceRate(horseID: String) -> HorseGoingPlaceRate? {
         horseOverall[horseID]
+    }
+}
+
+extension ResultsArchive: GoingStrikeRateProviding {
+    public func jockeyGoingStrikeRate(id: String, surface: Surface, bucket: HorseGoingBucket) -> StrikeRate? {
+        jockeyGoings[Self.goingKey(id: id, surface: surface, bucket: bucket)]
+    }
+
+    public func trainerGoingStrikeRate(id: String, surface: Surface, bucket: HorseGoingBucket) -> StrikeRate? {
+        trainerGoings[Self.goingKey(id: id, surface: surface, bucket: bucket)]
     }
 }

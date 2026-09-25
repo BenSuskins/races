@@ -35,6 +35,8 @@ const (
 	TrainerSurfaceStrikeRate  FactorID = "trainerSurfaceStrikeRate"
 	JockeyRaceTypeStrikeRate  FactorID = "jockeyRaceTypeStrikeRate"
 	TrainerRaceTypeStrikeRate FactorID = "trainerRaceTypeStrikeRate"
+	JockeyGoingStrikeRate     FactorID = "jockeyGoingStrikeRate"
+	TrainerGoingStrikeRate    FactorID = "trainerGoingStrikeRate"
 	HorseGoingPlaceRate       FactorID = "horseGoingPlaceRate"
 )
 
@@ -42,7 +44,7 @@ const (
 var AllFactors = []FactorID{
 	OfficialRating, HandicapBandPosition, RecentForm, WonLastTime, CompletionRate,
 	DaysSinceLastRun, Age, WeightCarried, Draw, Headgear, JockeyStrikeRate, TrainerStrikeRate,
-	JockeySurfaceStrikeRate, TrainerSurfaceStrikeRate, JockeyRaceTypeStrikeRate, TrainerRaceTypeStrikeRate, HorseGoingPlaceRate,
+	JockeySurfaceStrikeRate, TrainerSurfaceStrikeRate, JockeyRaceTypeStrikeRate, TrainerRaceTypeStrikeRate, JockeyGoingStrikeRate, TrainerGoingStrikeRate, HorseGoingPlaceRate,
 }
 
 // Label is the short name shown on screen.
@@ -80,6 +82,10 @@ func (f FactorID) Label() string {
 		return "Jockey strike rate by race type"
 	case TrainerRaceTypeStrikeRate:
 		return "Trainer strike rate by race type"
+	case JockeyGoingStrikeRate:
+		return "Jockey strike rate by going"
+	case TrainerGoingStrikeRate:
+		return "Trainer strike rate by going"
 	case HorseGoingPlaceRate:
 		return "Horse record by going"
 	}
@@ -121,6 +127,10 @@ func (f FactorID) Summary() string {
 		return "The jockey's win rate in this type of race, shrunk toward the jockey's overall record."
 	case TrainerRaceTypeStrikeRate:
 		return "The trainer's win rate in this type of race, shrunk toward the trainer's overall record."
+	case JockeyGoingStrikeRate:
+		return "The jockey's win rate on similar ground, shrunk toward the jockey's overall record."
+	case TrainerGoingStrikeRate:
+		return "The trainer's win rate on similar ground, shrunk toward the trainer's overall record."
 	case HorseGoingPlaceRate:
 		return "The horse's place rate on similar ground, shrunk toward its general record."
 	}
@@ -141,6 +151,8 @@ func (f FactorID) Rationale() string {
 		return "Surface cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
 	case JockeyRaceTypeStrikeRate, TrainerRaceTypeStrikeRate:
 		return "Race-type cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
+	case JockeyGoingStrikeRate, TrainerGoingStrikeRate:
+		return "Going cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
 	case HorseGoingPlaceRate:
 		return "The archive needs at least three completed runs in a going bucket. Its default weight is zero until replay supports it."
 	case WeightCarried:
@@ -251,6 +263,11 @@ type SurfaceStrikeRates interface {
 type RaceTypeStrikeRates interface {
 	JockeyRaceTypeStrikeRate(id string, raceType domain.RaceType) (StrikeRate, bool)
 	TrainerRaceTypeStrikeRate(id string, raceType domain.RaceType) (StrikeRate, bool)
+}
+
+type GoingStrikeRates interface {
+	JockeyGoingStrikeRate(id string, surface domain.Surface, bucket domain.GoingBucket) (StrikeRate, bool)
+	TrainerGoingStrikeRate(id string, surface domain.Surface, bucket domain.GoingBucket) (StrikeRate, bool)
 }
 
 type PlaceRate struct {

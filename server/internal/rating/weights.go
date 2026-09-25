@@ -63,6 +63,7 @@ func baseFactorWeights() map[string]float64 {
 		string(JockeyStrikeRate): 0.00, string(TrainerStrikeRate): 0.00,
 		string(JockeySurfaceStrikeRate): 0.00, string(TrainerSurfaceStrikeRate): 0.00,
 		string(JockeyRaceTypeStrikeRate): 0.00, string(TrainerRaceTypeStrikeRate): 0.00, string(HorseGoingPlaceRate): 0.00,
+		string(JockeyGoingStrikeRate): 0.00, string(TrainerGoingStrikeRate): 0.00,
 	}
 }
 

@@ -35,6 +35,8 @@ public struct RaceRater: Sendable {
             SurfaceStrikeRateFactor(subject: .trainer, minimumSample: weights.minimumStrikeRateSample),
             RaceTypeStrikeRateFactor(subject: .jockey, minimumSample: weights.minimumStrikeRateSample),
             RaceTypeStrikeRateFactor(subject: .trainer, minimumSample: weights.minimumStrikeRateSample),
+            GoingStrikeRateFactor(subject: .jockey, minimumSample: weights.minimumStrikeRateSample),
+            GoingStrikeRateFactor(subject: .trainer, minimumSample: weights.minimumStrikeRateSample),
             HorseGoingFactor(),
         ]
     }

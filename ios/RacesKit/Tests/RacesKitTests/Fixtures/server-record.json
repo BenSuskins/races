@@ -234,6 +234,30 @@
           }
         },
         {
+          "factor": "jockeyGoingStrikeRate",
+          "label": "Jockey strike rate by going",
+          "detail": "—",
+          "weight": 0,
+          "probabilityDelta": 0,
+          "availability": {
+            "missingData": {
+              "_0": "no record in this going archive yet"
+            }
+          }
+        },
+        {
+          "factor": "trainerGoingStrikeRate",
+          "label": "Trainer strike rate by going",
+          "detail": "—",
+          "weight": 0,
+          "probabilityDelta": 0,
+          "availability": {
+            "missingData": {
+              "_0": "no record in this going archive yet"
+            }
+          }
+        },
+        {
           "factor": "horseGoingPlaceRate",
           "label": "Horse record by going",
           "detail": "Field place prior (25%)",
@@ -446,6 +470,30 @@
           "availability": {
             "missingData": {
               "_0": "no record in this race-type archive yet"
+            }
+          }
+        },
+        {
+          "factor": "jockeyGoingStrikeRate",
+          "label": "Jockey strike rate by going",
+          "detail": "—",
+          "weight": 0,
+          "probabilityDelta": 0,
+          "availability": {
+            "missingData": {
+              "_0": "no record in this going archive yet"
+            }
+          }
+        },
+        {
+          "factor": "trainerGoingStrikeRate",
+          "label": "Trainer strike rate by going",
+          "detail": "—",
+          "weight": 0,
+          "probabilityDelta": 0,
+          "availability": {
+            "missingData": {
+              "_0": "no record in this going archive yet"
             }
           }
         },

@@ -341,6 +341,46 @@ public struct RaceTypeStrikeRateFactor: RatingFactor {
     }
 }
 
+public struct GoingStrikeRateFactor: RatingFactor {
+    public enum Subject: Sendable {
+        case jockey
+        case trainer
+    }
+
+    public let id: FactorID
+    public let minimumSample: Int
+    private let subject: Subject
+
+    public init(subject: Subject, minimumSample: Int = 30) {
+        self.subject = subject
+        self.minimumSample = minimumSample
+        self.id = subject == .jockey ? .jockeyGoingStrikeRate : .trainerGoingStrikeRate
+    }
+
+    public func value(for runner: Runner, in context: FactorContext) -> FactorValue {
+        guard let provider = context.goingStrikeRates else { return .missing("no going archive yet") }
+        guard let bucket = context.race.going.bucket(on: context.race.surface) else {
+            return .missing("going or surface is unknown")
+        }
+        let subjectID = subject == .jockey ? runner.jockeyID : runner.trainerID
+        guard let subjectID else { return .missing("not identified") }
+        let record = subject == .jockey
+            ? provider.jockeyGoingStrikeRate(id: subjectID, surface: context.race.surface, bucket: bucket)
+            : provider.trainerGoingStrikeRate(id: subjectID, surface: context.race.surface, bucket: bucket)
+        guard let record else { return .missing("no record in this going archive yet") }
+        guard record.runs >= minimumSample else {
+            return .missing("only \(record.runs) runs on similar ground")
+        }
+        let overall = subject == .jockey
+            ? provider.jockeyStrikeRate(id: subjectID)
+            : provider.trainerStrikeRate(id: subjectID)
+        let prior = overall?.smoothed(towards: provider.baselineStrikeRate) ?? provider.baselineStrikeRate
+        let smoothed = record.smoothed(towards: prior)
+        let percent = Int((smoothed * 100).rounded())
+        return .value(smoothed, "\(percent)% from \(record.runs) \(bucket.rawValue) going runs")
+    }
+}
+
 public struct HorseGoingFactor: RatingFactor {
     public let id: FactorID = .horseGoingPlaceRate
     public let minimumSample: Int
