@@ -17,12 +17,14 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
     public private(set) var trainers: [String: StrikeRate]
     public private(set) var jockeySurfaces: [String: StrikeRate]
     public private(set) var trainerSurfaces: [String: StrikeRate]
+    public private(set) var jockeyRaceTypes: [String: StrikeRate]
+    public private(set) var trainerRaceTypes: [String: StrikeRate]
     public private(set) var ingestedRaceIDs: Set<String>
     public private(set) var totalRuns: Int
     public private(set) var totalWins: Int
 
     private enum CodingKeys: String, CodingKey {
-        case jockeys, trainers, jockeySurfaces, trainerSurfaces, ingestedRaceIDs, totalRuns, totalWins
+        case jockeys, trainers, jockeySurfaces, trainerSurfaces, jockeyRaceTypes, trainerRaceTypes, ingestedRaceIDs, totalRuns, totalWins
     }
 
     public init(
@@ -30,6 +32,8 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
         trainers: [String: StrikeRate] = [:],
         jockeySurfaces: [String: StrikeRate] = [:],
         trainerSurfaces: [String: StrikeRate] = [:],
+        jockeyRaceTypes: [String: StrikeRate] = [:],
+        trainerRaceTypes: [String: StrikeRate] = [:],
         ingestedRaceIDs: Set<String> = [],
         totalRuns: Int = 0,
         totalWins: Int = 0
@@ -38,6 +42,8 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
         self.trainers = trainers
         self.jockeySurfaces = jockeySurfaces
         self.trainerSurfaces = trainerSurfaces
+        self.jockeyRaceTypes = jockeyRaceTypes
+        self.trainerRaceTypes = trainerRaceTypes
         self.ingestedRaceIDs = ingestedRaceIDs
         self.totalRuns = totalRuns
         self.totalWins = totalWins
@@ -50,6 +56,8 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
             trainers: try values.decodeIfPresent([String: StrikeRate].self, forKey: .trainers) ?? [:],
             jockeySurfaces: try values.decodeIfPresent([String: StrikeRate].self, forKey: .jockeySurfaces) ?? [:],
             trainerSurfaces: try values.decodeIfPresent([String: StrikeRate].self, forKey: .trainerSurfaces) ?? [:],
+            jockeyRaceTypes: try values.decodeIfPresent([String: StrikeRate].self, forKey: .jockeyRaceTypes) ?? [:],
+            trainerRaceTypes: try values.decodeIfPresent([String: StrikeRate].self, forKey: .trainerRaceTypes) ?? [:],
             ingestedRaceIDs: try values.decodeIfPresent(Set<String>.self, forKey: .ingestedRaceIDs) ?? [],
             totalRuns: try values.decodeIfPresent(Int.self, forKey: .totalRuns) ?? 0,
             totalWins: try values.decodeIfPresent(Int.self, forKey: .totalWins) ?? 0
@@ -62,6 +70,8 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
         try values.encode(trainers, forKey: .trainers)
         try values.encode(jockeySurfaces, forKey: .jockeySurfaces)
         try values.encode(trainerSurfaces, forKey: .trainerSurfaces)
+        try values.encode(jockeyRaceTypes, forKey: .jockeyRaceTypes)
+        try values.encode(trainerRaceTypes, forKey: .trainerRaceTypes)
         try values.encode(ingestedRaceIDs, forKey: .ingestedRaceIDs)
         try values.encode(totalRuns, forKey: .totalRuns)
         try values.encode(totalWins, forKey: .totalWins)
@@ -90,12 +100,20 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
                     let key = Self.surfaceKey(id: jockeyID, surface: result.surface)
                     jockeySurfaces[key] = increment(jockeySurfaces[key], won: won)
                 }
+                if result.type != .unknown {
+                    let key = Self.raceTypeKey(id: jockeyID, raceType: result.type)
+                    jockeyRaceTypes[key] = increment(jockeyRaceTypes[key], won: won)
+                }
             }
             if let trainerID = finisher.trainerID {
                 trainers[trainerID] = increment(trainers[trainerID], won: won)
                 if result.surface != .unknown {
                     let key = Self.surfaceKey(id: trainerID, surface: result.surface)
                     trainerSurfaces[key] = increment(trainerSurfaces[key], won: won)
+                }
+                if result.type != .unknown {
+                    let key = Self.raceTypeKey(id: trainerID, raceType: result.type)
+                    trainerRaceTypes[key] = increment(trainerRaceTypes[key], won: won)
                 }
             }
         }
@@ -118,6 +136,10 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
 
     private static func surfaceKey(id: String, surface: Surface) -> String {
         "\(id)|\(surface.rawValue)"
+    }
+
+    private static func raceTypeKey(id: String, raceType: RaceType) -> String {
+        "\(id)|\(raceType.rawValue)"
     }
 }
 
@@ -150,5 +172,15 @@ extension ResultsArchive: SurfaceStrikeRateProviding {
 
     public func trainerSurfaceStrikeRate(id: String, surface: Surface) -> StrikeRate? {
         trainerSurfaces[Self.surfaceKey(id: id, surface: surface)]
+    }
+}
+
+extension ResultsArchive: RaceTypeStrikeRateProviding {
+    public func jockeyRaceTypeStrikeRate(id: String, raceType: RaceType) -> StrikeRate? {
+        jockeyRaceTypes[Self.raceTypeKey(id: id, raceType: raceType)]
+    }
+
+    public func trainerRaceTypeStrikeRate(id: String, raceType: RaceType) -> StrikeRate? {
+        trainerRaceTypes[Self.raceTypeKey(id: id, raceType: raceType)]
     }
 }

@@ -329,6 +329,30 @@
                   "_0": "no record in this surface archive yet"
                 }
               }
+            },
+            {
+              "factor": "jockeyRaceTypeStrikeRate",
+              "label": "Jockey strike rate by race type",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no record in this race-type archive yet"
+                }
+              }
+            },
+            {
+              "factor": "trainerRaceTypeStrikeRate",
+              "label": "Trainer strike rate by race type",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no record in this race-type archive yet"
+                }
+              }
             }
           ]
         },
@@ -497,6 +521,30 @@
               "availability": {
                 "missingData": {
                   "_0": "no record in this surface archive yet"
+                }
+              }
+            },
+            {
+              "factor": "jockeyRaceTypeStrikeRate",
+              "label": "Jockey strike rate by race type",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no record in this race-type archive yet"
+                }
+              }
+            },
+            {
+              "factor": "trainerRaceTypeStrikeRate",
+              "label": "Trainer strike rate by race type",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no record in this race-type archive yet"
                 }
               }
             }
@@ -674,6 +722,30 @@
                   "_0": "no record in this surface archive yet"
                 }
               }
+            },
+            {
+              "factor": "jockeyRaceTypeStrikeRate",
+              "label": "Jockey strike rate by race type",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no record in this race-type archive yet"
+                }
+              }
+            },
+            {
+              "factor": "trainerRaceTypeStrikeRate",
+              "label": "Trainer strike rate by race type",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no record in this race-type archive yet"
+                }
+              }
             }
           ]
         },
@@ -842,6 +914,30 @@
               "availability": {
                 "missingData": {
                   "_0": "no record in this surface archive yet"
+                }
+              }
+            },
+            {
+              "factor": "jockeyRaceTypeStrikeRate",
+              "label": "Jockey strike rate by race type",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no record in this race-type archive yet"
+                }
+              }
+            },
+            {
+              "factor": "trainerRaceTypeStrikeRate",
+              "label": "Trainer strike rate by race type",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no record in this race-type archive yet"
                 }
               }
             }
@@ -1028,6 +1124,30 @@
                   "_0": "no record in this surface archive yet"
                 }
               }
+            },
+            {
+              "factor": "jockeyRaceTypeStrikeRate",
+              "label": "Jockey strike rate by race type",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no record in this race-type archive yet"
+                }
+              }
+            },
+            {
+              "factor": "trainerRaceTypeStrikeRate",
+              "label": "Trainer strike rate by race type",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no record in this race-type archive yet"
+                }
+              }
             }
           ]
         },
@@ -1197,6 +1317,30 @@
               "availability": {
                 "missingData": {
                   "_0": "no record in this surface archive yet"
+                }
+              }
+            },
+            {
+              "factor": "jockeyRaceTypeStrikeRate",
+              "label": "Jockey strike rate by race type",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no record in this race-type archive yet"
+                }
+              }
+            },
+            {
+              "factor": "trainerRaceTypeStrikeRate",
+              "label": "Trainer strike rate by race type",
+              "detail": "—",
+              "weight": 0,
+              "probabilityDelta": 0,
+              "availability": {
+                "missingData": {
+                  "_0": "no record in this race-type archive yet"
                 }
               }
             }
@@ -1385,6 +1529,30 @@
               "_0": "no record in this surface archive yet"
             }
           }
+        },
+        {
+          "factor": "jockeyRaceTypeStrikeRate",
+          "label": "Jockey strike rate by race type",
+          "detail": "—",
+          "weight": 0,
+          "probabilityDelta": 0,
+          "availability": {
+            "missingData": {
+              "_0": "no record in this race-type archive yet"
+            }
+          }
+        },
+        {
+          "factor": "trainerRaceTypeStrikeRate",
+          "label": "Trainer strike rate by race type",
+          "detail": "—",
+          "weight": 0,
+          "probabilityDelta": 0,
+          "availability": {
+            "missingData": {
+              "_0": "no record in this race-type archive yet"
+            }
+          }
         }
       ],
       "createdAt": "2026-09-20T09:00:00Z"
@@ -1564,6 +1732,30 @@
           "availability": {
             "missingData": {
               "_0": "no record in this surface archive yet"
+            }
+          }
+        },
+        {
+          "factor": "jockeyRaceTypeStrikeRate",
+          "label": "Jockey strike rate by race type",
+          "detail": "—",
+          "weight": 0,
+          "probabilityDelta": 0,
+          "availability": {
+            "missingData": {
+              "_0": "no record in this race-type archive yet"
+            }
+          }
+        },
+        {
+          "factor": "trainerRaceTypeStrikeRate",
+          "label": "Trainer strike rate by race type",
+          "detail": "—",
+          "weight": 0,
+          "probabilityDelta": 0,
+          "availability": {
+            "missingData": {
+              "_0": "no record in this race-type archive yet"
             }
           }
         }

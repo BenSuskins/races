@@ -19,27 +19,29 @@ import (
 type FactorID string
 
 const (
-	OfficialRating           FactorID = "officialRating"
-	HandicapBandPosition     FactorID = "handicapBandPosition"
-	RecentForm               FactorID = "recentForm"
-	WonLastTime              FactorID = "wonLastTime"
-	CompletionRate           FactorID = "completionRate"
-	DaysSinceLastRun         FactorID = "daysSinceLastRun"
-	Age                      FactorID = "age"
-	WeightCarried            FactorID = "weightCarried"
-	Draw                     FactorID = "draw"
-	Headgear                 FactorID = "headgear"
-	JockeyStrikeRate         FactorID = "jockeyStrikeRate"
-	TrainerStrikeRate        FactorID = "trainerStrikeRate"
-	JockeySurfaceStrikeRate  FactorID = "jockeySurfaceStrikeRate"
-	TrainerSurfaceStrikeRate FactorID = "trainerSurfaceStrikeRate"
+	OfficialRating            FactorID = "officialRating"
+	HandicapBandPosition      FactorID = "handicapBandPosition"
+	RecentForm                FactorID = "recentForm"
+	WonLastTime               FactorID = "wonLastTime"
+	CompletionRate            FactorID = "completionRate"
+	DaysSinceLastRun          FactorID = "daysSinceLastRun"
+	Age                       FactorID = "age"
+	WeightCarried             FactorID = "weightCarried"
+	Draw                      FactorID = "draw"
+	Headgear                  FactorID = "headgear"
+	JockeyStrikeRate          FactorID = "jockeyStrikeRate"
+	TrainerStrikeRate         FactorID = "trainerStrikeRate"
+	JockeySurfaceStrikeRate   FactorID = "jockeySurfaceStrikeRate"
+	TrainerSurfaceStrikeRate  FactorID = "trainerSurfaceStrikeRate"
+	JockeyRaceTypeStrikeRate  FactorID = "jockeyRaceTypeStrikeRate"
+	TrainerRaceTypeStrikeRate FactorID = "trainerRaceTypeStrikeRate"
 )
 
 // AllFactors in declaration order, which is also the rater's order.
 var AllFactors = []FactorID{
 	OfficialRating, HandicapBandPosition, RecentForm, WonLastTime, CompletionRate,
 	DaysSinceLastRun, Age, WeightCarried, Draw, Headgear, JockeyStrikeRate, TrainerStrikeRate,
-	JockeySurfaceStrikeRate, TrainerSurfaceStrikeRate,
+	JockeySurfaceStrikeRate, TrainerSurfaceStrikeRate, JockeyRaceTypeStrikeRate, TrainerRaceTypeStrikeRate,
 }
 
 // Label is the short name shown on screen.
@@ -73,6 +75,10 @@ func (f FactorID) Label() string {
 		return "Jockey strike rate by surface"
 	case TrainerSurfaceStrikeRate:
 		return "Trainer strike rate by surface"
+	case JockeyRaceTypeStrikeRate:
+		return "Jockey strike rate by race type"
+	case TrainerRaceTypeStrikeRate:
+		return "Trainer strike rate by race type"
 	}
 	return string(f)
 }
@@ -108,6 +114,10 @@ func (f FactorID) Summary() string {
 		return "The jockey's win rate on this surface, shrunk toward the jockey's overall record."
 	case TrainerSurfaceStrikeRate:
 		return "The trainer's win rate on this surface, shrunk toward the trainer's overall record."
+	case JockeyRaceTypeStrikeRate:
+		return "The jockey's win rate in this type of race, shrunk toward the jockey's overall record."
+	case TrainerRaceTypeStrikeRate:
+		return "The trainer's win rate in this type of race, shrunk toward the trainer's overall record."
 	}
 	return ""
 }
@@ -124,6 +134,8 @@ func (f FactorID) Rationale() string {
 		return "Legitimate, but derived from an archive that starts empty. It switches on once enough race days have been collected."
 	case JockeySurfaceStrikeRate, TrainerSurfaceStrikeRate:
 		return "Surface cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
+	case JockeyRaceTypeStrikeRate, TrainerRaceTypeStrikeRate:
+		return "Race-type cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
 	case WeightCarried:
 		return "Near zero on purpose: in a handicap, weight is the handicapper's equaliser, so it substantially double-counts the official rating."
 	}
@@ -227,6 +239,11 @@ type StrikeRates interface {
 type SurfaceStrikeRates interface {
 	JockeySurfaceStrikeRate(id string, surface domain.Surface) (StrikeRate, bool)
 	TrainerSurfaceStrikeRate(id string, surface domain.Surface) (StrikeRate, bool)
+}
+
+type RaceTypeStrikeRates interface {
+	JockeyRaceTypeStrikeRate(id string, raceType domain.RaceType) (StrikeRate, bool)
+	TrainerRaceTypeStrikeRate(id string, raceType domain.RaceType) (StrikeRate, bool)
 }
 
 // Context is everything a factor may look at beyond the runner.

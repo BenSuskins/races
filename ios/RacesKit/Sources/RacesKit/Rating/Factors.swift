@@ -302,3 +302,41 @@ public struct SurfaceStrikeRateFactor: RatingFactor {
         return .value(smoothed, "\(percent)% from \(record.runs) \(context.race.surface.displayName.lowercased()) runs")
     }
 }
+
+public struct RaceTypeStrikeRateFactor: RatingFactor {
+    public enum Subject: Sendable {
+        case jockey
+        case trainer
+    }
+
+    public let id: FactorID
+    public let minimumSample: Int
+    private let subject: Subject
+
+    public init(subject: Subject, minimumSample: Int = 30) {
+        self.subject = subject
+        self.minimumSample = minimumSample
+        self.id = subject == .jockey ? .jockeyRaceTypeStrikeRate : .trainerRaceTypeStrikeRate
+    }
+
+    public func value(for runner: Runner, in context: FactorContext) -> FactorValue {
+        guard let provider = context.raceTypeStrikeRates else { return .missing("no race-type archive yet") }
+        guard context.race.type != .unknown else { return .missing("race type is unknown") }
+        let subjectID = subject == .jockey ? runner.jockeyID : runner.trainerID
+        guard let subjectID else { return .missing("not identified") }
+        let record = subject == .jockey
+            ? provider.jockeyRaceTypeStrikeRate(id: subjectID, raceType: context.race.type)
+            : provider.trainerRaceTypeStrikeRate(id: subjectID, raceType: context.race.type)
+        guard let record else { return .missing("no record in this race-type archive yet") }
+        guard record.runs >= minimumSample else {
+            return .missing("only \(record.runs) runs in this race type")
+        }
+        let overall = subject == .jockey
+            ? provider.jockeyStrikeRate(id: subjectID)
+            : provider.trainerStrikeRate(id: subjectID)
+        let prior = overall?.smoothed(towards: provider.baselineStrikeRate) ?? provider.baselineStrikeRate
+        let smoothed = record.smoothed(towards: prior)
+        let percent = Int((smoothed * 100).rounded())
+        return .value(smoothed, "\(percent)% from \(record.runs) \(context.race.type.displayName.lowercased()) runs")
+    }
+}

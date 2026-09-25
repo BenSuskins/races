@@ -188,6 +188,62 @@ type surfaceStrikeRate struct {
 	minimumSample int
 }
 
+type raceTypeStrikeRate struct {
+	jockey        bool
+	minimumSample int
+}
+
+func (f raceTypeStrikeRate) ID() FactorID {
+	if f.jockey {
+		return JockeyRaceTypeStrikeRate
+	}
+	return TrainerRaceTypeStrikeRate
+}
+
+func (f raceTypeStrikeRate) Value(r domain.Runner, ctx Context) FactorValue {
+	if ctx.StrikeRates == nil {
+		return missing("no results archive yet")
+	}
+	provider, ok := ctx.StrikeRates.(RaceTypeStrikeRates)
+	if !ok {
+		return missing("no race-type archive yet")
+	}
+	if ctx.Race.Type == domain.RaceTypeUnknown {
+		return missing("race type is unknown")
+	}
+	subject := r.TrainerID
+	if f.jockey {
+		subject = r.JockeyID
+	}
+	if subject == nil {
+		return missing("not identified")
+	}
+	var record StrikeRate
+	if f.jockey {
+		record, ok = provider.JockeyRaceTypeStrikeRate(*subject, ctx.Race.Type)
+	} else {
+		record, ok = provider.TrainerRaceTypeStrikeRate(*subject, ctx.Race.Type)
+	}
+	if !ok {
+		return missing("no record in this race-type archive yet")
+	}
+	if record.Runs < f.minimumSample {
+		return missing(fmt.Sprintf("only %d runs in this race type", record.Runs))
+	}
+	prior := ctx.StrikeRates.BaselineStrikeRate()
+	var overall StrikeRate
+	if f.jockey {
+		overall, ok = ctx.StrikeRates.JockeyStrikeRate(*subject)
+	} else {
+		overall, ok = ctx.StrikeRates.TrainerStrikeRate(*subject)
+	}
+	if ok {
+		prior = overall.Smoothed(prior, 20)
+	}
+	smoothed := record.Smoothed(prior, 20)
+	return value(smoothed, fmt.Sprintf("%d%% from %d %s runs", int(math.Round(smoothed*100)), record.Runs, ctx.Race.Type))
+}
+
 func (f surfaceStrikeRate) ID() FactorID {
 	if f.jockey {
 		return JockeySurfaceStrikeRate
@@ -283,5 +339,7 @@ func DefaultFactors(w Weights) []Factor {
 		strikeRate{jockey: false, minimumSample: w.MinimumStrikeRateSample},
 		surfaceStrikeRate{jockey: true, minimumSample: w.MinimumStrikeRateSample},
 		surfaceStrikeRate{jockey: false, minimumSample: w.MinimumStrikeRateSample},
+		raceTypeStrikeRate{jockey: true, minimumSample: w.MinimumStrikeRateSample},
+		raceTypeStrikeRate{jockey: false, minimumSample: w.MinimumStrikeRateSample},
 	}
 }

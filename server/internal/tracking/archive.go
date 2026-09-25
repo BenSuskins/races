@@ -13,19 +13,21 @@ import (
 //
 // The JSON is ResultsArchive's, so a device's archive seeds this one.
 type Archive struct {
-	Jockeys         map[string]rating.StrikeRate `json:"jockeys"`
-	Trainers        map[string]rating.StrikeRate `json:"trainers"`
-	JockeySurfaces  map[string]rating.StrikeRate `json:"jockeySurfaces,omitempty"`
-	TrainerSurfaces map[string]rating.StrikeRate `json:"trainerSurfaces,omitempty"`
-	IngestedRaceIDs []string                     `json:"ingestedRaceIDs"`
-	TotalRuns       int                          `json:"totalRuns"`
-	TotalWins       int                          `json:"totalWins"`
+	Jockeys          map[string]rating.StrikeRate `json:"jockeys"`
+	Trainers         map[string]rating.StrikeRate `json:"trainers"`
+	JockeySurfaces   map[string]rating.StrikeRate `json:"jockeySurfaces,omitempty"`
+	TrainerSurfaces  map[string]rating.StrikeRate `json:"trainerSurfaces,omitempty"`
+	JockeyRaceTypes  map[string]rating.StrikeRate `json:"jockeyRaceTypes,omitempty"`
+	TrainerRaceTypes map[string]rating.StrikeRate `json:"trainerRaceTypes,omitempty"`
+	IngestedRaceIDs  []string                     `json:"ingestedRaceIDs"`
+	TotalRuns        int                          `json:"totalRuns"`
+	TotalWins        int                          `json:"totalWins"`
 
 	ingested map[string]bool
 }
 
 func NewArchive() *Archive {
-	return &Archive{Jockeys: map[string]rating.StrikeRate{}, Trainers: map[string]rating.StrikeRate{}, JockeySurfaces: map[string]rating.StrikeRate{}, TrainerSurfaces: map[string]rating.StrikeRate{}, ingested: map[string]bool{}}
+	return &Archive{Jockeys: map[string]rating.StrikeRate{}, Trainers: map[string]rating.StrikeRate{}, JockeySurfaces: map[string]rating.StrikeRate{}, TrainerSurfaces: map[string]rating.StrikeRate{}, JockeyRaceTypes: map[string]rating.StrikeRate{}, TrainerRaceTypes: map[string]rating.StrikeRate{}, ingested: map[string]bool{}}
 }
 
 func (a *Archive) index() {
@@ -48,6 +50,12 @@ func (a *Archive) index() {
 	}
 	if a.TrainerSurfaces == nil {
 		a.TrainerSurfaces = map[string]rating.StrikeRate{}
+	}
+	if a.JockeyRaceTypes == nil {
+		a.JockeyRaceTypes = map[string]rating.StrikeRate{}
+	}
+	if a.TrainerRaceTypes == nil {
+		a.TrainerRaceTypes = map[string]rating.StrikeRate{}
 	}
 }
 
@@ -73,12 +81,20 @@ func (a *Archive) Ingest(r domain.RaceResult) bool {
 				key := surfaceSubjectKey(*f.JockeyID, r.Surface)
 				a.JockeySurfaces[key] = bump(a.JockeySurfaces[key], won)
 			}
+			if r.Type != domain.RaceTypeUnknown {
+				key := raceTypeSubjectKey(*f.JockeyID, r.Type)
+				a.JockeyRaceTypes[key] = bump(a.JockeyRaceTypes[key], won)
+			}
 		}
 		if f.TrainerID != nil {
 			a.Trainers[*f.TrainerID] = bump(a.Trainers[*f.TrainerID], won)
 			if r.Surface != domain.SurfaceUnknown {
 				key := surfaceSubjectKey(*f.TrainerID, r.Surface)
 				a.TrainerSurfaces[key] = bump(a.TrainerSurfaces[key], won)
+			}
+			if r.Type != domain.RaceTypeUnknown {
+				key := raceTypeSubjectKey(*f.TrainerID, r.Type)
+				a.TrainerRaceTypes[key] = bump(a.TrainerRaceTypes[key], won)
 			}
 		}
 	}
@@ -87,6 +103,10 @@ func (a *Archive) Ingest(r domain.RaceResult) bool {
 
 func surfaceSubjectKey(id string, surface domain.Surface) string {
 	return id + "|" + string(surface)
+}
+
+func raceTypeSubjectKey(id string, raceType domain.RaceType) string {
+	return id + "|" + string(raceType)
 }
 
 // Merge adds another archive's counts for races this one has not seen. Used
@@ -127,6 +147,14 @@ func (a *Archive) Merge(other Archive) int {
 		current := a.TrainerSurfaces[id]
 		a.TrainerSurfaces[id] = rating.StrikeRate{Runs: current.Runs + s.Runs, Wins: current.Wins + s.Wins}
 	}
+	for id, s := range other.JockeyRaceTypes {
+		current := a.JockeyRaceTypes[id]
+		a.JockeyRaceTypes[id] = rating.StrikeRate{Runs: current.Runs + s.Runs, Wins: current.Wins + s.Wins}
+	}
+	for id, s := range other.TrainerRaceTypes {
+		current := a.TrainerRaceTypes[id]
+		a.TrainerRaceTypes[id] = rating.StrikeRate{Runs: current.Runs + s.Runs, Wins: current.Wins + s.Wins}
+	}
 	a.TotalRuns += other.TotalRuns
 	a.TotalWins += other.TotalWins
 	for _, id := range other.IngestedRaceIDs {
@@ -166,6 +194,18 @@ func (a *Archive) JockeySurfaceStrikeRate(id string, surface domain.Surface) (ra
 func (a *Archive) TrainerSurfaceStrikeRate(id string, surface domain.Surface) (rating.StrikeRate, bool) {
 	a.index()
 	record, ok := a.TrainerSurfaces[surfaceSubjectKey(id, surface)]
+	return record, ok
+}
+
+func (a *Archive) JockeyRaceTypeStrikeRate(id string, raceType domain.RaceType) (rating.StrikeRate, bool) {
+	a.index()
+	record, ok := a.JockeyRaceTypes[raceTypeSubjectKey(id, raceType)]
+	return record, ok
+}
+
+func (a *Archive) TrainerRaceTypeStrikeRate(id string, raceType domain.RaceType) (rating.StrikeRate, bool) {
+	a.index()
+	record, ok := a.TrainerRaceTypes[raceTypeSubjectKey(id, raceType)]
 	return record, ok
 }
 

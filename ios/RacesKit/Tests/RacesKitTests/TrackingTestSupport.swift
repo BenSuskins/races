@@ -53,7 +53,8 @@ enum TestResult {
         finishing: [(String, String)],
         startingPrices: [String: Double] = [:],
         jockeys: [String: String] = [:],
-        trainers: [String: String] = [:]
+        trainers: [String: String] = [:],
+        type: RaceType = .flat
     ) -> RaceResult {
         RaceResult(
             id: id,
@@ -62,7 +63,7 @@ enum TestResult {
             date: "2026-09-20",
             going: .good,
             surface: .turf,
-            type: .flat,
+            type: type,
             finishers: finishing.map { horseID, position in
                 Finisher(
                     horseID: horseID,

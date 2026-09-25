@@ -17,6 +17,8 @@ final class ResultsArchiveTests: XCTestCase {
         let archive = try JSONDecoder().decode(ResultsArchive.self, from: legacy)
         XCTAssertTrue(archive.jockeySurfaces.isEmpty)
         XCTAssertTrue(archive.trainerSurfaces.isEmpty)
+        XCTAssertTrue(archive.jockeyRaceTypes.isEmpty)
+        XCTAssertTrue(archive.trainerRaceTypes.isEmpty)
     }
 
     func test_ingestingBuildsStrikeRates() throws {
@@ -118,6 +120,45 @@ final class ResultsArchiveTests: XCTestCase {
             in: FactorContext(race: allWeather, strikeRates: archive)
         )
         XCTAssertEqual(missing.availability, .missingData("no record in this surface archive yet"))
+    }
+
+    func test_raceTypeArchiveSeparatesFlatAndJumpsAndRequiresThirtyRuns() {
+        var archive = ResultsArchive()
+        for index in 1...30 {
+            archive.ingest(TestResult.result(
+                id: "flat_\(index)",
+                finishing: [("a", index <= 10 ? "1" : "2"), ("b", index <= 10 ? "2" : "1")],
+                jockeys: ["a": "hot"],
+                trainers: ["a": "stable"]
+            ))
+        }
+        archive.ingest(TestResult.result(
+            id: "hurdle_1",
+            finishing: [("a", "1"), ("b", "2")],
+            jockeys: ["a": "hot"], trainers: ["a": "stable"], type: .hurdle
+        ))
+        XCTAssertEqual(archive.jockeyRaceTypeStrikeRate(id: "hot", raceType: .flat), StrikeRate(runs: 30, wins: 10))
+        XCTAssertEqual(archive.trainerRaceTypeStrikeRate(id: "stable", raceType: .flat), StrikeRate(runs: 30, wins: 10))
+        XCTAssertEqual(archive.jockeyRaceTypeStrikeRate(id: "hot", raceType: .hurdle), StrikeRate(runs: 1, wins: 1))
+
+        let race = TestRace.race(type: .flat, runners: [
+            TestRace.runner("a", jockeyID: "hot", trainerID: "stable"), TestRace.runner("b")
+        ])
+        let context = FactorContext(race: race, strikeRates: archive)
+        let reading = RaceTypeStrikeRateFactor(subject: .jockey).value(for: race.runners[0], in: context)
+        XCTAssertTrue(reading.availability.isAvailable)
+        XCTAssertEqual(reading.raw ?? 0, 0.30588235294117644, accuracy: 0.000001)
+
+        let hurdleRace = TestRace.race(type: .hurdle, runners: race.runners)
+        let missing = RaceTypeStrikeRateFactor(subject: .jockey).value(
+            for: hurdleRace.runners[0], in: FactorContext(race: hurdleRace, strikeRates: archive)
+        )
+        XCTAssertEqual(missing.availability, .missingData("only 1 runs in this race type"))
+        let unknownRace = TestRace.race(type: .unknown, runners: race.runners)
+        let unknown = RaceTypeStrikeRateFactor(subject: .jockey).value(
+            for: unknownRace.runners[0], in: FactorContext(race: unknownRace, strikeRates: archive)
+        )
+        XCTAssertEqual(unknown.availability, .missingData("race type is unknown"))
     }
 
     // MARK: - Baseline

@@ -17,6 +17,8 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
     case trainerStrikeRate
     case jockeySurfaceStrikeRate
     case trainerSurfaceStrikeRate
+    case jockeyRaceTypeStrikeRate
+    case trainerRaceTypeStrikeRate
 
     public var label: String {
         switch self {
@@ -34,6 +36,8 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
         case .trainerStrikeRate: return "Trainer strike rate"
         case .jockeySurfaceStrikeRate: return "Jockey strike rate by surface"
         case .trainerSurfaceStrikeRate: return "Trainer strike rate by surface"
+        case .jockeyRaceTypeStrikeRate: return "Jockey strike rate by race type"
+        case .trainerRaceTypeStrikeRate: return "Trainer strike rate by race type"
         }
     }
 
@@ -72,6 +76,10 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
             return "The jockey's win rate on this surface, shrunk toward the jockey's overall record."
         case .trainerSurfaceStrikeRate:
             return "The trainer's win rate on this surface, shrunk toward the trainer's overall record."
+        case .jockeyRaceTypeStrikeRate:
+            return "The jockey's win rate in this type of race, shrunk toward the jockey's overall record."
+        case .trainerRaceTypeStrikeRate:
+            return "The trainer's win rate in this type of race, shrunk toward the trainer's overall record."
         }
     }
 
@@ -93,6 +101,8 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
             return "Legitimate, but derived from an archive that starts empty. It switches on once enough race days have been collected."
         case .jockeySurfaceStrikeRate, .trainerSurfaceStrikeRate:
             return "Surface cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
+        case .jockeyRaceTypeStrikeRate, .trainerRaceTypeStrikeRate:
+            return "Race-type cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
         case .weightCarried:
             return "Near zero on purpose: in a handicap, weight is the handicapper's equaliser, so it substantially double-counts the official rating."
         case .officialRating, .handicapBandPosition, .recentForm, .wonLastTime,
@@ -168,11 +178,13 @@ public struct FactorContext: Sendable {
     /// enough history to be worth consulting.
     public let strikeRates: (any StrikeRateProviding)?
     public let surfaceStrikeRates: (any SurfaceStrikeRateProviding)?
+    public let raceTypeStrikeRates: (any RaceTypeStrikeRateProviding)?
 
-    public init(race: Race, strikeRates: (any StrikeRateProviding)? = nil, surfaceStrikeRates: (any SurfaceStrikeRateProviding)? = nil) {
+    public init(race: Race, strikeRates: (any StrikeRateProviding)? = nil, surfaceStrikeRates: (any SurfaceStrikeRateProviding)? = nil, raceTypeStrikeRates: (any RaceTypeStrikeRateProviding)? = nil) {
         self.race = race
         self.strikeRates = strikeRates
         self.surfaceStrikeRates = surfaceStrikeRates ?? (strikeRates as? any SurfaceStrikeRateProviding)
+        self.raceTypeStrikeRates = raceTypeStrikeRates ?? (strikeRates as? any RaceTypeStrikeRateProviding)
     }
 }
 
@@ -226,4 +238,9 @@ public protocol StrikeRateProviding: Sendable {
 public protocol SurfaceStrikeRateProviding: StrikeRateProviding {
     func jockeySurfaceStrikeRate(id: String, surface: Surface) -> StrikeRate?
     func trainerSurfaceStrikeRate(id: String, surface: Surface) -> StrikeRate?
+}
+
+public protocol RaceTypeStrikeRateProviding: StrikeRateProviding {
+    func jockeyRaceTypeStrikeRate(id: String, raceType: RaceType) -> StrikeRate?
+    func trainerRaceTypeStrikeRate(id: String, raceType: RaceType) -> StrikeRate?
 }

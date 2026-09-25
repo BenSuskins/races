@@ -69,9 +69,10 @@ func fullMarket() *domain.MarketSnapshot {
 var epoch = time.Unix(0, 0)
 
 type fakeStrikeRates struct {
-	jockeys, trainers               map[string]StrikeRate
-	jockeySurfaces, trainerSurfaces map[string]StrikeRate
-	baseline                        float64
+	jockeys, trainers                 map[string]StrikeRate
+	jockeySurfaces, trainerSurfaces   map[string]StrikeRate
+	jockeyRaceTypes, trainerRaceTypes map[string]StrikeRate
+	baseline                          float64
 }
 
 func (f fakeStrikeRates) JockeyStrikeRate(id string) (StrikeRate, bool) {
@@ -89,6 +90,14 @@ func (f fakeStrikeRates) JockeySurfaceStrikeRate(id string, surface domain.Surfa
 }
 func (f fakeStrikeRates) TrainerSurfaceStrikeRate(id string, surface domain.Surface) (StrikeRate, bool) {
 	rate, ok := f.trainerSurfaces[id+"|"+string(surface)]
+	return rate, ok
+}
+func (f fakeStrikeRates) JockeyRaceTypeStrikeRate(id string, raceType domain.RaceType) (StrikeRate, bool) {
+	rate, ok := f.jockeyRaceTypes[id+"|"+string(raceType)]
+	return rate, ok
+}
+func (f fakeStrikeRates) TrainerRaceTypeStrikeRate(id string, raceType domain.RaceType) (StrikeRate, bool) {
+	rate, ok := f.trainerRaceTypes[id+"|"+string(raceType)]
 	return rate, ok
 }
 
@@ -525,6 +534,32 @@ func TestSurfaceStrikeRateShrinksMatureCellsToTheGeneralRecord(t *testing.T) {
 	}
 }
 
+func TestRaceTypeStrikeRateRequiresThirtyRunsAndShrinksToTheGeneralRecord(t *testing.T) {
+	archive := fakeStrikeRates{
+		jockeys:         map[string]StrikeRate{"jockey": {Runs: 100, Wins: 20}},
+		jockeyRaceTypes: map[string]StrikeRate{"jockey|flat": {Runs: 30, Wins: 10}},
+		baseline:        0.125,
+	}
+	factor := raceTypeStrikeRate{jockey: true, minimumSample: 30}
+	r := runner("horse", runnerOpts{jockey: sp("jockey")})
+	context := Context{Race: domain.Race{Type: domain.RaceTypeFlat}, StrikeRates: archive}
+	reading := factor.Value(r, context)
+	if reading.Raw == nil || !near(*reading.Raw, 0.275, 1e-9) || reading.Availability.Kind != Available {
+		t.Fatalf("race-type record was not shrunk to the general record: %#v", reading)
+	}
+	archive.jockeyRaceTypes["jockey|flat"] = StrikeRate{Runs: 29, Wins: 10}
+	context.StrikeRates = archive
+	reading = factor.Value(r, context)
+	if reading.Raw != nil || reading.Availability.Kind != MissingData {
+		t.Fatalf("race-type record below the sample floor must be missing: %#v", reading)
+	}
+	context.Race.Type = domain.RaceTypeUnknown
+	reading = factor.Value(r, context)
+	if reading.Raw != nil || reading.Availability.Reason != "race type is unknown" {
+		t.Fatalf("unknown race type must be missing: %#v", reading)
+	}
+}
+
 // FactorDescriptionTests: every factor has copy, the presets name every
 // factor, and the set of deliberate zeros does not change silently.
 func TestFactorDescriptions(t *testing.T) {
@@ -544,7 +579,7 @@ func TestFactorDescriptions(t *testing.T) {
 			}
 		}
 	}
-	want := map[FactorID]bool{Draw: true, Headgear: true, JockeyStrikeRate: true, TrainerStrikeRate: true, JockeySurfaceStrikeRate: true, TrainerSurfaceStrikeRate: true}
+	want := map[FactorID]bool{Draw: true, Headgear: true, JockeyStrikeRate: true, TrainerStrikeRate: true, JockeySurfaceStrikeRate: true, TrainerSurfaceStrikeRate: true, JockeyRaceTypeStrikeRate: true, TrainerRaceTypeStrikeRate: true}
 	if len(zeros) != len(want) {
 		t.Fatal("the set of deliberate zeros changed", zeros)
 	}
