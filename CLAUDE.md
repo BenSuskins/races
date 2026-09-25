@@ -398,6 +398,12 @@ live in Ansible Vault, and only the server sees them.
   and returns `nil` where none is needed: it compares the **current UTC offset**
   rather than the zone identifier, so Europe/Dublin is not nagged for a zone that
   keeps London's clock all year.
+- **Odds are always fractional on screen, never decimal, and there is no
+  setting.** Betfair and the server speak decimal — `marketBackPrice`,
+  `fairOdds`, starting prices — and that is right for the maths, but anything
+  the app *shows* as odds goes through `FractionalOdds.display(decimal:)`,
+  which snaps to the traditional ladder ("5/2", "Evens", "4/6"). A raw
+  `.formatted(.number…)` on a price is the bug.
 - **`Date.FormatStyle.timeZone(_:)` is not the counterpart of `.locale(_:)`,
   and the mistake compiles nowhere but reads perfectly.** `.locale(locale)`
   returns a style using that locale, so `.timeZone(timeZone)` looks like it does
