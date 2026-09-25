@@ -77,6 +77,13 @@ func ApplyOverrides(base rating.Weights, variant SweepVariant) (rating.Weights, 
 			}
 			out.OverroundMethod = method
 			continue
+		case "formPoints":
+			var points map[string]float64
+			if err := json.Unmarshal(raw, &points); err != nil || !validFormPoints(points) {
+				return rating.Weights{}, fmt.Errorf("invalid formPoints curve")
+			}
+			out.FormPoints = points
+			continue
 		case "marketExponent", "formInfluence", "formInfluenceNoMarket", "clip", "minimumMarketCoverage", "formDecay", "formSeasonBreakPenalty", "formLongBreakPenalty", "minimumValueEdge", "minimumValueProbability":
 			if err := json.Unmarshal(raw, &number); err != nil || math.IsNaN(number) || math.IsInf(number, 0) {
 				return rating.Weights{}, fmt.Errorf("invalid numeric override %q", field)
@@ -157,6 +164,31 @@ func ApplyOverrides(base rating.Weights, variant SweepVariant) (rating.Weights, 
 		}
 	}
 	return out, nil
+}
+
+func validFormPoints(points map[string]float64) bool {
+	defaults := rating.DefaultFormPoints()
+	if len(points) != len(defaults) {
+		return false
+	}
+	for key := range defaults {
+		value, ok := points[key]
+		if !ok || math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value > 1 {
+			return false
+		}
+	}
+	previous := 1.0
+	for position := 1; position <= 9; position++ {
+		value := points[fmt.Sprint(position)]
+		if value > previous {
+			return false
+		}
+		previous = value
+	}
+	if points["tenOrWorse"] > previous || points["nonCompletion"] != 0 {
+		return false
+	}
+	return true
 }
 
 // Arm is one model's performance over the replayed races.

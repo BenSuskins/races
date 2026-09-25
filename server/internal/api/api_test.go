@@ -249,10 +249,12 @@ func TestManualWeightsAreValidatedAndActivatedAtomically(t *testing.T) {
 
 func TestBacktestSweepUsesOneCorpusAndRejectsUnknownOverrides(t *testing.T) {
 	s, _ := setup(t)
+	formPoints := rating.DefaultFormPoints()
+	formPoints["2"], formPoints["3"] = 0.8, 0.6
 	request := map[string]any{
 		"weightsID": "v3",
 		"variants": []any{
-			map[string]any{"name": "decay-low", "overrides": map[string]any{"formDecay": 0.4}},
+			map[string]any{"name": "decay-low", "overrides": map[string]any{"formDecay": 0.4, "formPoints": formPoints}},
 			map[string]any{"name": "power", "overrides": map[string]any{"overroundMethod": "power"}},
 		},
 	}
