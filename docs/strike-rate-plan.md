@@ -1,7 +1,8 @@
 # Improving the strike rate — a plan
 
 Written 2026-09-25 against a Record tab reading 25 wins from 70 settled tips
-(35.7%) with the favourite at 31.8%. This is the order of work for making the
+(35.7%) with the favourite at 31.8%, and revised the same day when `v3` merged
+and made the tip the most likely winner. This is the order of work for making the
 model pick more winners, with what each step needs, what it costs and what it
 cannot tell us. It is a plan, not a result: nothing below is proven until the
 back-test says so.
@@ -32,24 +33,30 @@ month. Every item below that says "back-test" means "wait for that corpus,
 then run it", and the earlier items are the ones whose cost is lowest while
 waiting.
 
-### Strike rate and return pull in opposite directions
+### Strike rate and return pull in opposite directions, and `v3` has chosen
 
-The selection rule (`docs/selection.md`) picks the runner with the largest
-value edge over 5%, not the most likely winner. That is why 25 of the 66
-benchmarked tips disagreed with the favourite. It lowers strike rate on
-purpose, in exchange for price. The highest-strike-rate policy available is
-"back the favourite", which wins about a third of UK races and loses money.
+Until `v3` the selection rule (`docs/selection.md`) picked the runner with the
+largest value edge over 5%, not the most likely winner. That is why 25 of the
+66 benchmarked tips disagreed with the favourite: every one of them is a `v2`
+or uploaded tip. Value selection lowers strike rate on purpose, in exchange
+for price.
 
-So the first decision is the objective:
+`v3` switches that off. The tip is now the runner the model gives the best
+chance, whatever its price, so the selection layer is no longer where strike
+rate is lost. Two consequences for this plan:
 
-- **Strike rate** — tighten selection towards the favourite; expect ROI to fall.
-- **Return** — keep value selection; expect strike rate near or below the
-  favourite's and judge on ROI over the disagreed subset.
+- **Everything that can still move strike rate is in the probability model**:
+  the market anchor, the de-vig, the factors and their weights. Selection
+  tuning is off the table until the back-test shows value selection earning
+  its keep, which is what 0.3 measures.
+- **The Record tab now mixes two populations.** `weightsID` keeps `v2` and
+  `v3` tips apart on the server, but the tab reads the whole record. Until it
+  says which set a number belongs to, a `v3` strike rate cannot be read off
+  the screen at all; that is 0.5.
 
-The plan below assumes strike rate is the target, because that is what was
-asked, but it keeps the probability model and the selection policy separate so
-the same work serves either. Item 0.3 makes the cost of the choice visible in
-every back-test run rather than leaving it as an argument.
+The highest-strike-rate policy available is still "back the favourite", which
+wins about a third of UK races and loses money. Everything below is judged on
+whether the model beats that on the same races.
 
 ---
 
@@ -90,12 +97,14 @@ what stops a run of good days being read as a result.
 
 **Owner: Claude. Medium. Server only.**
 
-`backtest.Run` reports one model arm: the value selection. Add a second,
-`highestProbability`, over the same races, so every run shows what the
-selection policy costs or earns in strike rate and ROI against picking the
-model's most likely winner. Also report the agree/disagree split per arm, as
-the Record tab does, since the disagreed subset is where the model's own
-information is.
+`backtest.Run` reports one model arm: whatever `Selection()` returns for the
+weights under test, which under `v3` is the most likely winner and under `v2`
+the value pick. Report both arms over the same races whatever the weights,
+`highestProbability` and `valueSelection`, so every run shows what value
+selection would have cost or earned in strike rate and ROI. That is the
+evidence for keeping it off, or the case for bringing it back, and today it
+does not exist. Also report the agree/disagree split per arm, as the Record
+tab does, since the disagreed subset is where the model's own information is.
 
 Add a `sweep` shape to `POST /v1/backtests`: a base weight set plus a list of
 field overrides, returning one report per variant with a shared race set. The
@@ -116,6 +125,17 @@ stays read-only; this is a server admin call behind the same token, used from
 the command line after a back-test, never from the app. `weightsID` on every
 tip keeps the populations apart in `GET /v1/record?weightsID=`.
 
+### 0.5 Show the record by weight set
+
+**Owner: Claude. Small. App only.**
+
+The server already returns `weightsInUse` with the record and takes
+`?weightsID=`. The Record tab should default to the active set and say so,
+with the whole record and each earlier set a tap away. Without this the
+headline mixes `v2` value picks, uploaded history and `v3` chance picks, and
+the one question the tab exists to answer, whether the current model beats
+the favourite, has no number on screen.
+
 ---
 
 ## Phase 1 — cheap, reversible, no new data
@@ -133,33 +153,33 @@ over-prices longshots and the value selector then sees edge on exactly those
 runners. The power method (`Σ pᵢ^k = 1`) is implemented and one field away:
 `overroundMethod: "power"`.
 
-Sweep: `{proportional, power}` × the current weights. Promote if log loss does
-not worsen and strike rate rises, which is the expected direction.
+Under `v3` the phantom-edge route is closed, but the bias still reaches the
+tip: an over-priced outsider carries an inflated market probability into the
+blend, and a form nudge on top can lift it past a fairly priced runner. Sweep
+`{proportional, power}` × the current weights. Promote if log loss does not
+worsen and strike rate rises, which is the expected direction.
 
 - Pros: implemented, one field, corrects a known bias in the direction wanted.
 - Cons: fewer disagreements with the favourite, so the disagreed subset fills
   more slowly.
 
-### 1.2 Tighten the selection gates
+### 1.2 Measure what `v3` gave up, and whether any gate would beat it
 
-**Owner: Claude runs the sweep; Ben decides. Sweep, plus one small tunable.**
+**Owner: Claude runs the sweep; Ben decides. Sweep only, no code.**
 
-The 8% probability floor and 5% edge threshold are stated as unfitted starting
-points. Sweep `minimumValueProbability ∈ {0.08, 0.12, 0.15, 0.20}` ×
-`minimumValueEdge ∈ {0.05, 0.10, 0.15}`. Read strike rate and ROI on both
-arms from 0.3.
+`v3` is the strike-rate end of the selection trade. The sweep that remains is
+the check on it: `v2` against `v3` over the same races through 0.3, and then a
+grid of gates, `minimumValueProbability ∈ {0.12, 0.15, 0.20, 0.30}` ×
+`minimumValueEdge ∈ {0.05, 0.10, 0.15}`, to see whether any value gate beats
+the most likely winner on the chosen objective. The expected answer is that
+none does on strike rate and some do on ROI, and the point of running it is
+to have that as a number rather than a belief.
 
-Add one tunable, `maximumValuePrice` (decimal odds, default none), so the
-selector cannot reach for a 14/1 shot on thin edge whatever the floor. It is
-a new field on `Weights`, so it needs: the Go struct, the Swift
-`RatingWeights` with a **decodable default** (the kit's Codable is synthesised,
-so a required field would break decoding of every stored weight set and every
-cached record), the parity golden regenerated, and a row on the Model tab.
-
-- Pros: directly targets strike rate; cheap; reversible; the probability
-  model and its log loss are untouched, so calibration stays measurable.
-- Cons: fewer disagreements, so ROI likely falls and the agree/disagree split
-  grows slower.
+Nothing new is added to `Weights` for this. A price cap or other gate is only
+worth its place once a sweep shows value selection coming back, and any new
+field would need a decodable default in the kit (its Codable is synthesised,
+so a required field breaks every stored set and cached record), the parity
+golden regenerated, and a row on the Model tab.
 
 ### 1.3 Record the decision
 
@@ -300,10 +320,11 @@ manual sweeps and becomes something the server does to itself, which is what
 | 1 | 0.1 Same denominator on the Record tab | nothing | S | Claude |
 | 2 | 0.2 Wilson interval on screen | nothing | S | Claude |
 | 3 | 0.4 Install a weight set | nothing | S | Claude |
-| 4 | 0.3 Second arm, sweep shape, script | nothing | M | Claude |
+| 4 | 0.3 Both arms, sweep shape, script | nothing | M | Claude |
+| 4a | 0.5 Record by weight set | nothing | S | Claude |
 | 5 | 2.4 (first step) keep every display snapshot | nothing | S | Claude |
 | 6 | 1.1 Power de-vig sweep | ~200 sealed races, 0.3 | run | Claude, Ben decides |
-| 7 | 1.2 Selection gate sweep + `maximumValuePrice` | 0.3, 1.1 | S + run | Claude, Ben decides |
+| 7 | 1.2 `v2` vs `v3`, and the gate sweep | 0.3, 1.1 | run | Claude, Ben decides |
 | 8 | 2.1 As-of-seal archive reads | nothing | S | Claude |
 | 9 | 2.3 Class-adjusted form | 8 | L | Claude |
 | 10 | 2.4 `marketMove` factor | 5 | M | Claude |
@@ -311,8 +332,8 @@ manual sweeps and becomes something the server does to itself, which is what
 | 12 | 4 Training over the re-rated corpus | 500 races, 7 | L | Claude |
 
 Items 1 to 5 and 8 can go in now, in one or two PRs, while the corpus fills.
-Items 6 and 7 are the first that change what the app tips, and they are the
-ones most likely to move strike rate quickly. Items 9 and 10 are where the
+Item 6 is the first that changes what the app tips; item 7 is a check on the
+choice `v3` already made, not a change. Items 9 and 10 are where the
 model can learn something the market has not already priced, and with paid
 data off the table they are the ceiling on what this plan can reach.
 
@@ -321,9 +342,9 @@ data off the table they are the ceiling on what this plan can reach.
 - The power method or the tighter gates raise strike rate but push model log
   loss above the market's plus 0.005. That is the model being made worse to
   look better, and `docs/algorithm.md`'s bar exists to catch it.
-- The highest-probability arm beats value selection on ROI as well as strike
-  rate over a few hundred races. Then value selection is not earning its keep
-  and should be switched off, not tuned.
+- Value selection beats the most likely winner on ROI *and* holds its strike
+  rate within the favourite's interval over a few hundred races. Then `v3`
+  gave up return for nothing, and the gate should come back as a new set.
 - The model's interval never separates from the favourite's after the corpus
   reaches a few hundred races and items 9 and 10 are live. Then the honest
   answer is that the free-tier factors do not add to the market. The model
