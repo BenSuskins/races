@@ -14,22 +14,23 @@ import (
 //
 // The JSON is ResultsArchive's, so a device's archive seeds this one.
 type Archive struct {
-	Jockeys          map[string]rating.StrikeRate `json:"jockeys"`
-	Trainers         map[string]rating.StrikeRate `json:"trainers"`
-	JockeySurfaces   map[string]rating.StrikeRate `json:"jockeySurfaces,omitempty"`
-	TrainerSurfaces  map[string]rating.StrikeRate `json:"trainerSurfaces,omitempty"`
-	JockeyRaceTypes  map[string]rating.StrikeRate `json:"jockeyRaceTypes,omitempty"`
-	TrainerRaceTypes map[string]rating.StrikeRate `json:"trainerRaceTypes,omitempty"`
-	JockeyGoings     map[string]rating.StrikeRate `json:"jockeyGoings,omitempty"`
-	TrainerGoings    map[string]rating.StrikeRate `json:"trainerGoings,omitempty"`
-	HorseGoing       map[string]rating.PlaceRate  `json:"horseGoing,omitempty"`
-	HorseOverall     map[string]rating.PlaceRate  `json:"horseOverall,omitempty"`
-	JockeyRecent     map[string][]RecentRun       `json:"jockeyRecent,omitempty"`
-	TrainerRecent    map[string][]RecentRun       `json:"trainerRecent,omitempty"`
-	JockeyTrainer    map[string]rating.StrikeRate `json:"jockeyTrainerPairs,omitempty"`
-	IngestedRaceIDs  []string                     `json:"ingestedRaceIDs"`
-	TotalRuns        int                          `json:"totalRuns"`
-	TotalWins        int                          `json:"totalWins"`
+	Jockeys          map[string]rating.StrikeRate   `json:"jockeys"`
+	Trainers         map[string]rating.StrikeRate   `json:"trainers"`
+	JockeySurfaces   map[string]rating.StrikeRate   `json:"jockeySurfaces,omitempty"`
+	TrainerSurfaces  map[string]rating.StrikeRate   `json:"trainerSurfaces,omitempty"`
+	JockeyRaceTypes  map[string]rating.StrikeRate   `json:"jockeyRaceTypes,omitempty"`
+	TrainerRaceTypes map[string]rating.StrikeRate   `json:"trainerRaceTypes,omitempty"`
+	JockeyGoings     map[string]rating.StrikeRate   `json:"jockeyGoings,omitempty"`
+	TrainerGoings    map[string]rating.StrikeRate   `json:"trainerGoings,omitempty"`
+	HorseGoing       map[string]rating.PlaceRate    `json:"horseGoing,omitempty"`
+	HorseOverall     map[string]rating.PlaceRate    `json:"horseOverall,omitempty"`
+	JockeyRecent     map[string][]RecentRun         `json:"jockeyRecent,omitempty"`
+	TrainerRecent    map[string][]RecentRun         `json:"trainerRecent,omitempty"`
+	JockeyTrainer    map[string]rating.StrikeRate   `json:"jockeyTrainerPairs,omitempty"`
+	DrawBias         map[string]rating.DrawBiasRate `json:"drawBias,omitempty"`
+	IngestedRaceIDs  []string                       `json:"ingestedRaceIDs"`
+	TotalRuns        int                            `json:"totalRuns"`
+	TotalWins        int                            `json:"totalWins"`
 
 	ingested map[string]bool
 }
@@ -45,7 +46,7 @@ type RecentRun struct {
 const RecentRunWindow = 50
 
 func NewArchive() *Archive {
-	return &Archive{Jockeys: map[string]rating.StrikeRate{}, Trainers: map[string]rating.StrikeRate{}, JockeySurfaces: map[string]rating.StrikeRate{}, TrainerSurfaces: map[string]rating.StrikeRate{}, JockeyRaceTypes: map[string]rating.StrikeRate{}, TrainerRaceTypes: map[string]rating.StrikeRate{}, JockeyGoings: map[string]rating.StrikeRate{}, TrainerGoings: map[string]rating.StrikeRate{}, HorseGoing: map[string]rating.PlaceRate{}, HorseOverall: map[string]rating.PlaceRate{}, JockeyRecent: map[string][]RecentRun{}, TrainerRecent: map[string][]RecentRun{}, JockeyTrainer: map[string]rating.StrikeRate{}, ingested: map[string]bool{}}
+	return &Archive{Jockeys: map[string]rating.StrikeRate{}, Trainers: map[string]rating.StrikeRate{}, JockeySurfaces: map[string]rating.StrikeRate{}, TrainerSurfaces: map[string]rating.StrikeRate{}, JockeyRaceTypes: map[string]rating.StrikeRate{}, TrainerRaceTypes: map[string]rating.StrikeRate{}, JockeyGoings: map[string]rating.StrikeRate{}, TrainerGoings: map[string]rating.StrikeRate{}, HorseGoing: map[string]rating.PlaceRate{}, HorseOverall: map[string]rating.PlaceRate{}, JockeyRecent: map[string][]RecentRun{}, TrainerRecent: map[string][]RecentRun{}, JockeyTrainer: map[string]rating.StrikeRate{}, DrawBias: map[string]rating.DrawBiasRate{}, ingested: map[string]bool{}}
 }
 
 func (a *Archive) index() {
@@ -95,6 +96,9 @@ func (a *Archive) index() {
 	}
 	if a.JockeyTrainer == nil {
 		a.JockeyTrainer = map[string]rating.StrikeRate{}
+	}
+	if a.DrawBias == nil {
+		a.DrawBias = map[string]rating.DrawBiasRate{}
 	}
 }
 
@@ -157,6 +161,17 @@ func (a *Archive) Ingest(r domain.RaceResult) bool {
 		if f.JockeyID != nil && f.TrainerID != nil {
 			key := jockeyTrainerKey(*f.JockeyID, *f.TrainerID)
 			a.JockeyTrainer[key] = bump(a.JockeyTrainer[key], won)
+		}
+		if f.Draw != nil {
+			if key, ok := domain.DrawBiasCellKey(r.CourseName, r.Distance, r.Surface, r.Going, len(r.Finishers), *f.Draw); ok {
+				record := a.DrawBias[key]
+				record.Runs++
+				record.ExpectedWins += 1 / float64(len(r.Finishers))
+				if won {
+					record.Wins++
+				}
+				a.DrawBias[key] = record
+			}
 		}
 		if f.Position.Kind == domain.PositionFinished {
 			placed := f.Position.Position <= 3
@@ -304,6 +319,10 @@ func (a *Archive) Merge(other Archive) int {
 		current := a.JockeyTrainer[id]
 		a.JockeyTrainer[id] = rating.StrikeRate{Runs: current.Runs + record.Runs, Wins: current.Wins + record.Wins}
 	}
+	for key, record := range other.DrawBias {
+		current := a.DrawBias[key]
+		a.DrawBias[key] = rating.DrawBiasRate{Runs: current.Runs + record.Runs, Wins: current.Wins + record.Wins, ExpectedWins: current.ExpectedWins + record.ExpectedWins}
+	}
 	a.TotalRuns += other.TotalRuns
 	a.TotalWins += other.TotalWins
 	for _, id := range other.IngestedRaceIDs {
@@ -383,6 +402,23 @@ func (a *Archive) TrainerRecentStrikeRate(id string) (rating.StrikeRate, bool) {
 func (a *Archive) JockeyTrainerStrikeRate(jockeyID, trainerID string) (rating.StrikeRate, bool) {
 	a.index()
 	record, ok := a.JockeyTrainer[jockeyTrainerKey(jockeyID, trainerID)]
+	return record, ok
+}
+
+func (a *Archive) DrawBiasRate(race domain.Race, runner domain.Runner) (rating.DrawBiasRate, bool) {
+	a.index()
+	if runner.Draw == nil {
+		return rating.DrawBiasRate{}, false
+	}
+	fieldSize := len(race.Runners)
+	if race.FieldSize != nil && *race.FieldSize > 0 {
+		fieldSize = *race.FieldSize
+	}
+	key, ok := domain.DrawBiasCellKey(race.CourseName, race.Distance, race.Surface, race.Going, fieldSize, *runner.Draw)
+	if !ok {
+		return rating.DrawBiasRate{}, false
+	}
+	record, ok := a.DrawBias[key]
 	return record, ok
 }
 

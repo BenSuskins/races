@@ -150,7 +150,7 @@ func (weightCarried) Value(r domain.Runner, _ Context) FactorValue {
 	return value(-float64(*r.WeightPounds), display)
 }
 
-// draw is present but deliberately inert: there is no bias data to use.
+// draw reads historical performance from comparable course and race contexts.
 type draw struct{}
 
 func (draw) ID() FactorID { return Draw }
@@ -161,7 +161,23 @@ func (draw) Value(r domain.Runner, ctx Context) FactorValue {
 	if r.Draw == nil {
 		return missing("no draw published")
 	}
-	return notApplicable("no draw-bias data for this course yet", fmt.Sprintf("Stall %d", *r.Draw))
+	if ctx.StrikeRates == nil {
+		return missing("no results archive yet")
+	}
+	provider, ok := ctx.StrikeRates.(DrawBiasRates)
+	if !ok {
+		return missing("no draw-bias archive yet")
+	}
+	record, ok := provider.DrawBiasRate(ctx.Race, r)
+	if !ok {
+		return missing("no comparable draw archive yet")
+	}
+	if record.Runs < 100 {
+		return missing(fmt.Sprintf("only %d comparable starters for this draw", record.Runs))
+	}
+	prior := record.ExpectedWins / float64(record.Runs)
+	smoothed := (float64(record.Wins) + prior*20) / (float64(record.Runs) + 20)
+	return value(smoothed, fmt.Sprintf("%d%% from %d comparable starters", int(math.Round(smoothed*100)), record.Runs))
 }
 
 // headgear is inert: the signal is first-time headgear, which needs history.

@@ -75,6 +75,8 @@ type fakeStrikeRates struct {
 	jockeyGoings, trainerGoings       map[string]StrikeRate
 	jockeyRecent, trainerRecent       map[string]StrikeRate
 	jockeyTrainer                     map[string]StrikeRate
+	drawBiasRecord                    DrawBiasRate
+	drawBiasExists                    bool
 	horseGoings                       map[string]PlaceRate
 	horseOverall                      map[string]PlaceRate
 	baseline                          float64
@@ -100,6 +102,9 @@ func (f fakeStrikeRates) TrainerRecentStrikeRate(id string) (StrikeRate, bool) {
 func (f fakeStrikeRates) JockeyTrainerStrikeRate(jockeyID, trainerID string) (StrikeRate, bool) {
 	rate, ok := f.jockeyTrainer[jockeyID+"|"+trainerID]
 	return rate, ok
+}
+func (f fakeStrikeRates) DrawBiasRate(domain.Race, domain.Runner) (DrawBiasRate, bool) {
+	return f.drawBiasRecord, f.drawBiasExists
 }
 func (f fakeStrikeRates) JockeySurfaceStrikeRate(id string, surface domain.Surface) (StrikeRate, bool) {
 	rate, ok := f.jockeySurfaces[id+"|"+string(surface)]
@@ -348,8 +353,8 @@ func TestFactorReadings(t *testing.T) {
 	if v := (weightCarried{}).Value(runner("a", runnerOpts{weight: ip(133)}), ctx); v.Display != "9-07" {
 		t.Fatal(v.Display)
 	}
-	if v := (draw{}).Value(runner("a", runnerOpts{draw: ip(3)}), ctx); v.Raw != nil || v.Display != "Stall 3" {
-		t.Fatal("draw is shown, not used")
+	if v := (draw{}).Value(runner("a", runnerOpts{draw: ip(3)}), ctx); v.Raw != nil || v.Availability.Kind != MissingData {
+		t.Fatal("draw without an archive must remain missing")
 	}
 	if v := (headgear{}).Value(runner("a", runnerOpts{headgear: sp("b")}), ctx); v.Display != "Wearing b" || v.Availability.Kind != RequiresPaidTier {
 		t.Fatal("headgear")
@@ -675,6 +680,25 @@ func TestJockeyTrainerInteractionNeedsMaturePairAndIndividualRecords(t *testing.
 	reading = factor.Value(r, Context{StrikeRates: archive})
 	if reading.Raw != nil || reading.Availability.Reason != "jockey and trainer need enough individual runs" {
 		t.Fatalf("interaction must require mature individual records: %#v", reading)
+	}
+}
+
+func TestDrawBiasUsesComparableStartsAndRequiresOneHundred(t *testing.T) {
+	factor := draw{}
+	r := runner("horse", runnerOpts{draw: ip(2)})
+	context := Context{Race: domain.Race{Type: domain.RaceTypeFlat}, StrikeRates: fakeStrikeRates{
+		drawBiasRecord: DrawBiasRate{Runs: 100, Wins: 20, ExpectedWins: 10}, drawBiasExists: true,
+	}}
+	reading := factor.Value(r, context)
+	if reading.Raw == nil || reading.Availability.Kind != Available || !near(*reading.Raw, 22.0/120.0, 1e-9) {
+		t.Fatalf("mature draw cell was not shrunk to its expected rate: %#v", reading)
+	}
+	archive := context.StrikeRates.(fakeStrikeRates)
+	archive.drawBiasRecord.Runs = 99
+	context.StrikeRates = archive
+	reading = factor.Value(r, context)
+	if reading.Raw != nil || reading.Availability.Reason != "only 99 comparable starters for this draw" {
+		t.Fatalf("thin draw cell must remain missing: %#v", reading)
 	}
 }
 

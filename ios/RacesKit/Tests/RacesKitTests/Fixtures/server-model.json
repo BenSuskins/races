@@ -340,9 +340,9 @@
     },
     {
       "id": "draw",
-      "label": "Draw",
-      "summary": "Stall number.",
-      "rationale": "Draw bias is real, but it is a course × distance × going × field-size interaction. Without a bias table it is noise, so the code ships switched off."
+      "label": "Draw bias",
+      "summary": "Historical win rate for the draw band in this course, distance, going, and field-size context.",
+      "rationale": "Draw bias uses course, distance, going, field-size, and draw bands. Cells need 100 comparable starters; the default weight is zero until walk-forward evidence supports it."
     },
     {
       "id": "headgear",

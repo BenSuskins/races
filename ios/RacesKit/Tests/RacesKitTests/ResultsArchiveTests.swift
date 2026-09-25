@@ -295,6 +295,41 @@ final class ResultsArchiveTests: XCTestCase {
         XCTAssertEqual(missing.availability, .missingData("only 29 runs for this jockey-trainer pair"))
     }
 
+    func test_drawBiasArchiveMeasuresBroadCellsAndRequiresOneHundredComparableStarts() throws {
+        var archive = ResultsArchive()
+        for raceIndex in 1...100 {
+            let winnerDraw = raceIndex <= 60 ? 2 : 12
+            let finishers = (1...12).map { draw in (String(draw), draw == winnerDraw ? "1" : "2") }
+            archive.ingest(TestResult.result(
+                id: "draw-race-\(raceIndex)", courseName: "Ascot", distance: Distance(exactFurlongs: 5),
+                finishing: finishers, draws: Dictionary(uniqueKeysWithValues: (1...12).map { (String($0), $0) })
+            ))
+        }
+        let race = TestRace.race(
+            distance: Distance(exactFurlongs: 5), fieldSize: 12,
+            runners: [TestRace.runner("2", draw: 2)]
+        )
+        let runner = race.runners[0]
+        let record = try XCTUnwrap(archive.drawBiasRate(race: race, runner: runner))
+        XCTAssertEqual(record.runs, 400)
+        XCTAssertEqual(record.wins, 60)
+        XCTAssertEqual(record.expectedWins, 100.0 / 3.0, accuracy: 0.000001)
+        let reading = DrawFactor().value(for: runner, in: FactorContext(race: race, strikeRates: archive))
+        XCTAssertTrue(reading.availability.isAvailable)
+        XCTAssertEqual(reading.raw ?? 0, 0.14682539682539683, accuracy: 0.000001)
+
+        var thinArchive = ResultsArchive()
+        for raceIndex in 1...24 {
+            let finishers = (1...12).map { (String($0), $0 == 2 ? "1" : "2") }
+            thinArchive.ingest(TestResult.result(
+                id: "thin-draw-\(raceIndex)", distance: Distance(exactFurlongs: 5),
+                finishing: finishers, draws: Dictionary(uniqueKeysWithValues: (1...12).map { (String($0), $0) })
+            ))
+        }
+        let thin = DrawFactor().value(for: runner, in: FactorContext(race: race, strikeRates: thinArchive))
+        XCTAssertEqual(thin.availability, .missingData("only 96 comparable starters for this draw"))
+    }
+
     // MARK: - Baseline
 
     /// Until there is enough archive to measure it, the baseline is a stated

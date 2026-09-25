@@ -70,7 +70,7 @@ func (f FactorID) Label() string {
 	case WeightCarried:
 		return "Weight carried"
 	case Draw:
-		return "Draw"
+		return "Draw bias"
 	case Headgear:
 		return "Headgear"
 	case JockeyStrikeRate:
@@ -121,7 +121,7 @@ func (f FactorID) Summary() string {
 	case WeightCarried:
 		return "Pounds carried, negated so less is better."
 	case Draw:
-		return "Stall number."
+		return "Historical win rate for the draw band in this course, distance, going, and field-size context."
 	case Headgear:
 		return "Blinkers, a visor, a hood, cheekpieces."
 	case JockeyStrikeRate:
@@ -157,7 +157,7 @@ func (f FactorID) Summary() string {
 func (f FactorID) Rationale() string {
 	switch f {
 	case Draw:
-		return "Draw bias is real, but it is a course × distance × going × field-size interaction. Without a bias table it is noise, so the code ships switched off."
+		return "Draw bias uses course, distance, going, field-size, and draw bands. Cells need 100 comparable starters; the default weight is zero until walk-forward evidence supports it."
 	case Headgear:
 		return "The signal is *first-time* headgear, and the free tier has no headgear history to detect it with."
 	case JockeyStrikeRate, TrainerStrikeRate:
@@ -287,6 +287,16 @@ type RaceTypeStrikeRates interface {
 type GoingStrikeRates interface {
 	JockeyGoingStrikeRate(id string, surface domain.Surface, bucket domain.GoingBucket) (StrikeRate, bool)
 	TrainerGoingStrikeRate(id string, surface domain.Surface, bucket domain.GoingBucket) (StrikeRate, bool)
+}
+
+type DrawBiasRate struct {
+	Runs         int     `json:"runs"`
+	Wins         int     `json:"wins"`
+	ExpectedWins float64 `json:"expectedWins"`
+}
+
+type DrawBiasRates interface {
+	DrawBiasRate(race domain.Race, runner domain.Runner) (DrawBiasRate, bool)
 }
 
 type RecentStrikeRates interface {

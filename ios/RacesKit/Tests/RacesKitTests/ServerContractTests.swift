@@ -35,7 +35,7 @@ final class ServerContractTests: XCTestCase {
         XCTAssertFalse(tip.contributions.isEmpty)
         XCTAssertEqual(
             tip.contributions.first { $0.factor == .draw }?.availability,
-            .notApplicable("no draw-bias data for this course yet"))
+            .missingData("no comparable draw archive yet"))
 
         let wetherby = try XCTUnwrap(card.results["rac_1002"])
         XCTAssertEqual(wetherby.finisher(horseID: "hrs_5")?.position, .pulledUp)

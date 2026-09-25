@@ -36,7 +36,7 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
         case .daysSinceLastRun: return "Days since last run"
         case .age: return "Age"
         case .weightCarried: return "Weight carried"
-        case .draw: return "Draw"
+        case .draw: return "Draw bias"
         case .headgear: return "Headgear"
         case .jockeyStrikeRate: return "Jockey strike rate"
         case .trainerStrikeRate: return "Trainer strike rate"
@@ -76,6 +76,8 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
             return "Age against the race's own age band."
         case .weightCarried:
             return "Pounds carried, negated so less is better."
+        case .draw:
+            return "Historical win rate for the draw band in this course, distance, going, and field-size context."
         case .draw:
             return "Stall number."
         case .headgear:
@@ -215,8 +217,9 @@ public struct FactorContext: Sendable {
     public let horseGoingRates: (any HorseGoingProviding)?
     public let recentStrikeRates: (any RecentStrikeRateProviding)?
     public let jockeyTrainerStrikeRates: (any JockeyTrainerStrikeRateProviding)?
+    public let drawBiasRates: (any DrawBiasProviding)?
 
-    public init(race: Race, strikeRates: (any StrikeRateProviding)? = nil, surfaceStrikeRates: (any SurfaceStrikeRateProviding)? = nil, raceTypeStrikeRates: (any RaceTypeStrikeRateProviding)? = nil, goingStrikeRates: (any GoingStrikeRateProviding)? = nil, horseGoingRates: (any HorseGoingProviding)? = nil, recentStrikeRates: (any RecentStrikeRateProviding)? = nil, jockeyTrainerStrikeRates: (any JockeyTrainerStrikeRateProviding)? = nil) {
+    public init(race: Race, strikeRates: (any StrikeRateProviding)? = nil, surfaceStrikeRates: (any SurfaceStrikeRateProviding)? = nil, raceTypeStrikeRates: (any RaceTypeStrikeRateProviding)? = nil, goingStrikeRates: (any GoingStrikeRateProviding)? = nil, horseGoingRates: (any HorseGoingProviding)? = nil, recentStrikeRates: (any RecentStrikeRateProviding)? = nil, jockeyTrainerStrikeRates: (any JockeyTrainerStrikeRateProviding)? = nil, drawBiasRates: (any DrawBiasProviding)? = nil) {
         self.race = race
         self.strikeRates = strikeRates
         self.surfaceStrikeRates = surfaceStrikeRates ?? (strikeRates as? any SurfaceStrikeRateProviding)
@@ -225,6 +228,7 @@ public struct FactorContext: Sendable {
         self.horseGoingRates = horseGoingRates ?? (strikeRates as? any HorseGoingProviding)
         self.recentStrikeRates = recentStrikeRates ?? (strikeRates as? any RecentStrikeRateProviding)
         self.jockeyTrainerStrikeRates = jockeyTrainerStrikeRates ?? (strikeRates as? any JockeyTrainerStrikeRateProviding)
+        self.drawBiasRates = drawBiasRates ?? (strikeRates as? any DrawBiasProviding)
     }
 }
 
@@ -297,6 +301,22 @@ public protocol RecentStrikeRateProviding: StrikeRateProviding {
 
 public protocol JockeyTrainerStrikeRateProviding: StrikeRateProviding {
     func jockeyTrainerStrikeRate(jockeyID: String, trainerID: String) -> StrikeRate?
+}
+
+public protocol DrawBiasProviding: StrikeRateProviding {
+    func drawBiasRate(race: Race, runner: Runner) -> DrawBiasRate?
+}
+
+public struct DrawBiasRate: Codable, Hashable, Sendable {
+    public let runs: Int
+    public let wins: Int
+    public let expectedWins: Double
+
+    public init(runs: Int, wins: Int, expectedWins: Double) {
+        self.runs = runs
+        self.wins = wins
+        self.expectedWins = expectedWins
+    }
 }
 
 public struct HorseGoingPlaceRate: Codable, Hashable, Sendable {

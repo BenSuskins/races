@@ -77,3 +77,29 @@ func TestArchiveKeepsTheLatestFiftyDatedRunsInChronologicalOrder(t *testing.T) {
 		}
 	}
 }
+
+func TestArchiveTracksDrawBandOutcomesAcrossComparableRaces(t *testing.T) {
+	archive := NewArchive()
+	distance := &domain.Distance{Furlongs: 5}
+	for raceIndex := 1; raceIndex <= 100; raceIndex++ {
+		finishers := make([]domain.Finisher, 0, 12)
+		winnerDraw := 12
+		if raceIndex <= 60 {
+			winnerDraw = 2
+		}
+		for draw := 1; draw <= 12; draw++ {
+			position := 2
+			if draw == winnerDraw {
+				position = 1
+			}
+			finishers = append(finishers, domain.Finisher{HorseID: fmt.Sprintf("horse-%d-%d", raceIndex, draw), Draw: &draw, Position: domain.Finished(position)})
+		}
+		archive.Ingest(domain.RaceResult{ID: fmt.Sprintf("race-%03d", raceIndex), CourseName: "Ascot", Distance: distance, Surface: domain.SurfaceTurf, Going: domain.GoingGood, Finishers: finishers})
+	}
+	fieldSize, draw := 12, 2
+	race := domain.Race{CourseName: "ASCOT", Distance: distance, Surface: domain.SurfaceTurf, Going: domain.GoingGood, FieldSize: &fieldSize, Runners: []domain.Runner{{ID: "horse", Draw: &draw}}}
+	record, ok := archive.DrawBiasRate(race, race.Runners[0])
+	if !ok || record.Runs != 400 || record.Wins != 60 || record.ExpectedWins < 33.3 || record.ExpectedWins > 33.4 {
+		t.Fatalf("unexpected comparable draw record: %+v, %v", record, ok)
+	}
+}

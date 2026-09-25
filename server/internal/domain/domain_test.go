@@ -172,3 +172,17 @@ func TestDeclaredRunnersOrder(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestDrawBiasCellKeyUsesBroadComparableGroups(t *testing.T) {
+	distance := &Distance{Furlongs: 5}
+	key, ok := DrawBiasCellKey(" Ascot ", distance, SurfaceTurf, GoingGood, 12, 2)
+	if !ok || key != "ascot|turf|sprint|good|9-12|inside" {
+		t.Fatalf("unexpected draw context %q, %v", key, ok)
+	}
+	if _, ok := DrawBiasCellKey("Ascot", distance, SurfaceTurf, GoingUnknown, 12, 2); ok {
+		t.Fatal("unknown going must not produce a comparable cell")
+	}
+	if _, ok := DrawBiasCellKey("Ascot", distance, SurfaceTurf, GoingGood, 12, 13); ok {
+		t.Fatal("a draw outside the field must not produce a cell")
+	}
+}

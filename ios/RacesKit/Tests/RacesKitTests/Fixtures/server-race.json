@@ -210,13 +210,13 @@
           },
           {
             "factor": "draw",
-            "label": "Draw",
-            "detail": "Stall 3",
+            "label": "Draw bias",
+            "detail": "—",
             "weight": 0,
             "probabilityDelta": 0,
             "availability": {
-              "notApplicable": {
-                "_0": "no draw-bias data for this course yet"
+              "missingData": {
+                "_0": "no comparable draw archive yet"
               }
             }
           },
@@ -475,13 +475,13 @@
           },
           {
             "factor": "draw",
-            "label": "Draw",
-            "detail": "Stall 1",
+            "label": "Draw bias",
+            "detail": "—",
             "weight": 0,
             "probabilityDelta": 0,
             "availability": {
-              "notApplicable": {
-                "_0": "no draw-bias data for this course yet"
+              "missingData": {
+                "_0": "no comparable draw archive yet"
               }
             }
           },
@@ -745,13 +745,13 @@
           },
           {
             "factor": "draw",
-            "label": "Draw",
-            "detail": "Stall 4",
+            "label": "Draw bias",
+            "detail": "—",
             "weight": 0,
             "probabilityDelta": 0,
             "availability": {
-              "notApplicable": {
-                "_0": "no draw-bias data for this course yet"
+              "missingData": {
+                "_0": "no comparable draw archive yet"
               }
             }
           },
@@ -1010,13 +1010,13 @@
           },
           {
             "factor": "draw",
-            "label": "Draw",
-            "detail": "Stall 2",
+            "label": "Draw bias",
+            "detail": "—",
             "weight": 0,
             "probabilityDelta": 0,
             "availability": {
-              "notApplicable": {
-                "_0": "no draw-bias data for this course yet"
+              "missingData": {
+                "_0": "no comparable draw archive yet"
               }
             }
           },
@@ -1289,13 +1289,13 @@
       },
       {
         "factor": "draw",
-        "label": "Draw",
-        "detail": "Stall 3",
+        "label": "Draw bias",
+        "detail": "—",
         "weight": 0,
         "probabilityDelta": 0,
         "availability": {
-          "notApplicable": {
-            "_0": "no draw-bias data for this course yet"
+          "missingData": {
+            "_0": "no comparable draw archive yet"
           }
         }
       },

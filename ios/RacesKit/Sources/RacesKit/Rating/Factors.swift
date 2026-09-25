@@ -174,17 +174,7 @@ public struct WeightCarriedFactor: RatingFactor {
     }
 }
 
-/// Draw bias — **present but deliberately inert**.
-///
-/// Draw bias is real and can be decisive over sprint trips. But it is a
-/// course × distance × going × field-size interaction, and the free tier gives us
-/// no bias data at all. Inventing a table from memory would produce confident
-/// nonsense, which is the worst possible failure for an app that tells you what to
-/// back. So the factor reports honestly that it has nothing to say.
-///
-/// Once `ResultStore` holds enough British Flat racing, an empirical table derived
-/// from the app's own archive can fill this in — and only then does the weight
-/// come off zero.
+/// Draw bias from the latest comparable race results.
 public struct DrawFactor: RatingFactor {
     public let id = FactorID.draw
     public init() {}
@@ -193,10 +183,19 @@ public struct DrawFactor: RatingFactor {
         guard context.race.type == .flat else {
             return .notApplicable("the draw doesn't apply over obstacles")
         }
-        guard let draw = runner.draw else {
+        guard runner.draw != nil else {
             return .missing("no draw published")
         }
-        return .notApplicable("no draw-bias data for this course yet", display: "Stall \(draw)")
+        guard let provider = context.drawBiasRates else { return .missing("no draw-bias archive yet") }
+        guard let record = provider.drawBiasRate(race: context.race, runner: runner) else {
+            return .missing("no comparable draw archive yet")
+        }
+        guard record.runs >= 100 else {
+            return .missing("only \(record.runs) comparable starters for this draw")
+        }
+        let prior = record.expectedWins / Double(record.runs)
+        let smoothed = (Double(record.wins) + prior * 20) / (Double(record.runs) + 20)
+        return .value(smoothed, "\(Int((smoothed * 100).rounded()))% from \(record.runs) comparable starters")
     }
 }
 

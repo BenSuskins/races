@@ -41,6 +41,8 @@ enum TestRace {
         type: RaceType = .flat,
         surface: Surface = .turf,
         going: Going = .good,
+        distance: Distance = Distance(exactFurlongs: 8),
+        fieldSize: Int? = nil,
         ratingBand: ClosedRange<Int>? = nil,
         ageBand: String? = "3yo+",
         runners: [Runner]
@@ -51,14 +53,14 @@ enum TestRace {
             name: name,
             offTime: "14:30",
             date: "2026-09-20",
-            distance: Distance(exactFurlongs: 8),
+            distance: distance,
             going: going,
             surface: surface,
             type: type,
             raceClass: 3,
             ageBand: ageBand,
             ratingBand: ratingBand,
-            fieldSize: runners.count,
+            fieldSize: fieldSize ?? runners.count,
             runners: runners
         )
     }

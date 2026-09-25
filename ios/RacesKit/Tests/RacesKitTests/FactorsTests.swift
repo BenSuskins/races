@@ -172,17 +172,15 @@ final class FactorsTests: XCTestCase {
         XCTAssertGreaterThan(light, heavy)
     }
 
-    // MARK: - The deliberately inert ones
+    // MARK: - Factors that need archived history
 
-    /// Draw bias is real, but it is a course × distance × going × field-size
-    /// interaction and we have no bias data. Saying so is better than guessing.
-    func test_drawReportsThatItHasNothingToSay() {
+    /// Draw bias needs enough comparable starts to support a cell.
+    func test_drawNeedsComparableHistory() {
         let factor = DrawFactor()
 
         let flat = factor.value(for: TestRace.runner("a", draw: 3), in: context(type: .flat))
         XCTAssertNil(flat.raw)
-        XCTAssertEqual(flat.availability, .notApplicable("no draw-bias data for this course yet"))
-        XCTAssertEqual(flat.display, "Stall 3", "the draw is still shown, just not used")
+        XCTAssertEqual(flat.availability, .missingData("no draw-bias archive yet"))
 
         let jumps = factor.value(for: TestRace.runner("a", draw: nil), in: context(type: .chase))
         XCTAssertEqual(jumps.availability, .notApplicable("the draw doesn't apply over obstacles"))

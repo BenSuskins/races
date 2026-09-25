@@ -187,6 +187,7 @@ type Report struct {
 	// MarketLogLoss: the de-vigged market's own log loss on those races.
 	MarketLogLoss         *float64       `json:"marketLogLoss,omitempty"`
 	JockeyTrainerCoverage FactorCoverage `json:"jockeyTrainerCoverage"`
+	DrawBiasCoverage      FactorCoverage `json:"drawBiasCoverage"`
 	// Snapshots: log loss over every frozen snapshot, device ones included.
 	Snapshots             int      `json:"snapshots"`
 	SnapshotLogLoss       *float64 `json:"snapshotLogLoss,omitempty"`
@@ -251,6 +252,7 @@ func Run(ctx context.Context, st *store.Store, w rating.Weights, req Request) (R
 	rater := rating.NewRater(w)
 	var highest, value, fav, market acc
 	var jockeyTrainerCoverage factorCoverageAccumulator
+	var drawBiasCoverage factorCoverageAccumulator
 	var corpus []string
 	var raceDates []string
 	missingSealCards := 0
@@ -289,6 +291,7 @@ func Run(ctx context.Context, st *store.Store, w rating.Weights, req Request) (R
 			continue
 		}
 		jockeyTrainerCoverage.add(a, rating.JockeyTrainerStrikeRate)
+		drawBiasCoverage.add(a, rating.Draw)
 		corpus = append(corpus, t.RaceID)
 		raceDates = append(raceDates, t.RaceDate)
 		winner := result.Winner().HorseID
@@ -317,6 +320,7 @@ func Run(ctx context.Context, st *store.Store, w rating.Weights, req Request) (R
 	}
 	rep.HighestProbability, rep.ValueSelection = highest.arm(), value.arm()
 	rep.JockeyTrainerCoverage = jockeyTrainerCoverage.report()
+	rep.DrawBiasCoverage = drawBiasCoverage.report()
 	rep.Rerated, rep.Favourite = rep.HighestProbability, fav.arm()
 	rep.MarketLogLoss = market.logLoss()
 	sort.Strings(corpus)

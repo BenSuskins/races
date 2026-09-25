@@ -33,12 +33,13 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
     public private(set) var jockeyRecent: [String: [RecentRun]]
     public private(set) var trainerRecent: [String: [RecentRun]]
     public private(set) var jockeyTrainerPairs: [String: StrikeRate]
+    public private(set) var drawBias: [String: DrawBiasRate]
     public private(set) var ingestedRaceIDs: Set<String>
     public private(set) var totalRuns: Int
     public private(set) var totalWins: Int
 
     private enum CodingKeys: String, CodingKey {
-        case jockeys, trainers, jockeySurfaces, trainerSurfaces, jockeyRaceTypes, trainerRaceTypes, jockeyGoings, trainerGoings, horseGoing, horseOverall, jockeyRecent, trainerRecent, jockeyTrainerPairs, ingestedRaceIDs, totalRuns, totalWins
+        case jockeys, trainers, jockeySurfaces, trainerSurfaces, jockeyRaceTypes, trainerRaceTypes, jockeyGoings, trainerGoings, horseGoing, horseOverall, jockeyRecent, trainerRecent, jockeyTrainerPairs, drawBias, ingestedRaceIDs, totalRuns, totalWins
     }
 
     public init(
@@ -55,6 +56,7 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
         jockeyRecent: [String: [RecentRun]] = [:],
         trainerRecent: [String: [RecentRun]] = [:],
         jockeyTrainerPairs: [String: StrikeRate] = [:],
+        drawBias: [String: DrawBiasRate] = [:],
         ingestedRaceIDs: Set<String> = [],
         totalRuns: Int = 0,
         totalWins: Int = 0
@@ -72,6 +74,7 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
         self.jockeyRecent = jockeyRecent
         self.trainerRecent = trainerRecent
         self.jockeyTrainerPairs = jockeyTrainerPairs
+        self.drawBias = drawBias
         self.ingestedRaceIDs = ingestedRaceIDs
         self.totalRuns = totalRuns
         self.totalWins = totalWins
@@ -93,6 +96,7 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
             jockeyRecent: try values.decodeIfPresent([String: [RecentRun]].self, forKey: .jockeyRecent) ?? [:],
             trainerRecent: try values.decodeIfPresent([String: [RecentRun]].self, forKey: .trainerRecent) ?? [:],
             jockeyTrainerPairs: try values.decodeIfPresent([String: StrikeRate].self, forKey: .jockeyTrainerPairs) ?? [:],
+            drawBias: try values.decodeIfPresent([String: DrawBiasRate].self, forKey: .drawBias) ?? [:],
             ingestedRaceIDs: try values.decodeIfPresent(Set<String>.self, forKey: .ingestedRaceIDs) ?? [],
             totalRuns: try values.decodeIfPresent(Int.self, forKey: .totalRuns) ?? 0,
             totalWins: try values.decodeIfPresent(Int.self, forKey: .totalWins) ?? 0
@@ -114,6 +118,7 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
         try values.encode(jockeyRecent, forKey: .jockeyRecent)
         try values.encode(trainerRecent, forKey: .trainerRecent)
         try values.encode(jockeyTrainerPairs, forKey: .jockeyTrainerPairs)
+        try values.encode(drawBias, forKey: .drawBias)
         try values.encode(ingestedRaceIDs, forKey: .ingestedRaceIDs)
         try values.encode(totalRuns, forKey: .totalRuns)
         try values.encode(totalWins, forKey: .totalWins)
@@ -178,6 +183,15 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
                 let key = Self.jockeyTrainerKey(jockeyID: jockeyID, trainerID: trainerID)
                 jockeyTrainerPairs[key] = increment(jockeyTrainerPairs[key], won: won)
             }
+            if let draw = finisher.draw,
+               let key = Self.drawBiasCellKey(courseName: result.courseName, distance: result.distance, surface: result.surface, going: result.going, fieldSize: result.finishers.count, draw: draw) {
+                let current = drawBias[key] ?? DrawBiasRate(runs: 0, wins: 0, expectedWins: 0)
+                drawBias[key] = DrawBiasRate(
+                    runs: current.runs + 1,
+                    wins: current.wins + (won ? 1 : 0),
+                    expectedWins: current.expectedWins + 1 / Double(result.finishers.count)
+                )
+            }
             if let position = finisher.position.numericPosition {
                 incrementHorseOverall(horseID: finisher.horseID, placed: position <= 3)
                 if let bucket = result.going.bucket(on: result.surface) {
@@ -223,6 +237,32 @@ public struct ResultsArchive: Codable, Hashable, Sendable {
 
     private static func goingKey(id: String, surface: Surface, bucket: HorseGoingBucket) -> String {
         "\(id)|\(surface.rawValue)|\(bucket.rawValue)"
+    }
+
+    private static func drawBiasCellKey(courseName: String, distance: Distance?, surface: Surface, going: Going, fieldSize: Int, draw: Int) -> String? {
+        guard let distance, distance.furlongs > 0, distance.furlongs.isFinite,
+              fieldSize >= 5, draw >= 1, draw <= fieldSize,
+              !courseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let ground = going.bucket(on: surface) else { return nil }
+        let distanceBand: String
+        switch distance.furlongs {
+        case ...6: distanceBand = "sprint"
+        case ...8: distanceBand = "mile"
+        case ...12: distanceBand = "middle"
+        default: distanceBand = "staying"
+        }
+        let fieldBand: String
+        switch fieldSize {
+        case ...8: fieldBand = "5-8"
+        case ...12: fieldBand = "9-12"
+        case ...16: fieldBand = "13-16"
+        default: fieldBand = "17+"
+        }
+        let drawBand: String
+        if draw * 3 <= fieldSize { drawBand = "inside" }
+        else if draw * 3 <= fieldSize * 2 { drawBand = "middle" }
+        else { drawBand = "outside" }
+        return [courseName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), surface.rawValue, distanceBand, ground.rawValue, fieldBand, drawBand].joined(separator: "|")
     }
 
     private static func jockeyTrainerKey(jockeyID: String, trainerID: String) -> String {
@@ -329,5 +369,14 @@ extension ResultsArchive: RecentStrikeRateProviding {
 extension ResultsArchive: JockeyTrainerStrikeRateProviding {
     public func jockeyTrainerStrikeRate(jockeyID: String, trainerID: String) -> StrikeRate? {
         jockeyTrainerPairs[Self.jockeyTrainerKey(jockeyID: jockeyID, trainerID: trainerID)]
+    }
+}
+
+extension ResultsArchive: DrawBiasProviding {
+    public func drawBiasRate(race: Race, runner: Runner) -> DrawBiasRate? {
+        guard let draw = runner.draw else { return nil }
+        let fieldSize = race.fieldSize.flatMap { $0 > 0 ? $0 : nil } ?? race.runners.count
+        guard let key = Self.drawBiasCellKey(courseName: race.courseName, distance: race.distance, surface: race.surface, going: race.going, fieldSize: fieldSize, draw: draw) else { return nil }
+        return drawBias[key]
     }
 }

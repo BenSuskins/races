@@ -51,7 +51,11 @@ enum TestResult {
     static func result(
         id: String = "rac_1",
         date: String = "2026-09-20",
+        courseName: String = "Ascot",
+        distance: Distance? = nil,
+        surface: Surface = .turf,
         finishing: [(String, String)],
+        draws: [String: Int] = [:],
         startingPrices: [String: Double] = [:],
         jockeys: [String: String] = [:],
         trainers: [String: String] = [:],
@@ -60,17 +64,19 @@ enum TestResult {
     ) -> RaceResult {
         RaceResult(
             id: id,
-            courseName: "Ascot",
+            courseName: courseName,
             name: "Test Handicap",
             date: date,
+            distance: distance,
             going: going,
-            surface: .turf,
+            surface: surface,
             type: type,
             finishers: finishing.map { horseID, position in
                 Finisher(
                     horseID: horseID,
                     horseName: horseID.capitalized,
                     position: FinishPosition(raw: position),
+                    draw: draws[horseID],
                     jockeyID: jockeys[horseID],
                     trainerID: trainers[horseID],
                     startingPriceDecimal: startingPrices[horseID]
