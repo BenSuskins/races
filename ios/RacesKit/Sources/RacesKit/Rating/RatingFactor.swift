@@ -19,6 +19,7 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
     case trainerSurfaceStrikeRate
     case jockeyRaceTypeStrikeRate
     case trainerRaceTypeStrikeRate
+    case horseGoingPlaceRate
 
     public var label: String {
         switch self {
@@ -38,6 +39,7 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
         case .trainerSurfaceStrikeRate: return "Trainer strike rate by surface"
         case .jockeyRaceTypeStrikeRate: return "Jockey strike rate by race type"
         case .trainerRaceTypeStrikeRate: return "Trainer strike rate by race type"
+        case .horseGoingPlaceRate: return "Horse record by going"
         }
     }
 
@@ -80,6 +82,8 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
             return "The jockey's win rate in this type of race, shrunk toward the jockey's overall record."
         case .trainerRaceTypeStrikeRate:
             return "The trainer's win rate in this type of race, shrunk toward the trainer's overall record."
+        case .horseGoingPlaceRate:
+            return "The horse's place rate on similar ground, shrunk toward its general record."
         }
     }
 
@@ -103,6 +107,8 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
             return "Surface cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
         case .jockeyRaceTypeStrikeRate, .trainerRaceTypeStrikeRate:
             return "Race-type cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
+        case .horseGoingPlaceRate:
+            return "The archive needs at least three completed runs in a going bucket. Its default weight is zero until replay supports it."
         case .weightCarried:
             return "Near zero on purpose: in a handicap, weight is the handicapper's equaliser, so it substantially double-counts the official rating."
         case .officialRating, .handicapBandPosition, .recentForm, .wonLastTime,
@@ -179,12 +185,14 @@ public struct FactorContext: Sendable {
     public let strikeRates: (any StrikeRateProviding)?
     public let surfaceStrikeRates: (any SurfaceStrikeRateProviding)?
     public let raceTypeStrikeRates: (any RaceTypeStrikeRateProviding)?
+    public let horseGoingRates: (any HorseGoingProviding)?
 
-    public init(race: Race, strikeRates: (any StrikeRateProviding)? = nil, surfaceStrikeRates: (any SurfaceStrikeRateProviding)? = nil, raceTypeStrikeRates: (any RaceTypeStrikeRateProviding)? = nil) {
+    public init(race: Race, strikeRates: (any StrikeRateProviding)? = nil, surfaceStrikeRates: (any SurfaceStrikeRateProviding)? = nil, raceTypeStrikeRates: (any RaceTypeStrikeRateProviding)? = nil, horseGoingRates: (any HorseGoingProviding)? = nil) {
         self.race = race
         self.strikeRates = strikeRates
         self.surfaceStrikeRates = surfaceStrikeRates ?? (strikeRates as? any SurfaceStrikeRateProviding)
         self.raceTypeStrikeRates = raceTypeStrikeRates ?? (strikeRates as? any RaceTypeStrikeRateProviding)
+        self.horseGoingRates = horseGoingRates ?? (strikeRates as? any HorseGoingProviding)
     }
 }
 
@@ -243,4 +251,23 @@ public protocol SurfaceStrikeRateProviding: StrikeRateProviding {
 public protocol RaceTypeStrikeRateProviding: StrikeRateProviding {
     func jockeyRaceTypeStrikeRate(id: String, raceType: RaceType) -> StrikeRate?
     func trainerRaceTypeStrikeRate(id: String, raceType: RaceType) -> StrikeRate?
+}
+
+public struct HorseGoingPlaceRate: Codable, Hashable, Sendable {
+    public let runs: Int
+    public let places: Int
+
+    public init(runs: Int, places: Int) {
+        self.runs = runs
+        self.places = places
+    }
+
+    public func smoothed(towards prior: Double, strength: Double = 5) -> Double {
+        (Double(places) + prior * strength) / (Double(runs) + strength)
+    }
+}
+
+public protocol HorseGoingProviding: Sendable {
+    func horseGoingRate(horseID: String, surface: Surface, bucket: HorseGoingBucket) -> HorseGoingPlaceRate?
+    func horseOverallPlaceRate(horseID: String) -> HorseGoingPlaceRate?
 }

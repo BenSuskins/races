@@ -188,6 +188,44 @@ type surfaceStrikeRate struct {
 	minimumSample int
 }
 
+type horseGoing struct{ minimumSample int }
+
+func (horseGoing) ID() FactorID { return HorseGoingPlaceRate }
+
+func (f horseGoing) Value(r domain.Runner, ctx Context) FactorValue {
+	provider, ok := ctx.StrikeRates.(HorseGoingProvider)
+	if !ok {
+		return missing("no horse going archive yet")
+	}
+	bucket := ctx.Race.Going.Bucket(ctx.Race.Surface)
+	if bucket == "" {
+		return missing("going or surface is unknown")
+	}
+	if r.ID == "" {
+		return missing("horse not identified")
+	}
+	prior := fieldPlacePrior(ctx.Race.FieldSize)
+	if record, found := provider.HorseGoingRate(r.ID, ctx.Race.Surface, bucket); found && record.Runs >= f.minimumSample {
+		if overall, hasOverall := provider.HorseOverallPlaceRate(r.ID); hasOverall && overall.Runs >= f.minimumSample {
+			prior = overall.Smoothed(prior, 5)
+		}
+		smoothed := record.Smoothed(prior, 5)
+		return value(smoothed, fmt.Sprintf("%d%% placed on similar ground from %d runs", int(math.Round(smoothed*100)), record.Runs))
+	}
+	if overall, found := provider.HorseOverallPlaceRate(r.ID); found && overall.Runs >= f.minimumSample {
+		smoothed := overall.Smoothed(prior, 5)
+		return value(smoothed, fmt.Sprintf("%d%% placed from %d runs", int(math.Round(smoothed*100)), overall.Runs))
+	}
+	return value(prior, fmt.Sprintf("Field place prior (%d%%)", int(math.Round(prior*100))))
+}
+
+func fieldPlacePrior(fieldSize *int) float64 {
+	if fieldSize == nil || *fieldSize < 3 {
+		return 0.25
+	}
+	return math.Min(1, 3/float64(*fieldSize))
+}
+
 type raceTypeStrikeRate struct {
 	jockey        bool
 	minimumSample int
@@ -341,5 +379,6 @@ func DefaultFactors(w Weights) []Factor {
 		surfaceStrikeRate{jockey: false, minimumSample: w.MinimumStrikeRateSample},
 		raceTypeStrikeRate{jockey: true, minimumSample: w.MinimumStrikeRateSample},
 		raceTypeStrikeRate{jockey: false, minimumSample: w.MinimumStrikeRateSample},
+		horseGoing{minimumSample: 3},
 	}
 }

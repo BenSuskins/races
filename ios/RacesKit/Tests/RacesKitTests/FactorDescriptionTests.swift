@@ -51,7 +51,7 @@ final class FactorDescriptionTests: XCTestCase {
 
         // Pinned, so switching one on is a visible decision rather than a
         // side effect. `weightCarried` is near zero and deliberately not zero.
-        XCTAssertEqual(zeroed, [.draw, .headgear, .jockeyStrikeRate, .trainerStrikeRate, .jockeySurfaceStrikeRate, .trainerSurfaceStrikeRate, .jockeyRaceTypeStrikeRate, .trainerRaceTypeStrikeRate])
+        XCTAssertEqual(zeroed, [.draw, .headgear, .jockeyStrikeRate, .trainerStrikeRate, .jockeySurfaceStrikeRate, .trainerSurfaceStrikeRate, .jockeyRaceTypeStrikeRate, .trainerRaceTypeStrikeRate, .horseGoingPlaceRate])
         XCTAssertGreaterThan(weights.weight(for: .weightCarried), 0)
     }
 

@@ -340,3 +340,33 @@ public struct RaceTypeStrikeRateFactor: RatingFactor {
         return .value(smoothed, "\(percent)% from \(record.runs) \(context.race.type.displayName.lowercased()) runs")
     }
 }
+
+public struct HorseGoingFactor: RatingFactor {
+    public let id: FactorID = .horseGoingPlaceRate
+    public let minimumSample: Int
+
+    public init(minimumSample: Int = 3) {
+        self.minimumSample = minimumSample
+    }
+
+    public func value(for runner: Runner, in context: FactorContext) -> FactorValue {
+        guard let provider = context.horseGoingRates else { return .missing("no horse going archive yet") }
+        guard let bucket = context.race.going.bucket(on: context.race.surface) else {
+            return .missing("going or surface is unknown")
+        }
+        guard !runner.id.isEmpty else { return .missing("horse not identified") }
+
+        let fieldPrior = context.race.fieldSize.map { $0 >= 3 ? min(1, 3 / Double($0)) : 0.25 } ?? 0.25
+        let overall = provider.horseOverallPlaceRate(horseID: runner.id)
+        if let record = provider.horseGoingRate(horseID: runner.id, surface: context.race.surface, bucket: bucket), record.runs >= minimumSample {
+            let prior = overall.flatMap { $0.runs >= minimumSample ? $0.smoothed(towards: fieldPrior) : nil } ?? fieldPrior
+            let smoothed = record.smoothed(towards: prior)
+            return .value(smoothed, "\(Int((smoothed * 100).rounded()))% placed on similar ground from \(record.runs) runs")
+        }
+        if let overall, overall.runs >= minimumSample {
+            let smoothed = overall.smoothed(towards: fieldPrior)
+            return .value(smoothed, "\(Int((smoothed * 100).rounded()))% placed from \(overall.runs) runs")
+        }
+        return .value(fieldPrior, "Field place prior (\(Int((fieldPrior * 100).rounded()))%)")
+    }
+}

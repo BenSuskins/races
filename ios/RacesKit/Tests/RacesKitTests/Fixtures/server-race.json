@@ -303,6 +303,17 @@
                 "_0": "no record in this race-type archive yet"
               }
             }
+          },
+          {
+            "factor": "horseGoingPlaceRate",
+            "label": "Horse record by going",
+            "detail": "Field place prior (75%)",
+            "zScore": 0,
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "available": {}
+            }
           }
         ]
       },
@@ -496,6 +507,17 @@
               "missingData": {
                 "_0": "no record in this race-type archive yet"
               }
+            }
+          },
+          {
+            "factor": "horseGoingPlaceRate",
+            "label": "Horse record by going",
+            "detail": "Field place prior (75%)",
+            "zScore": 0,
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "available": {}
             }
           }
         ]
@@ -696,6 +718,17 @@
                 "_0": "no record in this race-type archive yet"
               }
             }
+          },
+          {
+            "factor": "horseGoingPlaceRate",
+            "label": "Horse record by going",
+            "detail": "Field place prior (75%)",
+            "zScore": 0,
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "available": {}
+            }
           }
         ]
       },
@@ -889,6 +922,17 @@
               "missingData": {
                 "_0": "no record in this race-type archive yet"
               }
+            }
+          },
+          {
+            "factor": "horseGoingPlaceRate",
+            "label": "Horse record by going",
+            "detail": "Field place prior (75%)",
+            "zScore": 0,
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "available": {}
             }
           }
         ]
@@ -1097,6 +1141,17 @@
           "missingData": {
             "_0": "no record in this race-type archive yet"
           }
+        }
+      },
+      {
+        "factor": "horseGoingPlaceRate",
+        "label": "Horse record by going",
+        "detail": "Field place prior (75%)",
+        "zScore": 0,
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "available": {}
         }
       }
     ],
