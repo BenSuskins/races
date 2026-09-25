@@ -265,8 +265,8 @@ that is a decision, not a chore.
 `docs/strike-rate-plan.md` is the ordered plan for improving what the model
 tips: fix the benchmark's denominator, give the back-test a second arm and a
 sweep, then power de-vigging and tighter selection gates, then the factors the
-archive can already feed, then paid data. It is judged by the back-test, not by
-the Record tab, and it says why.
+archive can already feed. Paid data is ruled out, and the plan says what that
+costs. It is judged by the back-test, not by the Record tab, and it says why.
 
 ---
 

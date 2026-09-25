@@ -220,8 +220,9 @@ back to the string, exactly as today, so it degrades to the current model on
 day one and improves with every card.
 
 - Pros: attacks the model's main stated weakness; free; improves monotonically.
-- Cons: cold start measured in months; two form paths to keep honest; needs
-  the as-of-seal rule above or the replay leaks.
+- Cons: cold start measured in months, and with paid data ruled out there
+  is no shortcut round it; two form paths to keep honest; needs the
+  as-of-seal rule above or the replay leaks.
 
 ### 2.4 Market movement between draft and seal
 
@@ -243,34 +244,29 @@ series is a table rather than a decompression.
 
 ---
 
-## Phase 3 — paid data
+## Not on the table — paid data
 
-**Owner: Ben, a billing decision.** Nothing here is buildable from a Claude
-session, and `docs/providers.md` must change with any of it.
+**Decided 2026-09-25: no paid data sources.** The Racing API's Basic tier
+would have added Racing Post Rating and Topspeed per runner, and RPR is the
+strongest single public predictor of a UK race after the market itself. The
+domain already carries slots for both, so the plumbing exists if the decision
+is ever reversed, but nothing in this plan depends on it.
 
-### 3.1 The Racing API Basic tier
+What that decision costs, so it is a known cost rather than a surprise:
 
-Adds `rpr`, `ts`, `trainer_14_days`, `spotlight` and `going_detailed` per
-runner. Racing Post Rating is the strongest single public predictor of a UK
-race after the market itself, and it fixes the class-blindness of 2.3 at a
-stroke rather than over months. The domain and the client already map `rpr`
-and `ts` into `Runner.racingPostRating` and `topspeedRating`; what is missing
-is two factors that read them, copy in the kit, and the sweep to weight them.
-The nightly trainer fits the rest.
+- The class-blindness of free-tier form has one free fix, item 2.3, and it
+  takes months to fill rather than an afternoon. Item 2.3 is therefore the
+  spine of Phase 2, not one option among several.
+- Market movement (2.4) becomes the second-strongest free signal and moves up
+  the order accordingly.
+- The archive is the only source of anything the market does not already
+  know. Every day the server runs is a day of that archive; a day it misses
+  is gone, which makes the `races.db` backup in the roadmap part of this plan
+  rather than housekeeping beside it.
 
-Note the inversion recorded in CLAUDE.md: `/v1/racecards/basic` is the
-endpoint that returns the full schema.
-
-- Pros: one factor with more signal than everything else in Phase 2 combined;
-  the plumbing exists.
-- Cons: a subscription; a paid factor missing at runtime must degrade to
-  neutral, never fail the race (the `TierUnavailable` latch already does this).
-
-### 3.2 The Pro tier horse results
-
-`/v1/horses/{horse_id}/results` gives full career history with class, SP,
-beaten lengths and RPR per run: 2.3 without the cold start. Only worth
-considering if 3.1 proves out and 2.3 is still wanting.
+`docs/data-sources.md` already rules out every runtime provider other than the
+two in use; the one free reference table it would admit is Racing Alpha's
+draw bias, licence permitting, for item 2.2.
 
 ---
 
@@ -312,13 +308,13 @@ manual sweeps and becomes something the server does to itself, which is what
 | 9 | 2.3 Class-adjusted form | 8 | L | Claude |
 | 10 | 2.4 `marketMove` factor | 5 | M | Claude |
 | 11 | 2.2 Draw-bias table | a flat season | M | Claude |
-| 12 | 3.1 Basic tier + RPR factors | a subscription | M | Ben, then Claude |
-| 13 | 4 Training over the re-rated corpus | 500 races, 7 | L | Claude |
+| 12 | 4 Training over the re-rated corpus | 500 races, 7 | L | Claude |
 
 Items 1 to 5 and 8 can go in now, in one or two PRs, while the corpus fills.
 Items 6 and 7 are the first that change what the app tips, and they are the
-ones most likely to move strike rate. Item 12 is the single most valuable
-piece of data and the only one that costs money.
+ones most likely to move strike rate quickly. Items 9 and 10 are where the
+model can learn something the market has not already priced, and with paid
+data off the table they are the ceiling on what this plan can reach.
 
 ## What would make me stop
 
@@ -329,5 +325,7 @@ piece of data and the only one that costs money.
   rate over a few hundred races. Then value selection is not earning its keep
   and should be switched off, not tuned.
 - The model's interval never separates from the favourite's after the corpus
-  reaches a few hundred races. Then the honest answer is that the free-tier
-  factors do not add to the market, and Phase 3 is the only remaining move.
+  reaches a few hundred races and items 9 and 10 are live. Then the honest
+  answer is that the free-tier factors do not add to the market. The model
+  should then run market-only, and the app's value is the record it keeps,
+  not the picks.
