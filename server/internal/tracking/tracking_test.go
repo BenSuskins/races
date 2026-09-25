@@ -307,6 +307,23 @@ func TestFavouriteBaselineAndSplit(t *testing.T) {
 	}
 }
 
+func TestWilsonIntervalsAndSharedDenominator(t *testing.T) {
+	r := Accuracy([]Tip{
+		tipWith("model-win", &Outcome{Kind: Won}, 0.4, nil, &FavouriteOutcome{HorseID: "fav", Won: false}),
+		tipWith("model-loss", &Outcome{Kind: Lost}, 0.3, nil, &FavouriteOutcome{HorseID: "fav", Won: true}),
+		tipWith("no-benchmark", &Outcome{Kind: Won}, 0.5, nil, nil),
+	}, DefaultCommission)
+	if r.BenchmarkedModel.Settled != 2 || r.BenchmarkedModel.Wins != 1 || r.FavouriteBaseline.Settled != 2 {
+		t.Fatalf("arms do not share a denominator: model=%+v favourite=%+v", r.BenchmarkedModel, r.FavouriteBaseline)
+	}
+	if r.ModelWilson == nil || r.FavouriteWilson == nil || r.ModelWilson.Lower >= 0.5 || r.ModelWilson.Upper <= 0.5 {
+		t.Fatalf("invalid Wilson intervals: %+v %+v", r.ModelWilson, r.FavouriteWilson)
+	}
+	if Wilson(0, 0) != nil {
+		t.Fatal("empty interval must be absent")
+	}
+}
+
 // MARK: - Wire format
 
 // The shapes Swift's synthesised Codable writes. A device upload is decoded

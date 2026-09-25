@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bensuskins/races/server/internal/backtest"
 	"github.com/bensuskins/races/server/internal/domain"
 	"github.com/bensuskins/races/server/internal/httpx"
 	"github.com/bensuskins/races/server/internal/matching"
@@ -329,9 +330,28 @@ func (s *Service) rateAndRecord(ctx context.Context, races []domain.Race, kind s
 	if err != nil {
 		return 0, err
 	}
-	archive, err := s.archive(ctx)
-	if err != nil {
-		return 0, err
+	var archive *tracking.Archive
+	if kind == "seal" {
+		archive = tracking.NewArchive()
+		sealing := make(map[string]bool, len(races))
+		for _, race := range races {
+			sealing[race.ID] = true
+		}
+		facts, factsErr := s.Store.ResultFactsKnownBefore(ctx, now)
+		if factsErr != nil {
+			return 0, factsErr
+		}
+		for _, result := range facts {
+			if !sealing[result.ID] {
+				archive.Ingest(result)
+			}
+		}
+	} else {
+		var err error
+		archive, err = s.archive(ctx)
+		if err != nil {
+			return 0, err
+		}
 	}
 	snapshots, references := s.priced(ctx, races)
 	stored := 0
@@ -361,7 +381,12 @@ func (s *Service) rateAndRecord(ctx context.Context, races []domain.Race, kind s
 		if tip == nil {
 			continue
 		}
-		if err := s.Store.SaveTip(ctx, *tip, sourceServer, now); err != nil {
+		if outcome == tracking.Sealed {
+			err = s.Store.SaveSealedTip(ctx, *tip, race, sourceServer, now)
+		} else {
+			err = s.Store.SaveTip(ctx, *tip, sourceServer, now)
+		}
+		if err != nil {
 			return stored, err
 		}
 		stored++
@@ -487,6 +512,30 @@ func (s *Service) startingPrices(ctx context.Context, waiting []store.TipRow, no
 }
 
 // MARK: - Training
+
+// BaselineBacktest replays the active immutable weight set and stores the
+// report ID in the job summary for status and metrics.
+func (s *Service) BaselineBacktest(ctx context.Context) (int64, backtest.Report, error) {
+	var report backtest.Report
+	var reportID int64
+	err := s.run(ctx, "baseline-backtest", func() (string, error) {
+		weights, err := s.Store.ActiveWeights(ctx)
+		if err != nil || weights == nil {
+			return "", errors.Join(err, errors.New("no active weights"))
+		}
+		request := backtest.Request{WeightsID: weights.ID}
+		report, err = backtest.Run(ctx, s.Store, *weights, request)
+		if err != nil {
+			return "", err
+		}
+		reportID, err = s.Store.SaveBacktest(ctx, weights.ID, request, report, s.Now())
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("report %d, weights %s, races %d", reportID, weights.ID, report.HighestProbability.Races), nil
+	})
+	return reportID, report, err
+}
 
 // Train re-fits the weights over every settled sample. Promotion mints a new
 // weights id and makes it active; the record splits by id from then on.

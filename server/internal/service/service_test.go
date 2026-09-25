@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -180,13 +181,27 @@ func TestADayEndToEnd(t *testing.T) {
 	}
 
 	// The sealed race replays through any weights, against the market.
+	beforeChange, err := backtest.Run(ctx, s.Store, rating.V2(), backtest.Request{From: "2026-09-20", To: "2026-09-20"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed := first
+	changed.Name = "Updated after sealing"
+	changed.Runners = changed.Runners[:1]
+	if err := s.Store.SaveRaces(ctx, []domain.Race{changed}, c.t.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
 	for _, w := range []rating.Weights{rating.V2(), rating.MarketOnly()} {
 		rep, err := backtest.Run(ctx, s.Store, w, backtest.Request{From: "2026-09-20", To: "2026-09-20"})
-		if err != nil || rep.Rerated.Races != 1 || rep.Snapshots != 1 || rep.Rerated.LogLoss == nil || rep.MarketLogLoss == nil || rep.BeatsMarket == nil {
+		if err != nil || rep.Rerated.Races != 1 || rep.HighestProbability.Races != rep.ValueSelection.Races || rep.CorpusID == "" || rep.Snapshots != 1 || rep.Rerated.LogLoss == nil || rep.MarketLogLoss == nil || rep.BeatsMarket == nil {
 			t.Fatalf("%s: %+v %v", w.ID, rep, err)
 		}
 		if w.ID == "market-only" && math.Abs(*rep.Rerated.LogLoss-*rep.MarketLogLoss) > 1e-9 {
 			t.Fatal("the control arm is the market exactly")
+		}
+		if w.ID == "v2" && (rep.HighestProbability.Wins != beforeChange.HighestProbability.Wins ||
+			*rep.HighestProbability.StrikeRate != *beforeChange.HighestProbability.StrikeRate) {
+			t.Fatal("a later card refresh changed the sealed replay")
 		}
 	}
 	if rep, _ := backtest.Run(ctx, s.Store, rating.V2(), backtest.Request{From: "2026-09-21"}); rep.Rerated.Races != 0 {
@@ -265,9 +280,31 @@ func TestPlanTimetable(t *testing.T) {
 	if p := at(3, 0); !p.Train || p.CardsToday {
 		t.Fatal("nightly training")
 	}
+	if p := at(2, 45); !p.Backtest || p.Train {
+		t.Fatal("nightly baseline replay precedes training")
+	}
 	if p := at(10, 7); p.CardsToday || !p.Seal {
 		t.Fatal("seal every minute, cards every quarter")
 	}
+}
+
+func TestBaselineBacktestStoresReportAndStatus(t *testing.T) {
+	ctx := context.Background()
+	s, _, _, _, _, _ := setup(t)
+	reportID, report, err := s.BaselineBacktest(ctx)
+	if err != nil || reportID == 0 || report.WeightsID != "v3" {
+		t.Fatalf("baseline report was not stored: %d %+v %v", reportID, report, err)
+	}
+	runs, err := s.Store.JobRuns(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, run := range runs {
+		if run.Name == "baseline-backtest" && run.SucceededAt != nil && strings.Contains(run.Summary, "report 1") {
+			return
+		}
+	}
+	t.Fatalf("baseline result is absent from status: %+v", runs)
 }
 
 // A server that was running v2 moves onto v3 at boot, because v2 was only ever

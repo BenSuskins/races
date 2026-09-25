@@ -128,7 +128,7 @@ public struct RaceAssessment: Codable, Hashable, Sendable {
 
         let candidates = runners.filter { runner in
             guard let edge = runner.valueEdge else { return false }
-            return edge >= minimumValueEdge
+            return edge + 1e-12 >= minimumValueEdge
                 && runner.winProbability >= minimumValueProbability
         }
 

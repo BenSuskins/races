@@ -19,6 +19,10 @@ inherits the switched-off threshold.
 
 The rest of this document describes the value policy as `v2` runs it.
 
+Back-tests report `highestProbability` and `valueSelection` as separate
+policies over one frozen race set. The value arm uses the standard v2 gates or
+explicit sweep overrides. This comparison does not change the live v3 policy.
+
 ## Why
 
 The rating engine produces a calibrated probability distribution. The previous

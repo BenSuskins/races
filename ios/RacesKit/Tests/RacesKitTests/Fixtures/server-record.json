@@ -1,44 +1,33 @@
 {
+  "weightsID": "v3",
+  "activeWeightsID": "v3",
   "commission": 0.05,
   "report": {
-    "total": 5,
-    "settled": 2,
-    "wins": 1,
+    "total": 2,
+    "settled": 0,
+    "wins": 0,
     "voided": 0,
     "unresolved": 0,
-    "expired": 1,
+    "expired": 0,
     "pending": 2,
-    "coverage": 0.6666666666666666,
-    "expectedWins": 0.5800000000000001,
-    "brierScore": 0.19619999999999999,
-    "roi": {
-      "bets": 2,
-      "returned": 2.558
-    },
+    "coverage": 1,
+    "expectedWins": 0,
     "settledWithoutPrice": 0,
     "favouriteBaseline": {
-      "settled": 1,
-      "wins": 1,
-      "roi": {
-        "bets": 1,
-        "returned": 2.558
-      }
+      "settled": 0,
+      "wins": 0
+    },
+    "benchmarkedModel": {
+      "settled": 0,
+      "wins": 0
     },
     "whenAgreeingWithFavourite": {
-      "settled": 1,
-      "wins": 1,
-      "roi": {
-        "bets": 1,
-        "returned": 2.558
-      }
+      "settled": 0,
+      "wins": 0
     },
     "whenDisagreeing": {
-      "settled": 1,
-      "wins": 0,
-      "roi": {
-        "bets": 1,
-        "returned": 0
-      }
+      "settled": 0,
+      "wins": 0
     }
   },
   "weightsInUse": {
@@ -47,7 +36,6 @@
     "v3": 2
   },
   "sources": {
-    "device:phone": 3,
     "server": 2
   },
   "archivedRaces": 4

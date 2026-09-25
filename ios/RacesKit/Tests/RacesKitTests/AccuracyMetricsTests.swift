@@ -46,6 +46,20 @@ final class AccuracyMetricsTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(report.strikeRate), 0.5, accuracy: 0.000001)
     }
 
+    func test_benchmarkedModelAndFavouriteShareWilsonDenominator() throws {
+        let report = AccuracyCalculator.report(for: [
+            tip("model-win", outcome: .won(betfairSP: 4.0), favourite: FavouriteOutcome(horseID: "fav", won: false, betfairSP: nil)),
+            tip("model-loss", outcome: .lost(position: 2, betfairSP: nil), favourite: FavouriteOutcome(horseID: "fav", won: true, betfairSP: nil)),
+            tip("no-favourite", outcome: .won(betfairSP: 3.0)),
+        ])
+
+        XCTAssertEqual(report.benchmarkedModel?.settled, 2)
+        XCTAssertEqual(report.benchmarkedModel?.wins, 1)
+        XCTAssertEqual(report.favouriteBaseline.settled, 2)
+        XCTAssertEqual(try XCTUnwrap(report.modelWilson).lower, 0.0945, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(report.favouriteWilson).upper, 0.9055, accuracy: 0.001)
+    }
+
     func test_coverageReportsHowMuchOfTheRecordWeActuallyKnow() throws {
         let report = AccuracyCalculator.report(for: [
             tip("a", outcome: .won(betfairSP: 4.0)),

@@ -266,9 +266,21 @@ func (s *Store) SaveResults(ctx context.Context, results []domain.RaceResult, at
 		}
 		if n, _ := res.RowsAffected(); n > 0 {
 			fresh++
+			if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO result_facts (race_id, known_at, json) VALUES (?,?,?)`, r.ID, ts(at), mustJSON(r)); err != nil {
+				tx.Rollback()
+				return 0, err
+			}
 		}
 	}
 	return fresh, tx.Commit()
+}
+
+// ResultFactsKnownBefore returns the latest version of each result known by a
+// given time. It never includes facts collected after that time.
+func (s *Store) ResultFactsKnownBefore(ctx context.Context, cutoff time.Time) ([]domain.RaceResult, error) {
+	return queryJSON[domain.RaceResult](ctx, s.db, `SELECT facts.json FROM result_facts AS facts
+		JOIN (SELECT race_id, MAX(known_at) AS known_at FROM result_facts WHERE known_at < ? GROUP BY race_id) AS latest
+		ON latest.race_id = facts.race_id AND latest.known_at = facts.known_at ORDER BY facts.race_id`, ts(cutoff))
 }
 
 func (s *Store) Result(ctx context.Context, raceID string) (*domain.RaceResult, error) {
@@ -428,6 +440,29 @@ func (s *Store) SaveTip(ctx context.Context, t tracking.Tip, source string, at t
 	return saveTip(ctx, s.db, t, source, at)
 }
 
+// SaveSealedTip stores the seal card and tip atomically. The first card for a
+// race remains fixed even if a later refresh changes the current card.
+func (s *Store) SaveSealedTip(ctx context.Context, t tracking.Tip, race domain.Race, source string, at time.Time) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO seal_cards (race_id, version, captured_at, json) VALUES (?,1,?,?) ON CONFLICT(race_id) DO NOTHING`, race.ID, ts(at), mustJSON(race)); err != nil {
+		tx.Rollback()
+		return err
+	}
+	if err := saveTip(ctx, tx, t, source, at); err != nil {
+		tx.Rollback()
+		return err
+	}
+	return tx.Commit()
+}
+
+// SealCard returns the immutable race card used at seal time.
+func (s *Store) SealCard(ctx context.Context, raceID string) (*domain.Race, error) {
+	return queryOne[domain.Race](ctx, s.db, `SELECT json FROM seal_cards WHERE race_id = ?`, raceID)
+}
+
 type execer interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
@@ -570,6 +605,23 @@ func (s *Store) SetActiveWeights(ctx context.Context, id string) error {
 	}
 	_ = res
 	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	return tx.Commit()
+}
+
+// InstallManualWeights stores a new immutable set and activates it atomically.
+func (s *Store) InstallManualWeights(ctx context.Context, weights rating.Weights, at time.Time) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO weights (id, origin, created_at, active, json) VALUES (?, 'manual', ?, 0, ?)`, weights.ID, ts(at), mustJSON(weights)); err != nil {
+		tx.Rollback()
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE weights SET active = CASE WHEN id = ? THEN 1 ELSE 0 END`, weights.ID); err != nil {
 		tx.Rollback()
 		return err
 	}

@@ -38,6 +38,11 @@ public struct SubsetPerformance: Codable, Hashable, Sendable {
     public static let empty = SubsetPerformance(settled: 0, wins: 0, roi: nil)
 }
 
+public struct WilsonInterval: Codable, Hashable, Sendable {
+    public let lower: Double
+    public let upper: Double
+}
+
 /// What the tips actually did.
 ///
 /// Three things here exist specifically to stop the app flattering itself, and
@@ -78,6 +83,9 @@ public struct AccuracyReport: Codable, Hashable, Sendable {
     public let settledWithoutPrice: Int
 
     public let favouriteBaseline: SubsetPerformance
+    public let benchmarkedModel: SubsetPerformance?
+    public let modelWilson: WilsonInterval?
+    public let favouriteWilson: WilsonInterval?
     public let whenAgreeingWithFavourite: SubsetPerformance
     public let whenDisagreeing: SubsetPerformance
 
@@ -135,6 +143,7 @@ public enum AccuracyCalculator {
 
         var favouriteSettled = 0
         var favouriteWins = 0
+        var benchmarkedWins = 0
         var favouriteBets = 0
         var favouriteReturned = 0.0
 
@@ -195,6 +204,7 @@ public enum AccuracyCalculator {
                 if let favourite = tip.favouriteOutcome {
                     favouriteSettled += 1
                     if favourite.won { favouriteWins += 1 }
+                    if won { benchmarkedWins += 1 }
                     if let price = favourite.betfairSP, price > 1 {
                         favouriteBets += 1
                         favouriteReturned += returnFor(
@@ -226,6 +236,13 @@ public enum AccuracyCalculator {
                 wins: favouriteWins,
                 roi: favouriteBets > 0 ? ROI(bets: favouriteBets, returned: favouriteReturned) : nil
             ),
+            benchmarkedModel: SubsetPerformance(
+                settled: favouriteSettled,
+                wins: benchmarkedWins,
+                roi: nil
+            ),
+            modelWilson: Self.wilson(wins: benchmarkedWins, trials: favouriteSettled),
+            favouriteWilson: Self.wilson(wins: favouriteWins, trials: favouriteSettled),
             whenAgreeingWithFavourite: SubsetPerformance(
                 settled: agreed.settled,
                 wins: agreed.wins,
@@ -237,6 +254,17 @@ public enum AccuracyCalculator {
                 roi: disagreed.bets > 0 ? ROI(bets: disagreed.bets, returned: disagreed.returned) : nil
             )
         )
+    }
+
+    private static func wilson(wins: Int, trials: Int) -> WilsonInterval? {
+        guard trials > 0 else { return nil }
+        let z = 1.959963984540054
+        let count = Double(trials)
+        let rate = Double(wins) / count
+        let denominator = 1 + z * z / count
+        let center = (rate + z * z / (2 * count)) / denominator
+        let halfWidth = z * sqrt((rate * (1 - rate) + z * z / (4 * count)) / count) / denominator
+        return WilsonInterval(lower: max(0, center - halfWidth), upper: min(1, center + halfWidth))
     }
 
     /// Return on a one-point stake. A winner pays the price less the stake, net of

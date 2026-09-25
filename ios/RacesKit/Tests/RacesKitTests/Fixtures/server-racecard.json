@@ -458,7 +458,7 @@
           "horseID": "hrs_3",
           "horseName": "Unraced Newcomer",
           "clothNumber": 3,
-          "formScore": -0.014864851284812752,
+          "formScore": -0.01486485128481275,
           "winProbability": 0.20954851737344599,
           "contributions": [
             {
@@ -640,7 +640,7 @@
               "detail": "0-P42",
               "zScore": -1.390186268533193,
               "weight": 0.25,
-              "probabilityDelta": -0.039060683019170137,
+              "probabilityDelta": -0.03906068301917011,
               "availability": {
                 "available": {}
               }

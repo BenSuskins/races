@@ -95,7 +95,7 @@ func (a Assessment) Selection() *RunnerAssessment {
 	for i := range a.Runners {
 		r := &a.Runners[i]
 		edge := r.ValueEdge()
-		if edge == nil || *edge < a.MinimumValueEdge || r.WinProbability < a.MinimumValueProbability {
+		if edge == nil || *edge+1e-12 < a.MinimumValueEdge || r.WinProbability < a.MinimumValueProbability {
 			continue
 		}
 		if best == nil {

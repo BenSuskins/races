@@ -33,6 +33,23 @@ final class RecordViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_theRecordDefaultsToActiveAndCanSelectAnEarlierWeightSet() async throws {
+        let record = ServerRecord.fixture(
+            weightsInUse: ["v2": 2, "v3": 4],
+            activeWeightsID: "v3")
+        let server = FakeRacesServer(record: .success(record))
+        let model = RecordViewModel(link: ServerLink(server: server), store: nil)
+
+        await model.load()
+        XCTAssertEqual(model.selectedWeightsID, "v3")
+        XCTAssertEqual(server.recordRequests, [nil])
+
+        await model.selectWeights("v2")
+        XCTAssertEqual(model.selectedWeightsID, "v2")
+        XCTAssertEqual(server.recordRequests, [nil, "v2"])
+    }
+
+    @MainActor
     func test_refreshAsksTheServerToCollectResults() async throws {
         let server = FakeRacesServer(record: .success(.fixture()))
         let model = RecordViewModel(link: ServerLink(server: server), store: nil)

@@ -24,6 +24,7 @@ struct RecordView: View {
                         description: Text("The server records a tip for every race five minutes before the off and settles it after racing. History from before the server can be uploaded in Settings."))
                 } else {
                     List {
+                        weightsSelector
                         headline(report)
                         baseline(report)
                         split(report)
@@ -54,6 +55,27 @@ struct RecordView: View {
     // MARK: - Sections
 
     @ViewBuilder
+    private var weightsSelector: some View {
+        if !model.weightsInUse.isEmpty {
+            Section("Weight set") {
+                Picker("Population", selection: selectedWeightsBinding) {
+                    ForEach(model.weightsInUse.keys.sorted(), id: \.self) { weightsID in
+                        Text(weightsID == model.activeWeightsID ? "\(weightsID) (active)" : weightsID)
+                            .tag(weightsID)
+                    }
+                }
+            }
+        }
+    }
+
+    private var selectedWeightsBinding: Binding<String> {
+        Binding(
+            get: { model.selectedWeightsID ?? model.activeWeightsID ?? "" },
+            set: { weightsID in Task { await model.selectWeights(weightsID) } }
+        )
+    }
+
+    @ViewBuilder
     private func headline(_ report: AccuracyReport) -> some View {
         Section {
             LabeledContent("Settled", value: "\(report.settled)")
@@ -73,9 +95,24 @@ struct RecordView: View {
     /// The most important number in the app.
     @ViewBuilder
     private func baseline(_ report: AccuracyReport) -> some View {
+        let model = report.benchmarkedModel ?? .empty
         Section {
-            LabeledContent("Favourite's strike rate",
-                           value: percent(report.favouriteBaseline.strikeRate))
+            LabeledContent("Model, benchmarked races") {
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(percent(model.strikeRate)).monospacedDigit()
+                    Text("\(model.wins)/\(model.settled)")
+                        .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                    Text(interval(report.modelWilson)).font(.caption2).foregroundStyle(.secondary)
+                }
+            }
+            LabeledContent("Favourite, same races") {
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(percent(report.favouriteBaseline.strikeRate)).monospacedDigit()
+                    Text("\(report.favouriteBaseline.wins)/\(report.favouriteBaseline.settled)")
+                        .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                    Text(interval(report.favouriteWilson)).font(.caption2).foregroundStyle(.secondary)
+                }
+            }
             if let beats = report.beatsFavouriteOnStrikeRate {
                 LabeledContent("Beating the favourite") {
                     Text(beats ? "Yes" : "No")
@@ -180,5 +217,10 @@ struct RecordView: View {
     private func percent(_ value: Double?) -> String {
         guard let value else { return "—" }
         return value.formatted(.percent.precision(.fractionLength(1)))
+    }
+
+    private func interval(_ value: WilsonInterval?) -> String {
+        guard let value else { return "95% interval unavailable" }
+        return "95%: \(percent(value.lower))–\(percent(value.upper))"
     }
 }

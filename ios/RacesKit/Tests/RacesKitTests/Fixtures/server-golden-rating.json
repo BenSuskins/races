@@ -23,7 +23,7 @@
         {
           "horseID": "hrs_3",
           "winProbability": 0.09395573959763438,
-          "formScore": -0.014864851284812752,
+          "formScore": -0.01486485128481275,
           "marketProbability": 0.11293518256439286
         },
         {
@@ -55,7 +55,7 @@
         {
           "horseID": "hrs_3",
           "winProbability": 0.20954851737344599,
-          "formScore": -0.014864851284812752
+          "formScore": -0.01486485128481275
         },
         {
           "horseID": "hrs_4",
@@ -129,7 +129,7 @@
         {
           "horseID": "hrs_3",
           "winProbability": 0.09395573959763438,
-          "formScore": -0.014864851284812752,
+          "formScore": -0.01486485128481275,
           "marketProbability": 0.11293518256439286
         },
         {
@@ -161,7 +161,7 @@
         {
           "horseID": "hrs_3",
           "winProbability": 0.20954851737344599,
-          "formScore": -0.014864851284812752
+          "formScore": -0.01486485128481275
         },
         {
           "horseID": "hrs_4",
@@ -235,7 +235,7 @@
         {
           "horseID": "hrs_3",
           "winProbability": 0.09395573959763438,
-          "formScore": -0.014864851284812752,
+          "formScore": -0.01486485128481275,
           "marketProbability": 0.11293518256439286
         },
         {
@@ -267,7 +267,7 @@
         {
           "horseID": "hrs_3",
           "winProbability": 0.20954851737344599,
-          "formScore": -0.014864851284812752
+          "formScore": -0.01486485128481275
         },
         {
           "horseID": "hrs_4",
@@ -346,7 +346,7 @@
         },
         {
           "horseID": "hrs_4",
-          "winProbability": 0.04811774695726012,
+          "winProbability": 0.048117746957260114,
           "formScore": 0,
           "marketProbability": 0.048117746957260114
         }

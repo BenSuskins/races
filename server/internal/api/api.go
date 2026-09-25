@@ -7,13 +7,16 @@
 package api
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"sort"
 	"strconv"
@@ -58,6 +61,7 @@ func (s *Server) Handler() http.Handler {
 	v1.HandleFunc("GET /v1/model", s.model)
 	v1.HandleFunc("POST /v1/import", s.importHistory)
 	v1.HandleFunc("POST /v1/backtests", s.runBacktest)
+	v1.HandleFunc("POST /v1/admin/weights", s.installWeights)
 	v1.HandleFunc("GET /v1/backtests", s.backtests)
 	v1.HandleFunc("GET /v1/backtests/{id}", s.backtests)
 	v1.HandleFunc("POST /v1/admin/jobs/{name}", s.runJob)
@@ -373,10 +377,11 @@ func (s *Server) tips(w http.ResponseWriter, r *http.Request) {
 
 // Record is GET /v1/record.
 type Record struct {
-	WeightsID    string          `json:"weightsID,omitempty"`
-	Commission   float64         `json:"commission"`
-	Report       tracking.Report `json:"report"`
-	WeightsInUse map[string]int  `json:"weightsInUse"`
+	WeightsID       string          `json:"weightsID,omitempty"`
+	ActiveWeightsID string          `json:"activeWeightsID,omitempty"`
+	Commission      float64         `json:"commission"`
+	Report          tracking.Report `json:"report"`
+	WeightsInUse    map[string]int  `json:"weightsInUse"`
 	// Sources counts tips by where they came from, so a record that is mostly
 	// imported history says so.
 	Sources       map[string]int `json:"sources"`
@@ -386,6 +391,14 @@ type Record struct {
 func (s *Server) record(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	weightsID := r.URL.Query().Get("weightsID")
+	active, err := s.Service.Store.ActiveWeights(ctx)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	if weightsID == "" && active != nil {
+		weightsID = active.ID
+	}
 	commission := tracking.DefaultCommission
 	if c, err := strconv.ParseFloat(r.URL.Query().Get("commission"), 64); err == nil && c >= 0 && c <= 1 {
 		commission = c
@@ -402,7 +415,11 @@ func (s *Server) record(w http.ResponseWriter, r *http.Request) {
 		sources[row.Source]++
 	}
 	inUse, _ := s.Service.Store.WeightsIDsInUse(ctx)
-	writeJSON(w, http.StatusOK, Record{WeightsID: weightsID, Commission: commission, Report: tracking.Accuracy(tips, commission), WeightsInUse: inUse, Sources: sources, ArchivedRaces: s.Service.ArchivedRaceCount(ctx)})
+	activeID := ""
+	if active != nil {
+		activeID = active.ID
+	}
+	writeJSON(w, http.StatusOK, Record{WeightsID: weightsID, ActiveWeightsID: activeID, Commission: commission, Report: tracking.Accuracy(tips, commission), WeightsInUse: inUse, Sources: sources, ArchivedRaces: s.Service.ArchivedRaceCount(ctx)})
 }
 
 // MARK: - Model
@@ -471,7 +488,9 @@ func (s *Server) importHistory(w http.ResponseWriter, r *http.Request) {
 func (s *Server) runBacktest(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var req backtest.Request
-	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+	decoder := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil && !errors.Is(err, io.EOF) {
 		writeError(w, http.StatusBadRequest, "badRequest", err.Error())
 		return
 	}
@@ -482,6 +501,10 @@ func (s *Server) runBacktest(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "badRequest", "Supplied weights need an id.")
 			return
 		}
+		if err := validateManualWeights(*req.Weights); err != nil {
+			writeError(w, http.StatusBadRequest, "badRequest", err.Error())
+			return
+		}
 		weights = req.Weights
 	case req.WeightsID != "":
 		weights, _ = s.Service.Store.Weights(ctx, req.WeightsID)
@@ -490,6 +513,45 @@ func (s *Server) runBacktest(w http.ResponseWriter, r *http.Request) {
 	}
 	if weights == nil {
 		writeError(w, http.StatusNotFound, "notFound", "No such weights.")
+		return
+	}
+	if len(req.Variants) > 0 {
+		sweep := backtest.SweepReport{Reports: make([]backtest.VariantReport, 0, len(req.Variants))}
+		seen := map[string]bool{}
+		for _, variant := range req.Variants {
+			if seen[variant.Name] {
+				writeError(w, http.StatusBadRequest, "badRequest", "Sweep variant names must be unique.")
+				return
+			}
+			seen[variant.Name] = true
+			candidate, err := backtest.ApplyOverrides(*weights, variant)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, "badRequest", err.Error())
+				return
+			}
+			variantRequest := req
+			variantRequest.Variants = nil
+			variantRequest.Weights = nil
+			variantRequest.WeightsID = weights.ID
+			report, err := backtest.Run(ctx, s.Service.Store, candidate, variantRequest)
+			if err != nil {
+				s.internal(w, err)
+				return
+			}
+			if sweep.SharedCorpusID == "" {
+				sweep.SharedCorpusID = report.CorpusID
+			} else if sweep.SharedCorpusID != report.CorpusID {
+				s.internal(w, errors.New("sweep variants used different race sets"))
+				return
+			}
+			sweep.Reports = append(sweep.Reports, backtest.VariantReport{Name: variant.Name, Report: report})
+		}
+		id, err := s.Service.Store.SaveBacktest(ctx, weights.ID, req, sweep, s.now())
+		if err != nil {
+			s.internal(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"id": id, "sweep": sweep})
 		return
 	}
 	rep, err := backtest.Run(ctx, s.Service.Store, *weights, req)
@@ -503,6 +565,88 @@ func (s *Server) runBacktest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"id": id, "report": rep})
+}
+
+func (s *Server) installWeights(w http.ResponseWriter, r *http.Request) {
+	body, readErr := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if readErr != nil {
+		writeError(w, http.StatusBadRequest, "badRequest", readErr.Error())
+		return
+	}
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.DisallowUnknownFields()
+	var weights rating.Weights
+	if err := decoder.Decode(&weights); err != nil {
+		writeError(w, http.StatusBadRequest, "badRequest", err.Error())
+		return
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		writeError(w, http.StatusBadRequest, "badRequest", "The request must contain one JSON object.")
+		return
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(body, &fields); err != nil {
+		s.internal(w, err)
+		return
+	}
+	for _, key := range []string{"marketExponent", "formInfluence", "formInfluenceNoMarket", "clip", "overroundMethod", "minimumMarketCoverage", "factorWeights", "formDecay", "formPoints", "formSeasonBreakPenalty", "formLongBreakPenalty", "formMaxRuns", "minimumStrikeRateSample", "minimumValueEdge", "minimumValueProbability"} {
+		if _, exists := fields[key]; !exists {
+			writeError(w, http.StatusBadRequest, "badRequest", "The full weight set is required.")
+			return
+		}
+	}
+	if err := validateManualWeights(weights); err != nil {
+		writeError(w, http.StatusBadRequest, "badRequest", err.Error())
+		return
+	}
+	var suffix [8]byte
+	if _, err := rand.Read(suffix[:]); err != nil {
+		s.internal(w, err)
+		return
+	}
+	weights.ID = fmt.Sprintf("manual-%d-%x", s.now().Unix(), suffix[:])
+	if err := s.Service.Store.InstallManualWeights(r.Context(), weights, s.now()); err != nil {
+		s.internal(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"weights": weights, "origin": "manual", "active": true})
+}
+
+func validateManualWeights(weights rating.Weights) error {
+	finite := func(value float64) bool { return !math.IsNaN(value) && !math.IsInf(value, 0) }
+	if weights.OverroundMethod != rating.Proportional && weights.OverroundMethod != rating.Power {
+		return errors.New("invalid overroundMethod")
+	}
+	if !finite(weights.MarketExponent) || weights.MarketExponent <= 0 || weights.MarketExponent > 4 ||
+		!finite(weights.FormInfluence) || weights.FormInfluence < 0 || weights.FormInfluence > 1 ||
+		!finite(weights.FormInfluenceNoMarket) || weights.FormInfluenceNoMarket < 0 || weights.FormInfluenceNoMarket > 1 ||
+		!finite(weights.Clip) || weights.Clip <= 0 || weights.Clip > 10 ||
+		!finite(weights.MinimumMarketCoverage) || weights.MinimumMarketCoverage < 0 || weights.MinimumMarketCoverage > 1 ||
+		!finite(weights.FormDecay) || weights.FormDecay < 0 || weights.FormDecay > 1 ||
+		!finite(weights.FormSeasonBreakPenalty) || weights.FormSeasonBreakPenalty < 0 || weights.FormSeasonBreakPenalty > 1 ||
+		!finite(weights.FormLongBreakPenalty) || weights.FormLongBreakPenalty < 0 || weights.FormLongBreakPenalty > 1 ||
+		weights.FormMaxRuns < 1 || weights.FormMaxRuns > 20 || weights.MinimumStrikeRateSample < 30 ||
+		!finite(weights.MinimumValueEdge) || weights.MinimumValueEdge < -1 || weights.MinimumValueEdge > 10 ||
+		!finite(weights.MinimumValueProbability) || weights.MinimumValueProbability < 0 || weights.MinimumValueProbability > 1 {
+		return errors.New("weight fields are outside valid ranges")
+	}
+	if len(weights.FactorWeights) != len(rating.AllFactors) || len(weights.FormPoints) != len(rating.DefaultFormPoints()) {
+		return errors.New("factorWeights and formPoints must contain every supported key")
+	}
+	for _, id := range rating.AllFactors {
+		value, ok := weights.FactorWeights[string(id)]
+		if !ok || !finite(value) || value < 0 || value > 1 {
+			return fmt.Errorf("invalid factor weight %q", id)
+		}
+	}
+	for key := range rating.DefaultFormPoints() {
+		value, ok := weights.FormPoints[key]
+		if !ok || !finite(value) || value < 0 || value > 1 {
+			return fmt.Errorf("invalid form point %q", key)
+		}
+	}
+	return nil
 }
 
 func (s *Server) backtests(w http.ResponseWriter, r *http.Request) {

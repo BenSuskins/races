@@ -117,6 +117,7 @@ public struct ServerRaceDetail: Codable, Hashable, Sendable {
 /// its own and any history a phone uploaded.
 public struct ServerRecord: Codable, Hashable, Sendable {
     public let weightsID: String?
+    public let activeWeightsID: String?
     public let commission: Double
     public let report: AccuracyReport
     public let weightsInUse: [String: Int]
@@ -126,6 +127,7 @@ public struct ServerRecord: Codable, Hashable, Sendable {
 
     public init(
         weightsID: String? = nil,
+        activeWeightsID: String? = nil,
         commission: Double = AccuracyCalculator.defaultCommission,
         report: AccuracyReport,
         weightsInUse: [String: Int] = [:],
@@ -133,6 +135,7 @@ public struct ServerRecord: Codable, Hashable, Sendable {
         archivedRaces: Int = 0
     ) {
         self.weightsID = weightsID
+        self.activeWeightsID = activeWeightsID
         self.commission = commission
         self.report = report
         self.weightsInUse = weightsInUse

@@ -23,6 +23,7 @@ final class FakeRacesServer: RacesServing, @unchecked Sendable {
 
     private var _racecardCalls = 0
     private var _jobs: [String] = []
+    private var _recordRequests: [String?] = []
     private var _uploads: [ServerHistoryUpload] = []
 
     static let unscripted = APIError.server(status: 599, serverMessage: "FakeRacesServer: not scripted")
@@ -47,6 +48,7 @@ final class FakeRacesServer: RacesServing, @unchecked Sendable {
 
     var racecardCalls: Int { lock.withLock { _racecardCalls } }
     var jobs: [String] { lock.withLock { _jobs } }
+    var recordRequests: [String?] { lock.withLock { _recordRequests } }
     var uploads: [ServerHistoryUpload] { lock.withLock { _uploads } }
 
     func setRacecard(_ result: Result<ServerRacecard, APIError>, for day: RaceDay = .today) {
@@ -69,7 +71,13 @@ final class FakeRacesServer: RacesServing, @unchecked Sendable {
     }
 
     func race(id: String) async throws -> ServerRaceDetail { try lock.withLock { _race }.get() }
-    func record(weightsID: String?) async throws -> ServerRecord { try lock.withLock { _record }.get() }
+    func record(weightsID: String?) async throws -> ServerRecord {
+        let result = lock.withLock { () -> Result<ServerRecord, APIError> in
+            _recordRequests.append(weightsID)
+            return _record
+        }
+        return try result.get()
+    }
     func model() async throws -> ServerModel { try lock.withLock { _model }.get() }
 
     func importHistory(_ upload: ServerHistoryUpload) async throws -> ServerImportSummary {
@@ -306,10 +314,14 @@ extension ServerRecord {
     static func fixture(
         tips: [TipRecord] = [],
         sources: [String: Int] = [:],
-        archivedRaces: Int = 0
+        archivedRaces: Int = 0,
+        weightsInUse: [String: Int] = [:],
+        activeWeightsID: String? = nil
     ) -> ServerRecord {
         ServerRecord(
+            activeWeightsID: activeWeightsID,
             report: AccuracyCalculator.report(for: tips),
+            weightsInUse: weightsInUse,
             sources: sources,
             archivedRaces: archivedRaces)
     }

@@ -52,11 +52,13 @@ final class ServerContractTests: XCTestCase {
 
     func test_theRecordDecodesIntoAnAccuracyReport() throws {
         let record = try decode(ServerRecord.self, "server-record.json")
-        XCTAssertEqual(record.sources["device:phone"], 3, "the uploaded history is counted and labelled")
-        XCTAssertGreaterThan(record.report.total, 0)
-        XCTAssertEqual(record.report.settled, 2)
-        XCTAssertEqual(record.report.wins, 1)
-        XCTAssertEqual(record.report.favouriteBaseline.settled, 1)
+        XCTAssertEqual(record.weightsID, record.activeWeightsID)
+        XCTAssertEqual(record.sources["server"], 2)
+        XCTAssertEqual(record.report.total, 2)
+        XCTAssertEqual(record.report.pending, 2)
+        XCTAssertEqual(record.report.benchmarkedModel?.settled, record.report.favouriteBaseline.settled)
+        XCTAssertNil(record.report.modelWilson)
+        XCTAssertNil(record.report.favouriteWilson)
     }
 
     func test_theModelDecodesIntoRatingWeights() throws {

@@ -12,6 +12,9 @@ final class RecordViewModel {
     /// Tips by where they came from: `server`, or `device:<name>` for history
     /// uploaded from a phone.
     private(set) var sources: [String: Int] = [:]
+    private(set) var weightsInUse: [String: Int] = [:]
+    private(set) var activeWeightsID: String?
+    private(set) var selectedWeightsID: String?
     /// Non-nil when the record on screen is the last one saved on the phone.
     private(set) var staleSince: Date?
 
@@ -37,7 +40,7 @@ final class RecordViewModel {
     func load() async {
         if state.value == nil { state = .loading }
         do {
-            let record = try await link.require().record(weightsID: nil)
+            let record = try await link.require().record(weightsID: selectedWeightsID)
             apply(record)
             staleSince = nil
             if let store { await store.saveRecord(record) }
@@ -59,6 +62,15 @@ final class RecordViewModel {
         state = .loaded(record.report)
         archivedRaceCount = record.archivedRaces
         sources = record.sources
+        weightsInUse = record.weightsInUse
+        activeWeightsID = record.activeWeightsID
+        if selectedWeightsID == nil { selectedWeightsID = record.weightsID ?? record.activeWeightsID }
+    }
+
+    func selectWeights(_ weightsID: String) async {
+        selectedWeightsID = weightsID
+        state = .loading
+        await load()
     }
 
     /// Ask the server to collect results now rather than at its next quarter

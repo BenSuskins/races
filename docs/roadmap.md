@@ -126,10 +126,11 @@ are outside this environment's network policy.
 
 ### 2. Back-test harness and CI job
 
-**Owner: Claude. Partly built: `POST /v1/backtests` on the server re-rates every
-sealed race from its stored card and seal-time prices, and scores every frozen
-snapshot, against the market. What is left is the CI assertion over real
-history, which depends on item 1 for fixtures and item 4 for the control arm.**
+**Owner: Claude. Built: `POST /v1/backtests` replays server tips from immutable
+seal cards and seal-time prices. It reports highest-probability and value
+selection over one corpus, supports named sweeps, and records market log loss.
+Legacy sealed tips without a seal card are excluded until raw-payload recovery
+exists. A real control report still needs access to the deployed database.**
 
 Runs the rater over past races with known results and reports strike rate, ROI,
 the favourite baseline and log loss for the model and for the market. Pure and

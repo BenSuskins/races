@@ -61,6 +61,7 @@ Environment variables, supplied by Ansible from the vault
 | Hourly, 06:00–22:00 | Tomorrow's card, markets, drafts |
 | Every 15 min from 12:00, and 23:55 | Today's results, Betfair SP, settlement |
 | 06:00 | Course directory |
+| 02:45 | Baseline back-test, stored with the active weight ID |
 | 03:00 | Retraining |
 
 A race first seen after its off is never recorded, and a sealed tip is never
@@ -79,11 +80,12 @@ Everything under `/v1` needs `Authorization: Bearer $RACES_API_TOKEN`.
 | `GET /v1/racecards?day=today\|tomorrow` | Races, assessments, tips, results and match refusals for a day |
 | `GET /v1/races/{id}` | One race in full, with the snapshot it was sealed on |
 | `GET /v1/tips?weightsID=&date=` | Tips, with their source |
-| `GET /v1/record?weightsID=&commission=` | The accuracy report — favourite baseline, agree/disagree split, separate denominators |
+| `GET /v1/record?weightsID=&commission=` | The selected weight set's accuracy report, shared favourite benchmark, and Wilson intervals. Defaults to the active set |
 | `GET /v1/model` | Active weights, every stored set, factor copy, training progress |
 | `POST /v1/import` | A phone's pre-server documents. Idempotent |
-| `POST /v1/backtests` | `{"weightsID": …}` or `{"weights": {…}}`, optional `from`/`to` dates |
+| `POST /v1/backtests` | `{"weightsID": …}` or `{"weights": {…}}`, optional `from`/`to` dates and named `variants` |
 | `GET /v1/backtests[/{id}]` | Stored back-tests |
+| `POST /v1/admin/weights` | Install and activate a validated immutable weight set |
 | `POST /v1/admin/jobs/{courses\|cards\|markets\|tips\|results\|train\|all}` | Run a job now |
 
 ```bash
@@ -92,6 +94,24 @@ curl -s -H "$T" https://races-api.suskins.co.uk/v1/status | jq
 curl -s -H "$T" -X POST -d '{"weightsID":"market-only","from":"2026-10-01"}' \
   https://races-api.suskins.co.uk/v1/backtests | jq .report
 ```
+
+Every back-test report includes the exact `weightsID`, date range, shared
+`corpusID`, both selection policies, the favourite arm, market log loss, and
+sample counts. Sweep variants use the same race IDs and reject unknown fields.
+Run the standard de-vig and value-gate sweeps with
+`RACES_API_TOKEN=... bash scripts/backtest-sweeps.sh`.
+
+The nightly baseline replay runs at 02:45 London time, after the final results
+pass and before training. Its report ID and weight ID appear in the job summary
+at `GET /v1/status`.
+
+Manual weights require every field. The server validates the full set, mints a
+new ID, stores origin `manual`, and activates it in one transaction. A stored ID
+never changes.
+
+The Record tab selects the active weight set by default. It can show earlier
+sets as separate populations. The all-tip model report remains distinct from
+the model and favourite subset with matching benchmark coverage.
 
 ## The contract with the app
 

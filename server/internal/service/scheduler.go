@@ -11,7 +11,7 @@ import (
 // timetable is tested without a clock.
 type Plan struct {
 	Courses, CardsToday, CardsTomorrow, MarketsToday, MarketsTomorrow bool
-	DraftToday, DraftTomorrow, Seal, Results, Train                   bool
+	DraftToday, DraftTomorrow, Seal, Results, Train, Backtest         bool
 }
 
 // PlanFor is the timetable:
@@ -21,7 +21,7 @@ type Plan struct {
 //   - hourly, 06:00–22:00: tomorrow's card, markets and drafts;
 //   - every 15 minutes from 12:00, and at 23:55: today's results — the free
 //     endpoint is today-only, so the last pass of the day matters most;
-//   - 06:00: the course directory; 03:00: retraining.
+//   - 06:00: the course directory; 02:45: baseline replay; 03:00: retraining.
 func PlanFor(t time.Time) Plan {
 	l := t.In(domain.London)
 	h, m := l.Hour(), l.Minute()
@@ -39,6 +39,7 @@ func PlanFor(t time.Time) Plan {
 	}
 	p.Courses = h == 6 && m == 0
 	p.Train = h == 3 && m == 0
+	p.Backtest = h == 2 && m == 45
 	return p
 }
 
@@ -63,6 +64,7 @@ func (s *Service) Execute(ctx context.Context, p Plan) {
 	step(p.DraftTomorrow, func() error { return s.DraftTips(ctx, domain.Tomorrow) })
 	step(p.Results, func() error { _, err := s.CollectResults(ctx); return err })
 	step(p.Train, func() error { _, err := s.Train(ctx); return err })
+	step(p.Backtest, func() error { _, _, err := s.BaselineBacktest(ctx); return err })
 }
 
 // Run executes the start-up plan, then ticks on each wall-clock minute until

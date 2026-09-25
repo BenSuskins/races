@@ -69,6 +69,11 @@ is noise, and showing it would invite exactly the wrong conclusion.
 Commission defaults to Betfair's 5% base rate and is a user setting, since the
 real rate varies with discount and points allowance.
 
+The Record tab defaults to the active `weightsID` and can select earlier sets.
+Each selection uses only tips with that ID. The all-tip model rate is separate
+from the model and favourite rates over the same benchmarked races. The server
+returns a 95% Wilson interval for both rates; the app shows it with the count.
+
 ## The three figures that keep it honest
 
 **1. The favourite baseline.** What backing the market favourite would have done

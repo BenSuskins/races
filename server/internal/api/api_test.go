@@ -14,11 +14,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bensuskins/races/server/internal/backtest"
 	"github.com/bensuskins/races/server/internal/domain"
 	"github.com/bensuskins/races/server/internal/importer"
 	"github.com/bensuskins/races/server/internal/racingapi"
+	"github.com/bensuskins/races/server/internal/rating"
 	"github.com/bensuskins/races/server/internal/service"
 	"github.com/bensuskins/races/server/internal/store"
+	"github.com/bensuskins/races/server/internal/tracking"
 )
 
 const token = "test-token-0123456789"
@@ -155,13 +158,13 @@ func TestImportRecordAndModel(t *testing.T) {
 	code, body = call(t, s, "GET", "/v1/record", nil, true)
 	var rec Record
 	json.Unmarshal(body, &rec)
-	if code != 200 || rec.Report.Settled != 2 || rec.Sources["device:phone"] != 3 || rec.WeightsInUse["v2"] != 2 {
-		t.Fatal(string(body))
+	if code != 200 || rec.WeightsID != "v3" || rec.ActiveWeightsID != "v3" || rec.Report.Total != 0 {
+		t.Fatalf("the default record uses the active population: %s", string(body))
 	}
 	_, body = call(t, s, "GET", "/v1/record?weightsID=v2", nil, true)
 	json.Unmarshal(body, &rec)
-	if rec.Report.Total != 2 {
-		t.Fatal("the record splits by weights id")
+	if rec.Report.Settled != 1 || rec.Sources["device:phone"] != 2 || rec.Report.BenchmarkedModel.Settled != 1 {
+		t.Fatalf("the record splits by weight id: %s", string(body))
 	}
 	code, body = call(t, s, "GET", "/v1/model", nil, true)
 	var m Model
@@ -194,6 +197,69 @@ func TestBacktestAndJobs(t *testing.T) {
 	json.Unmarshal(body, &st)
 	if code != 200 || !st.RacingAPI.Configured || st.Betfair.Configured || st.ActiveWeights != "v3" || len(st.Jobs) == 0 {
 		t.Fatal(string(body))
+	}
+}
+
+func TestManualWeightsAreValidatedAndActivatedAtomically(t *testing.T) {
+	s, svc := setup(t)
+	old := tracking.Tip{RaceID: "old-race", WeightsID: "v3"}
+	if err := svc.Store.SaveTip(context.Background(), old, "server", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	code, body := call(t, s, "POST", "/v1/admin/weights", rating.V2(), true)
+	if code != http.StatusCreated {
+		t.Fatalf("%d: %s", code, body)
+	}
+	var result struct {
+		Weights rating.Weights `json:"weights"`
+		Origin  string         `json:"origin"`
+		Active  bool           `json:"active"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		t.Fatal(err)
+	}
+	active, err := svc.Store.ActiveWeights(context.Background())
+	if err != nil || active.ID != result.Weights.ID || !strings.HasPrefix(active.ID, "manual-") || result.Origin != "manual" || !result.Active {
+		t.Fatalf("manual weights were not activated: %+v, %+v, %v", result, active, err)
+	}
+	unchanged, err := svc.Store.Tip(context.Background(), "old-race")
+	if err != nil || unchanged == nil || unchanged.Tip.WeightsID != "v3" {
+		t.Fatal("manual promotion changed a sealed tip", err)
+	}
+	code, body = call(t, s, "POST", "/v1/admin/weights", map[string]any{"id": "incomplete"}, true)
+	if code != http.StatusBadRequest {
+		t.Fatalf("incomplete body accepted: %d %s", code, body)
+	}
+	after, err := svc.Store.ActiveWeights(context.Background())
+	if err != nil || after.ID != active.ID {
+		t.Fatal("invalid body changed the active set", err)
+	}
+}
+
+func TestBacktestSweepUsesOneCorpusAndRejectsUnknownOverrides(t *testing.T) {
+	s, _ := setup(t)
+	request := map[string]any{
+		"weightsID": "v3",
+		"variants": []any{
+			map[string]any{"name": "decay-low", "overrides": map[string]any{"formDecay": 0.4}},
+			map[string]any{"name": "power", "overrides": map[string]any{"overroundMethod": "power"}},
+		},
+	}
+	code, body := call(t, s, "POST", "/v1/backtests", request, true)
+	var result struct {
+		Sweep backtest.SweepReport `json:"sweep"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		t.Fatal(err)
+	}
+	if code != http.StatusOK || len(result.Sweep.Reports) != 2 || result.Sweep.SharedCorpusID == "" ||
+		result.Sweep.Reports[0].Report.CorpusID != result.Sweep.SharedCorpusID || result.Sweep.Reports[1].Report.CorpusID != result.Sweep.SharedCorpusID {
+		t.Fatalf("variants did not share a corpus: %d %s", code, body)
+	}
+	request["variants"] = []any{map[string]any{"name": "bad", "overrides": map[string]any{"unknownField": 1}}}
+	code, body = call(t, s, "POST", "/v1/backtests", request, true)
+	if code != http.StatusBadRequest {
+		t.Fatalf("unknown override accepted: %d %s", code, body)
 	}
 }
 
