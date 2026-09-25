@@ -70,6 +70,8 @@ var epoch = time.Unix(0, 0)
 
 type fakeStrikeRates struct {
 	jockeys, trainers map[string]StrikeRate
+	horseGoings       map[string]PlaceRate
+	horseOverall      map[string]PlaceRate
 	baseline          float64
 }
 
@@ -82,6 +84,14 @@ func (f fakeStrikeRates) TrainerStrikeRate(id string) (StrikeRate, bool) {
 	return s, ok
 }
 func (f fakeStrikeRates) BaselineStrikeRate() float64 { return f.baseline }
+func (f fakeStrikeRates) HorseGoingRate(horseID string, surface domain.Surface, bucket domain.GoingBucket) (PlaceRate, bool) {
+	rate, ok := f.horseGoings[horseID+"|"+string(surface)+"|"+string(bucket)]
+	return rate, ok
+}
+func (f fakeStrikeRates) HorseOverallPlaceRate(horseID string) (PlaceRate, bool) {
+	rate, ok := f.horseOverall[horseID]
+	return rate, ok
+}
 
 func contribution(t *testing.T, r RunnerAssessment, id FactorID) Contribution {
 	t.Helper()
@@ -497,6 +507,26 @@ func TestStrikeRateFactorsStaySilentOnThinArchive(t *testing.T) {
 	}
 }
 
+func TestHorseGoingFactorUsesOnlyMatureBucketHistory(t *testing.T) {
+	factor := horseGoing{minimumSample: 3}
+	archive := fakeStrikeRates{
+		horseGoings:  map[string]PlaceRate{"horse|turf|soft": {Runs: 3, Places: 2}},
+		horseOverall: map[string]PlaceRate{"horse": {Runs: 4, Places: 3}},
+	}
+	context := Context{Race: domain.Race{Going: domain.GoingHeavy, Surface: domain.SurfaceTurf}, StrikeRates: archive}
+	got := factor.Value(runner("horse", runnerOpts{}), context)
+	if got.Raw == nil || !near(*got.Raw, 0.545, 0.001) || got.Availability.Kind != Available {
+		t.Fatalf("expected smoothed soft-bucket place rate, got %#v", got)
+	}
+	context.Race.Going = domain.GoingGood
+	if got := factor.Value(runner("horse", runnerOpts{}), context); got.Availability.Kind != Available || got.Raw == nil || !near(*got.Raw, 0.472, 0.001) {
+		t.Fatalf("thin going bucket must fall back to general horse form: %#v", got)
+	}
+	if got := factor.Value(runner("new-horse", runnerOpts{}), context); got.Availability.Kind != Available || got.Raw == nil || !near(*got.Raw, 0.25, 1e-9) {
+		t.Fatalf("no mature history must use the field prior: %#v", got)
+	}
+}
+
 // FactorDescriptionTests: every factor has copy, the presets name every
 // factor, and the set of deliberate zeros does not change silently.
 func TestFactorDescriptions(t *testing.T) {
@@ -516,7 +546,7 @@ func TestFactorDescriptions(t *testing.T) {
 			}
 		}
 	}
-	want := map[FactorID]bool{Draw: true, Headgear: true, JockeyStrikeRate: true, TrainerStrikeRate: true}
+	want := map[FactorID]bool{Draw: true, Headgear: true, JockeyStrikeRate: true, TrainerStrikeRate: true, HorseGoingPlaceRate: true}
 	if len(zeros) != len(want) {
 		t.Fatal("the set of deliberate zeros changed", zeros)
 	}

@@ -13,6 +13,17 @@ import (
 // Going is the state of the ground. Raw values match Swift's enum cases.
 type Going string
 
+type GoingBucket string
+
+const (
+	GoingBucketSoft     GoingBucket = "soft"
+	GoingBucketGood     GoingBucket = "good"
+	GoingBucketFirm     GoingBucket = "firm"
+	GoingBucketSlow     GoingBucket = "slow"
+	GoingBucketStandard GoingBucket = "standard"
+	GoingBucketFast     GoingBucket = "fast"
+)
+
 const (
 	GoingHeavy          Going = "heavy"
 	GoingSoft           Going = "soft"
@@ -57,6 +68,33 @@ func ParseGoing(raw string) Going {
 		return GoingFast
 	}
 	return GoingUnknown
+}
+
+func (g Going) Bucket(surface Surface) GoingBucket {
+	if surface == SurfaceAllWeather {
+		switch g {
+		case GoingSlow, GoingStandardToSlow:
+			return GoingBucketSlow
+		case GoingStandard:
+			return GoingBucketStandard
+		case GoingStandardToFast, GoingFast:
+			return GoingBucketFast
+		}
+		return ""
+	}
+	if surface != SurfaceTurf {
+		return ""
+	}
+	switch g {
+	case GoingHeavy, GoingSoft:
+		return GoingBucketSoft
+	case GoingGoodToSoft, GoingGood:
+		return GoingBucketGood
+	case GoingGoodToFirm, GoingFirm:
+		return GoingBucketFirm
+	default:
+		return ""
+	}
 }
 
 // Surface is turf or all-weather.

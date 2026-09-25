@@ -255,6 +255,17 @@
                 "_0": "only 2 runs recorded so far"
               }
             }
+          },
+          {
+            "factor": "horseGoingPlaceRate",
+            "label": "Horse record by going",
+            "detail": "Field place prior (75%)",
+            "zScore": 0,
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "available": {}
+            }
           }
         ]
       },
@@ -400,6 +411,17 @@
               "missingData": {
                 "_0": "no record in the archive yet"
               }
+            }
+          },
+          {
+            "factor": "horseGoingPlaceRate",
+            "label": "Horse record by going",
+            "detail": "Field place prior (75%)",
+            "zScore": 0,
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "available": {}
             }
           }
         ]
@@ -552,6 +574,17 @@
                 "_0": "no record in the archive yet"
               }
             }
+          },
+          {
+            "factor": "horseGoingPlaceRate",
+            "label": "Horse record by going",
+            "detail": "Field place prior (75%)",
+            "zScore": 0,
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "available": {}
+            }
           }
         ]
       },
@@ -697,6 +730,17 @@
               "missingData": {
                 "_0": "no record in the archive yet"
               }
+            }
+          },
+          {
+            "factor": "horseGoingPlaceRate",
+            "label": "Horse record by going",
+            "detail": "Field place prior (75%)",
+            "zScore": 0,
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "available": {}
             }
           }
         ]
@@ -857,6 +901,17 @@
           "missingData": {
             "_0": "only 2 runs recorded so far"
           }
+        }
+      },
+      {
+        "factor": "horseGoingPlaceRate",
+        "label": "Horse record by going",
+        "detail": "Field place prior (75%)",
+        "zScore": 0,
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "available": {}
         }
       }
     ],

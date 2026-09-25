@@ -79,6 +79,28 @@ public enum Going: String, Codable, Sendable, CaseIterable {
         case .unknown: return nil
         }
     }
+
+    public func bucket(on surface: Surface) -> HorseGoingBucket? {
+        if surface == .allWeather {
+            switch self {
+            case .slow, .standardToSlow: return .slow
+            case .standard: return .standard
+            case .standardToFast, .fast: return .fast
+            default: return nil
+            }
+        }
+        guard surface == .turf else { return nil }
+        switch self {
+        case .heavy, .soft: return .soft
+        case .goodToSoft, .good: return .good
+        case .goodToFirm, .firm: return .firm
+        default: return nil
+        }
+    }
+}
+
+public enum HorseGoingBucket: String, Codable, Sendable {
+    case soft, good, firm, slow, standard, fast
 }
 
 public enum Surface: String, Codable, Sendable, CaseIterable {

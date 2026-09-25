@@ -38,8 +38,14 @@ The app reads. It holds the server's address and an API token, nothing else.
 
 ## Configuration
 
-Environment variables, supplied by Ansible from the vault
-(`tasks/docker/races-server.yml` in the homelab repo):
+The live server runs as the `races-server` container on the Docker host. It
+binds host port `8790` to container port `8080` and stores its database in
+`/home/docker/server-docker/races`, mounted at `/data`. The current Homelab
+repository has no Ansible task for this container. Confirm the host's
+deployment method before replacing the image. Preserve its environment and
+data mount.
+
+Environment variables:
 
 | Variable | |
 |---|---|
@@ -108,7 +114,7 @@ Legacy seal-card recovery runs against the server database. After the new
 server version applies its migrations, run the scan without `--apply`:
 
 ```bash
-docker exec CONTAINER_NAME /races-server recover-seal-cards
+docker exec races-server /races-server recover-seal-cards
 ```
 
 The scan accepts a card only when all retained pre-seal versions are identical
@@ -116,7 +122,7 @@ and rerating it reproduces every stored tip field exactly. Review the payload
 IDs and statuses. Back up the database, then apply only the verified rows with:
 
 ```bash
-docker exec CONTAINER_NAME /races-server recover-seal-cards --apply
+docker exec races-server /races-server recover-seal-cards --apply
 ```
 
 Recovery inserts missing cards only and records the source payload ID and
