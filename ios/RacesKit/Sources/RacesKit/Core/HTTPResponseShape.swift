@@ -29,6 +29,11 @@ public struct HTTPResponseShape: Hashable, Sendable, CustomStringConvertible {
     /// from an empty reply from JSON of an unexpected shape.
     public let snippet: String
 
+    /// The field that could not be read, when the failure was a decode rather
+    /// than a transport problem. Optional because a shape is also built where
+    /// there is no `DecodingError` to describe.
+    public let failure: DecodingFailure?
+
     public static let snippetLimit = 160
 
     /// Unbroken letter/digit runs this long are tokens, ids or hashes rather
@@ -37,11 +42,19 @@ public struct HTTPResponseShape: Hashable, Sendable, CustomStringConvertible {
     /// about what might be in it.
     static let redactRunsOfAtLeast = 20
 
-    public init(statusCode: Int, contentType: String?, body: Data) {
+    /// `failure` defaults to nil so a caller with nothing to add says nothing,
+    /// rather than every call site growing an argument it cannot fill.
+    public init(
+        statusCode: Int,
+        contentType: String?,
+        body: Data,
+        failure: DecodingFailure? = nil
+    ) {
         self.statusCode = statusCode
         self.contentType = Self.normalise(contentType)
         self.byteCount = body.count
         self.snippet = Self.makeSnippet(from: body)
+        self.failure = failure
     }
 
     static func normalise(_ raw: String?) -> String? {
@@ -110,6 +123,110 @@ public struct HTTPResponseShape: Hashable, Sendable, CustomStringConvertible {
     }
 
     public var description: String {
-        "HTTP \(statusCode), \(contentType ?? "no content type"), \(byteCount) bytes: \(snippet)"
+        let head = "HTTP \(statusCode), \(contentType ?? "no content type"), \(byteCount) bytes"
+        guard let failure else { return "\(head): \(snippet)" }
+        // The path leads, because it is the finding. The body still follows: it
+        // is what distinguishes a card with one odd runner from a login page.
+        return "\(head), \(failure). Body: \(snippet)"
     }
+}
+
+/// Which field could not be read, and why.
+///
+/// `HTTPResponseShape` says what arrived. This says what we could not make sense
+/// of in it, and the two answer genuinely different questions — the second is
+/// usually the actionable one.
+///
+/// The case that earned it: a 418KB Betfair catalogue, HTTP 200,
+/// `application/json`, beginning with a perfectly well-formed market. Every fact
+/// the response shape could offer said the reply was fine, because it *was*
+/// fine; one runner some way down carried one `null` where a string was
+/// expected, and that single value cost the whole day's card. From the body
+/// alone that is indistinguishable from a payload wrong from its first byte, and
+/// a 160-character snippet can never show it. The coding path names it outright.
+public struct DecodingFailure: Hashable, Sendable, CustomStringConvertible {
+
+    /// Dotted and bracketed, in the shape a reader would use to find the value:
+    /// `[0].runners[3].metadata.SIRE_NAME`.
+    public let path: String
+
+    /// Foundation's own explanation, collapsed to one line and redacted exactly
+    /// as a body snippet is — `dataCorrupted` occasionally quotes the offending
+    /// value, and this string is built to be pasted into an issue unread.
+    public let reason: String
+
+    static let reasonLimit = 120
+
+    public init(path: String, reason: String) {
+        self.path = path
+        self.reason = reason
+    }
+
+    /// Fails for anything that is not a `DecodingError`, so a caller can offer
+    /// it for every error and get a payload only where there is one to give.
+    public init?(_ error: Error) {
+        guard let error = error as? DecodingError else { return nil }
+
+        let context: DecodingError.Context
+        var trailing: (any CodingKey)?
+        switch error {
+        case .typeMismatch(_, let found), .valueNotFound(_, let found):
+            context = found
+        case .keyNotFound(let key, let found):
+            context = found
+            // The absent key is not in the container's path, and it is the one
+            // thing worth naming.
+            trailing = key
+        case .dataCorrupted(let found):
+            context = found
+        @unknown default:
+            return nil
+        }
+
+        let fullPath: [any CodingKey] = context.codingPath + (trailing.map { [$0] } ?? [])
+        self.path = Self.describe(fullPath)
+        self.reason = Self.tidy(context.debugDescription, fallback: Self.name(of: error))
+    }
+
+    static func describe(_ codingPath: [any CodingKey]) -> String {
+        var rendered = ""
+        for key in codingPath {
+            // An array index has an `intValue`; a JSON object key does not. The
+            // distinction is what makes the result readable as a path rather
+            // than a list.
+            if let index = key.intValue {
+                rendered += "[\(index)]"
+            } else {
+                rendered += rendered.isEmpty ? key.stringValue : ".\(key.stringValue)"
+            }
+        }
+        // The root is a real answer: "the top-level value was the wrong type"
+        // is exactly what an HTML error page decodes to.
+        return rendered.isEmpty ? "(the whole response)" : rendered
+    }
+
+    static func tidy(_ raw: String, fallback: String) -> String {
+        let collapsed = raw
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        let redacted = HTTPResponseShape.redacting(collapsed)
+        guard !redacted.isEmpty else { return fallback }
+        if redacted.count > reasonLimit {
+            return String(redacted.prefix(reasonLimit)) + "…"
+        }
+        return redacted
+    }
+
+    static func name(of error: DecodingError) -> String {
+        switch error {
+        case .typeMismatch: return "wrong type"
+        case .valueNotFound: return "value missing"
+        case .keyNotFound: return "key missing"
+        case .dataCorrupted: return "not valid JSON"
+        @unknown default: return "could not be decoded"
+        }
+    }
+
+    public var description: String { "at \(path): \(reason)" }
 }

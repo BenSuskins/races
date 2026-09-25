@@ -229,6 +229,45 @@ final class BetfairClientTests: XCTestCase {
         }
     }
 
+    func test_aCatalogueWeCannotReadNamesTheFieldRatherThanOurSecondGuess() async throws {
+        // `BetfairRawResponse` tries the array, then the fault envelope. The
+        // envelope cannot decode from an array either, so reporting *its*
+        // complaint — "expected a dictionary, found an array" — describes our
+        // own fallback and hides the finding. The array's error names the field.
+        //
+        // This is not hypothetical. A 418KB catalogue that would not decode
+        // reported exactly that, and the real cause was one value some way down
+        // the payload. Nothing in the message could point at it.
+        let transport = FakeHTTPTransport()
+        transport.enqueueJSON(#"""
+        [{"marketId":"1.262709800","marketName":"1m2f Mdn Stks","runners":[
+            {"selectionId":102146666},
+            {"selectionId":null}
+        ]}]
+        """#)
+        let client = await makeClient(transport)
+
+        do {
+            _ = try await client.markets(day: .today, countries: ["GB"])
+            XCTFail("Expected the decode to fail")
+        } catch {
+            guard case .decoding(let reported) = APIError.from(error) else {
+                return XCTFail("Expected decoding, got \(APIError.from(error))")
+            }
+            let shape = try XCTUnwrap(reported)
+            let failure = try XCTUnwrap(
+                shape.failure, "A decode failure with no coding path is the bug this fixes")
+            XCTAssertEqual(failure.path, "[0].runners[1].selectionId")
+            // And the message the user reads says so, which is the point.
+            XCTAssertTrue(
+                shape.description.contains("[0].runners[1].selectionId"),
+                shape.description)
+            XCTAssertFalse(
+                shape.description.lowercased().contains("dictionary"),
+                "That would be the envelope's complaint, not the payload's: \(shape.description)")
+        }
+    }
+
     func test_anUnknownFaultCodeIsCarriedThroughRatherThanSwallowed() async throws {
         let transport = FakeHTTPTransport()
         transport.enqueueJSON(

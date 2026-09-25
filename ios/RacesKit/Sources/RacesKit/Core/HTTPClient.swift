@@ -260,11 +260,16 @@ public final class HTTPClient: @unchecked Sendable {
             // first line of the body are usually the entire diagnosis, and
             // discarding them leaves the user with "try again" for a failure
             // that trying again will not change.
+            //
+            // And carry the coding path, because "usually" is not "always": a
+            // valid payload with one unexpected value satisfies every other
+            // question this type can answer, and only the path says where.
             throw APIError.decoding(
                 HTTPResponseShape(
                     statusCode: response.statusCode,
                     contentType: response.value(forHTTPHeaderField: "Content-Type"),
-                    body: data
+                    body: data,
+                    failure: DecodingFailure(error)
                 )
             )
         }

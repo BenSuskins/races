@@ -241,18 +241,35 @@ enum BetfairRawResponse<Value: Decodable>: Decodable {
 
     init(from decoder: Decoder) throws {
         // The happy path first: the overwhelmingly common case should not pay
-        // for the error shape.
-        if let values = try? [Value](from: decoder) {
-            self = .success(values)
+        // for the error shape. Its error is kept rather than dropped — see the
+        // last branch for why that matters.
+        let arrayFailure: Error
+        do {
+            self = .success(try [Value](from: decoder))
+            return
+        } catch {
+            arrayFailure = error
+        }
+
+        // Not an array. It may be Betfair's fault envelope, which arrives on a
+        // 200 as readily as on a 400.
+        if let envelope = try? BetfairFaultEnvelope(from: decoder),
+           let code = envelope.errorCode {
+            self = .fault(BetfairFault(
+                code: BetfairErrorCode(rawValue: code),
+                details: envelope.detail?.apingException?.errorDetails))
             return
         }
-        let envelope = try BetfairFaultEnvelope(from: decoder)
-        guard let code = envelope.errorCode else {
-            throw APIError.decoding(nil)
-        }
-        self = .fault(BetfairFault(
-            code: BetfairErrorCode(rawValue: code),
-            details: envelope.detail?.apingException?.errorDetails))
+
+        // Neither shape. Report why the **array** failed, not why the envelope
+        // did.
+        //
+        // A `try?` here throws away the only error that names a field. When a
+        // catalogue could not be read, what surfaced was the envelope's
+        // complaint — "expected a dictionary, found an array" — which describes
+        // our own second guess and says nothing about the payload. The array's
+        // error names the exact field, and the field is the whole diagnosis.
+        throw arrayFailure
     }
 }
 

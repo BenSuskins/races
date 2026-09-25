@@ -283,6 +283,28 @@ live in Ansible Vault, and only the server sees them.
   matcher's *primary* join key — so treating it as real would join on a value
   every such runner shares. `BetfairMapping.clothNumber` requires `> 0`. All the
   metadata arrives as strings, including the numeric fields.
+- **`try?` on a speculative decode throws away the only useful error.**
+  `BetfairRawResponse` tries the array, then Betfair's fault envelope. With the
+  array attempt written as `try?`, a catalogue that would not decode surfaced
+  the *envelope's* complaint — "expected a dictionary, found an array" — which
+  describes our own second guess and says nothing about the payload. Keep the
+  first error and throw it when neither shape decodes: it is the one that names
+  the field.
+- **A decode diagnostic without the coding path is only half a diagnostic.**
+  `HTTPResponseShape` answers "what arrived"; `DecodingFailure` answers "what we
+  could not read in it", and they are different questions. The case that earned
+  it was a 418KB Betfair catalogue: HTTP 200, `application/json`, opening with a
+  well-formed market — every fact the shape could offer said the reply was fine,
+  because it was, and a 160-character snippet of 418KB can never show the one
+  value that was not. Only `DecodingError.codingPath` identified it.
+  `HTTPClient.decode` now fills both in for every call, which matters most on
+  the **app↔server** contract: the Swift client decodes the Go server's JSON
+  with synthesised `Codable`, so a shape drift on either side lands here, and
+  the path names the field rather than leaving 40KB of valid JSON to read by
+  eye. Note the asymmetry between the two `DecodingError` cases:
+  `valueNotFound` *includes* the failing key in `codingPath`, `keyNotFound`
+  does **not** — it carries the absent key separately, so taking the path alone
+  drops the only part worth reading.
 - **Betfair's price ladder is best-price-first**, so the best available is
   `.first`, never `max`. `max` happens to be right for backing and is wrong for
   laying, which is the sort of asymmetry that survives a casual read.
