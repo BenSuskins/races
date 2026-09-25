@@ -398,6 +398,12 @@ live in Ansible Vault, and only the server sees them.
   and returns `nil` where none is needed: it compares the **current UTC offset**
   rather than the zone identifier, so Europe/Dublin is not nagged for a zone that
   keeps London's clock all year.
+- **Odds are always fractional on screen, never decimal, and there is no
+  setting.** Betfair and the server speak decimal — `marketBackPrice`,
+  `fairOdds`, starting prices — and that is right for the maths, but anything
+  the app *shows* as odds goes through `FractionalOdds.display(decimal:)`,
+  which snaps to the traditional ladder ("5/2", "Evens", "4/6"). A raw
+  `.formatted(.number…)` on a price is the bug.
 - **`Date.FormatStyle.timeZone(_:)` is not the counterpart of `.locale(_:)`,
   and the mistake compiles nowhere but reads perfectly.** `.locale(locale)`
   returns a style using that locale, so `.timeZone(timeZone)` looks like it does
@@ -479,9 +485,10 @@ live in Ansible Vault, and only the server sees them.
   which truncates. A new response field of type `time.Time` is the bug.
 - **The trainer has a hard floor of 100 training races, whatever the
   configuration says.** It is in the Swift original too:
-  `eligible.count - validationCount >= 100`. RacesKit's own trainer tests run at
-  40 races and assert a fit, which that guard cannot reach — so the Go tests use
-  150. If those Swift tests are red, that is why, and it predates the server.
+  `eligible.count - validationCount >= 100`. RacesKit's trainer tests once ran
+  at 40 races and asserted a fit, which that guard cannot reach; they now fit on
+  150, as the Go tests do, and keep 40 only to prove the floor refuses. A trainer
+  test that expects a fit needs more than 100 races left after validation.
 - **Qualify the column inside `json_each`.** `json_each(json, '$.runnerIDs')` in
   an `UPDATE training_samples` silently matched nothing — the bare `json` is
   ambiguous with the function of the same name. `training_samples.json` works,

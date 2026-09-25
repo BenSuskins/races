@@ -140,7 +140,7 @@ public actor BetfairClient: MarketDataProviding {
             let request = BetfairBookRequest(
                 marketIds: marketIDs,
                 priceProjection: BetfairPriceProjection(priceData: priceData, virtualise: false))
-            return try await send("/listMarketBook/", body: request)
+            return try await send("/listMarketBook/", body: request, passingOversize: true)
         } catch let fault as BetfairFault where fault.code == .tooMuchData && marketIDs.count > 1 {
             let middle = marketIDs.count / 2
             let left = try await booksSplittingOnOversize(
@@ -148,6 +148,9 @@ public actor BetfairClient: MarketDataProviding {
             let right = try await booksSplittingOnOversize(
                 Array(marketIDs[middle...]), priceData: priceData)
             return left + right
+        } catch let fault as BetfairFault {
+            // A single market still too big: nothing left to split.
+            throw fault.code.asAPIError
         }
     }
 
@@ -157,18 +160,25 @@ public actor BetfairClient: MarketDataProviding {
     ///
     /// The retry is deliberately single and deliberately only for an invalid
     /// session: anything else that loops here would hammer the exchange.
+    ///
+    /// Every fault leaves as an `APIError`, except that `passingOversize` lets
+    /// `TOO_MUCH_DATA` out as the raw `BetfairFault`. The book splitter needs to
+    /// see it to halve the batch; mapped first, it arrived as a `badRequest` the
+    /// splitter's catch could never match, so no batch was ever split.
     private func send<Response: Decodable, Body: Encodable>(
         _ path: String,
-        body: Body
+        body: Body,
+        passingOversize: Bool = false
     ) async throws -> [Response] {
         do {
             return try await sendOnce(path, body: body)
         } catch let fault as BetfairFault {
+            if passingOversize && fault.code == .tooMuchData { throw fault }
             guard fault.code.isRecoverableBySigningInAgain else {
                 throw fault.code.asAPIError
             }
             await session.invalidate()
-            return try await sendMappingFaults(path, body: body)
+            return try await sendMappingFaults(path, body: body, passingOversize: passingOversize)
         }
     }
 
@@ -176,11 +186,13 @@ public actor BetfairClient: MarketDataProviding {
     /// each function has a single, plainly exhaustive do/catch.
     private func sendMappingFaults<Response: Decodable, Body: Encodable>(
         _ path: String,
-        body: Body
+        body: Body,
+        passingOversize: Bool
     ) async throws -> [Response] {
         do {
             return try await sendOnce(path, body: body)
         } catch let fault as BetfairFault {
+            if passingOversize && fault.code == .tooMuchData { throw fault }
             throw fault.code.asAPIError
         }
     }

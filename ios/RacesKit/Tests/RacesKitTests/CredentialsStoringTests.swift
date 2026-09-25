@@ -138,9 +138,11 @@ final class CredentialsStoringTests: XCTestCase {
 
     // MARK: - Slots
 
-    func test_onlyPasswordSlotsAreSecret() {
+    /// The server token is the bearer credential for every `/v1` call, so it is
+    /// as secret as the provider passwords it replaced.
+    func test_passwordsAndTheServerTokenAreSecret() {
         let secret = CredentialSlot.allCases.filter(\.isSecret)
 
-        XCTAssertEqual(Set(secret), [.racingAPIPassword, .betfairPassword])
+        XCTAssertEqual(Set(secret), [.racingAPIPassword, .betfairPassword, .serverToken])
     }
 }

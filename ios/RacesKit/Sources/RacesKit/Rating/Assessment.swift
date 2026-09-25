@@ -153,6 +153,22 @@ public struct RaceAssessment: Codable, Hashable, Sendable {
         return selection.horseID == favourite.horseID
     }
 
+    /// The runner the model gives the best chance, whatever its price.
+    public var topRated: RunnerAssessment? {
+        runners.max { $0.winProbability < $1.winProbability }
+    }
+
+    /// The selection is a value pick rather than the model's most likely winner:
+    /// its price beat both thresholds, so it was preferred over `topRated`.
+    ///
+    /// Worth saying on screen every time, because the card shows the selection's
+    /// win probability and the runner list shows everyone's, and without it a
+    /// 15% pick sitting above a 35% runner reads as a bug.
+    public var isValuePick: Bool {
+        guard !isFormOnly, let selection, let topRated else { return false }
+        return selection.horseID != topRated.horseID
+    }
+
     public init(
         raceID: String,
         generatedAt: Date,

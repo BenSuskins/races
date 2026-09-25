@@ -158,7 +158,7 @@
       "raceID": "rac_1001",
       "generatedAt": "2026-09-20T09:00:00Z",
       "modelVersion": "market-anchored-3",
-      "weightsID": "v2",
+      "weightsID": "v3",
       "marketCoverage": 0,
       "isMarketDelayed": false,
       "runners": [
@@ -754,13 +754,13 @@
       ],
       "confidence": "low",
       "minimumValueEdge": 0.05,
-      "minimumValueProbability": 0.08
+      "minimumValueProbability": 1
     },
     "rac_1002": {
       "raceID": "rac_1002",
       "generatedAt": "2026-09-20T09:00:00Z",
       "modelVersion": "market-anchored-3",
-      "weightsID": "v2",
+      "weightsID": "v3",
       "marketCoverage": 0,
       "isMarketDelayed": false,
       "runners": [
@@ -1061,7 +1061,7 @@
       ],
       "confidence": "low",
       "minimumValueEdge": 0.05,
-      "minimumValueProbability": 0.08
+      "minimumValueProbability": 1
     }
   },
   "tips": {
@@ -1079,7 +1079,7 @@
       "wasFormOnly": true,
       "confidence": "low",
       "modelVersion": "market-anchored-3",
-      "weightsID": "v2",
+      "weightsID": "v3",
       "contributions": [
         {
           "factor": "officialRating",
@@ -1235,7 +1235,7 @@
       "wasFormOnly": true,
       "confidence": "low",
       "modelVersion": "market-anchored-3",
-      "weightsID": "v2",
+      "weightsID": "v3",
       "contributions": [
         {
           "factor": "officialRating",
