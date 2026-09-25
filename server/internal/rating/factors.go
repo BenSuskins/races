@@ -204,7 +204,7 @@ func (f horseGoing) Value(r domain.Runner, ctx Context) FactorValue {
 		smoothed := overall.Smoothed(prior, 5)
 		return value(smoothed, fmt.Sprintf("%d%% placed from %d runs", int(math.Round(smoothed*100)), overall.Runs))
 	}
-	return missing("no mature horse record; using the field prior")
+	return value(prior, fmt.Sprintf("Field place prior (%d%%)", int(math.Round(prior*100))))
 }
 
 func fieldPlacePrior(fieldSize *int) float64 {

@@ -309,13 +309,12 @@
             {
               "factor": "horseGoingPlaceRate",
               "label": "Horse record by going",
-              "detail": "—",
+              "detail": "Field place prior (75%)",
+              "zScore": 0,
               "weight": 0,
               "probabilityDelta": 0,
               "availability": {
-                "missingData": {
-                  "_0": "no mature horse record; using the field prior"
-                }
+                "available": {}
               }
             }
           ]
@@ -467,13 +466,12 @@
             {
               "factor": "horseGoingPlaceRate",
               "label": "Horse record by going",
-              "detail": "—",
+              "detail": "Field place prior (75%)",
+              "zScore": 0,
               "weight": 0,
               "probabilityDelta": 0,
               "availability": {
-                "missingData": {
-                  "_0": "no mature horse record; using the field prior"
-                }
+                "available": {}
               }
             }
           ]
@@ -630,13 +628,12 @@
             {
               "factor": "horseGoingPlaceRate",
               "label": "Horse record by going",
-              "detail": "—",
+              "detail": "Field place prior (75%)",
+              "zScore": 0,
               "weight": 0,
               "probabilityDelta": 0,
               "availability": {
-                "missingData": {
-                  "_0": "no mature horse record; using the field prior"
-                }
+                "available": {}
               }
             }
           ]
@@ -788,13 +785,12 @@
             {
               "factor": "horseGoingPlaceRate",
               "label": "Horse record by going",
-              "detail": "—",
+              "detail": "Field place prior (75%)",
+              "zScore": 0,
               "weight": 0,
               "probabilityDelta": 0,
               "availability": {
-                "missingData": {
-                  "_0": "no mature horse record; using the field prior"
-                }
+                "available": {}
               }
             }
           ]
@@ -960,13 +956,12 @@
             {
               "factor": "horseGoingPlaceRate",
               "label": "Horse record by going",
-              "detail": "—",
+              "detail": "Field place prior (25%)",
+              "zScore": 0,
               "weight": 0,
               "probabilityDelta": 0,
               "availability": {
-                "missingData": {
-                  "_0": "no mature horse record; using the field prior"
-                }
+                "available": {}
               }
             }
           ]
@@ -1119,13 +1114,12 @@
             {
               "factor": "horseGoingPlaceRate",
               "label": "Horse record by going",
-              "detail": "—",
+              "detail": "Field place prior (25%)",
+              "zScore": 0,
               "weight": 0,
               "probabilityDelta": 0,
               "availability": {
-                "missingData": {
-                  "_0": "no mature horse record; using the field prior"
-                }
+                "available": {}
               }
             }
           ]
@@ -1293,13 +1287,12 @@
         {
           "factor": "horseGoingPlaceRate",
           "label": "Horse record by going",
-          "detail": "—",
+          "detail": "Field place prior (75%)",
+          "zScore": 0,
           "weight": 0,
           "probabilityDelta": 0,
           "availability": {
-            "missingData": {
-              "_0": "no mature horse record; using the field prior"
-            }
+            "available": {}
           }
         }
       ],
@@ -1462,13 +1455,12 @@
         {
           "factor": "horseGoingPlaceRate",
           "label": "Horse record by going",
-          "detail": "—",
+          "detail": "Field place prior (25%)",
+          "zScore": 0,
           "weight": 0,
           "probabilityDelta": 0,
           "availability": {
-            "missingData": {
-              "_0": "no mature horse record; using the field prior"
-            }
+            "available": {}
           }
         }
       ],

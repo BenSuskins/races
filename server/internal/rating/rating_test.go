@@ -522,6 +522,9 @@ func TestHorseGoingFactorUsesOnlyMatureBucketHistory(t *testing.T) {
 	if got := factor.Value(runner("horse", runnerOpts{}), context); got.Availability.Kind != Available || got.Raw == nil || !near(*got.Raw, 0.472, 0.001) {
 		t.Fatalf("thin going bucket must fall back to general horse form: %#v", got)
 	}
+	if got := factor.Value(runner("new-horse", runnerOpts{}), context); got.Availability.Kind != Available || got.Raw == nil || !near(*got.Raw, 0.25, 1e-9) {
+		t.Fatalf("no mature history must use the field prior: %#v", got)
+	}
 }
 
 // FactorDescriptionTests: every factor has copy, the presets name every

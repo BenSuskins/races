@@ -291,6 +291,6 @@ public struct HorseGoingFactor: RatingFactor {
             let smoothed = overall.smoothed(towards: fieldPrior)
             return .value(smoothed, "\(Int((smoothed * 100).rounded()))% placed from \(overall.runs) runs")
         }
-        return .missing("no mature horse record; using the field prior")
+        return .value(fieldPrior, "Field place prior (\(Int((fieldPrior * 100).rounded()))%)")
     }
 }

@@ -45,7 +45,9 @@ final class ResultsArchiveTests: XCTestCase {
         let reading = HorseGoingFactor().value(for: race.runners[0], in: context)
         XCTAssertTrue(reading.availability.isAvailable)
         XCTAssertTrue(reading.display.contains("on similar ground from 3 runs"))
-        XCTAssertNil(HorseGoingFactor().value(for: TestRace.runner("unknown"), in: context).raw)
+        let unknownHorse = HorseGoingFactor().value(for: TestRace.runner("unknown"), in: context)
+        XCTAssertEqual(unknownHorse.raw, 0.25)
+        XCTAssertEqual(unknownHorse.display, "Field place prior (25%)")
     }
 
     /// The single most important property of this type. The app re-fetches
