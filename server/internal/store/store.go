@@ -790,7 +790,7 @@ func (s *Store) LoadDocument(ctx context.Context, name string, v any) (bool, err
 	return true, json.Unmarshal([]byte(raw), v)
 }
 
-// MARK: - Back-tests, imports, job runs
+// MARK: - Back-tests, job runs
 
 func (s *Store) SaveBacktest(ctx context.Context, weightsID string, request, report any, at time.Time) (int64, error) {
 	res, err := s.db.ExecContext(ctx, `INSERT INTO backtests (created_at, weights_id, request, report) VALUES (?,?,?,?)`, ts(at), weightsID, mustJSON(request), mustJSON(report))
@@ -831,11 +831,6 @@ func (s *Store) Backtests(ctx context.Context, id int64) ([]BacktestRow, error) 
 		out = append(out, b)
 	}
 	return out, rows.Err()
-}
-
-func (s *Store) SaveImport(ctx context.Context, device string, summary any, raw []byte, at time.Time) error {
-	_, err := s.db.ExecContext(ctx, `INSERT INTO imports (device, received_at, summary, raw) VALUES (?,?,?,?)`, device, ts(at), mustJSON(summary), gz(raw))
-	return err
 }
 
 // JobRun is the last run of a scheduled job.
@@ -937,40 +932,4 @@ func queryOne[T any](ctx context.Context, db queryer, q string, args ...any) (*T
 		return nil, err
 	}
 	return &list[0], nil
-}
-
-// Tx runs fn in a transaction, for the importer.
-func (s *Store) Tx(ctx context.Context, fn func(tx *Tx) error) error {
-	sqlTx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	if err := fn(&Tx{tx: sqlTx}); err != nil {
-		sqlTx.Rollback()
-		return err
-	}
-	return sqlTx.Commit()
-}
-
-// Tx exposes the writes an import needs, atomically.
-type Tx struct{ tx *sql.Tx }
-
-func (t *Tx) Tip(ctx context.Context, raceID string) (*TipRow, error) {
-	var raw, source string
-	err := t.tx.QueryRowContext(ctx, `SELECT json, source FROM tips WHERE race_id = ?`, raceID).Scan(&raw, &source)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	var tip tracking.Tip
-	if err := json.Unmarshal([]byte(raw), &tip); err != nil {
-		return nil, err
-	}
-	return &TipRow{Tip: tip, Source: source}, nil
-}
-
-func (t *Tx) SaveTip(ctx context.Context, tip tracking.Tip, source string, at time.Time) error {
-	return saveTip(ctx, t.tx, tip, source, at)
 }

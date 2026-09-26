@@ -18,10 +18,8 @@ final class AppEnvironment {
     private let credentials: any CredentialsStoring
     private let makeServer: (ServerConfiguration) -> any RacesServing
 
-    /// Last-known responses on disk, and the history a device collected
-    /// before the server existed.
+    /// Last-known responses on disk.
     let store: RacesStore
-    let history: LegacyHistory
 
     private(set) var configuration: ServerConfiguration?
     private(set) var credentialsFailure: APIError?
@@ -40,13 +38,11 @@ final class AppEnvironment {
     init(
         credentials: any CredentialsStoring,
         store: RacesStore? = nil,
-        history: LegacyHistory = .applicationSupport(),
         makeServer: ((ServerConfiguration) -> any RacesServing)? = nil
     ) {
         self.credentials = credentials
         let store = store ?? RacesStore(documents: AppEnvironment.makeDocumentStore())
         self.store = store
-        self.history = history
         self.makeServer = makeServer ?? { configuration in
             RacesServerClient(configuration: configuration, transport: SharedTransport.instance)
         }

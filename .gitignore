@@ -20,6 +20,7 @@ ios-test-results/
 # Claude local config (may contain secrets)
 .claude/
 .worktrees/
+plans/
 
 # Never commit provider credentials. The app takes them from Settings at runtime
 # and stores them in the Keychain — nothing belongs in the repo.
