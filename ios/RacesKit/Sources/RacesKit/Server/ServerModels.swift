@@ -226,6 +226,40 @@ public struct ServerJobRun: Codable, Hashable, Sendable, Identifiable {
     public var id: String { name }
 }
 
+/// A stored back-test, or a named sweep, as returned by `GET /v1/backtests`.
+public struct ServerBacktest: Decodable, Hashable, Sendable, Identifiable {
+    public let id: Int64
+    public let createdAt: Date
+    public let weightsID: String
+    public let report: ServerBacktestReport
+}
+
+public struct ServerBacktestReport: Decodable, Hashable, Sendable {
+    public let from: String?
+    public let to: String?
+    public let corpusID: String?
+    public let sharedCorpusID: String?
+    public let highestProbability: ServerBacktestArm?
+    public let favourite: ServerBacktestArm?
+    public let marketLogLoss: Double?
+    public let reports: [ServerBacktestVariant]?
+}
+
+public struct ServerBacktestVariant: Decodable, Hashable, Sendable, Identifiable {
+    public let name: String
+    public let report: ServerBacktestReport
+
+    public var id: String { name }
+}
+
+public struct ServerBacktestArm: Decodable, Hashable, Sendable {
+    public let races: Int
+    public let wins: Int
+    public let strikeRate: Double?
+    public let logLoss: Double?
+    public let brier: Double?
+}
+
 /// `GET /v1/status`: what Settings shows under "Test connection".
 public struct ServerStatus: Codable, Hashable, Sendable {
     public let version: String

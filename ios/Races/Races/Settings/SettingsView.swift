@@ -4,8 +4,10 @@ import RacesKit
 /// Where the server is, its token, and the one-off history upload.
 struct SettingsView: View {
     @State private var model: SettingsViewModel
+    private let environment: AppEnvironment
 
     init(environment: AppEnvironment) {
+        self.environment = environment
         _model = State(initialValue: SettingsViewModel(environment: environment))
     }
 
@@ -53,6 +55,16 @@ struct SettingsView: View {
                     .disabled(!model.isConfigured || model.isTesting)
 
                     StatusRow(result: model.testResult)
+                }
+
+                Section {
+                    NavigationLink {
+                        InfoView(environment: environment)
+                    } label: {
+                        Label("Server info", systemImage: "info.circle")
+                    }
+                } footer: {
+                    Text("View scheduled jobs and recent back-test reports.")
                 }
 
                 if let saveError = model.saveError {
