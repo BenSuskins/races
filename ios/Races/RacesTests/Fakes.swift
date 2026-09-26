@@ -18,6 +18,7 @@ final class FakeRacesServer: RacesServing, @unchecked Sendable {
     private var _record: Result<ServerRecord, APIError>
     private var _model: Result<ServerModel, APIError>
     private var _status: Result<ServerStatus, APIError>
+    private var _backtests: Result<[ServerBacktest], APIError>
     private var _courses: Result<[Course], APIError>
     private var _import: Result<ServerImportSummary, APIError>
 
@@ -34,6 +35,7 @@ final class FakeRacesServer: RacesServing, @unchecked Sendable {
         record: Result<ServerRecord, APIError> = .failure(FakeRacesServer.unscripted),
         model: Result<ServerModel, APIError> = .failure(FakeRacesServer.unscripted),
         status: Result<ServerStatus, APIError> = .failure(FakeRacesServer.unscripted),
+        backtests: Result<[ServerBacktest], APIError> = .failure(FakeRacesServer.unscripted),
         courses: Result<[Course], APIError> = .failure(FakeRacesServer.unscripted),
         importSummary: Result<ServerImportSummary, APIError> = .failure(FakeRacesServer.unscripted)
     ) {
@@ -42,6 +44,7 @@ final class FakeRacesServer: RacesServing, @unchecked Sendable {
         self._record = record
         self._model = model
         self._status = status
+        self._backtests = backtests
         self._courses = courses
         self._import = importSummary
     }
@@ -60,6 +63,7 @@ final class FakeRacesServer: RacesServing, @unchecked Sendable {
     }
 
     func status() async throws -> ServerStatus { try lock.withLock { _status }.get() }
+    func backtests() async throws -> [ServerBacktest] { try lock.withLock { _backtests }.get() }
     func courses() async throws -> [Course] { try lock.withLock { _courses }.get() }
 
     func racecard(day: RaceDay) async throws -> ServerRacecard {

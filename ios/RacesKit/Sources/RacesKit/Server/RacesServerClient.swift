@@ -10,6 +10,7 @@ import FoundationNetworking
 /// API and Betfair, rates, seals, settles and retrains. The app reads.
 public protocol RacesServing: AnyObject, Sendable {
     func status() async throws -> ServerStatus
+    func backtests() async throws -> [ServerBacktest]
     func courses() async throws -> [Course]
     func racecard(day: RaceDay) async throws -> ServerRacecard
     func race(id: String) async throws -> ServerRaceDetail
@@ -54,12 +55,21 @@ public final class RacesServerClient: RacesServing, @unchecked Sendable {
         let courses: [Course]
     }
 
+    private struct BacktestsPage: Decodable {
+        let backtests: [ServerBacktest]
+    }
+
     private struct JobReply: Decodable {
         let job: String
     }
 
     public func status() async throws -> ServerStatus {
         try await http.get("v1/status", authorization: authorization)
+    }
+
+    public func backtests() async throws -> [ServerBacktest] {
+        let page: BacktestsPage = try await http.get("v1/backtests", authorization: authorization)
+        return page.backtests
     }
 
     public func courses() async throws -> [Course] {
