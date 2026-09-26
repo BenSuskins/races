@@ -15,7 +15,18 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
     case headgear
     case jockeyStrikeRate
     case trainerStrikeRate
+    case jockeySurfaceStrikeRate
+    case trainerSurfaceStrikeRate
+    case jockeyRaceTypeStrikeRate
+    case trainerRaceTypeStrikeRate
+    case jockeyGoingStrikeRate
+    case trainerGoingStrikeRate
     case horseGoingPlaceRate
+    case jockeyRecentStrikeRate
+    case trainerRecentStrikeRate
+    case jockeyTrainerStrikeRate
+    case classAdjustedForm
+    case marketMovement
 
     public var label: String {
         switch self {
@@ -27,11 +38,22 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
         case .daysSinceLastRun: return "Days since last run"
         case .age: return "Age"
         case .weightCarried: return "Weight carried"
-        case .draw: return "Draw"
+        case .draw: return "Draw bias"
         case .headgear: return "Headgear"
         case .jockeyStrikeRate: return "Jockey strike rate"
         case .trainerStrikeRate: return "Trainer strike rate"
+        case .jockeySurfaceStrikeRate: return "Jockey strike rate by surface"
+        case .trainerSurfaceStrikeRate: return "Trainer strike rate by surface"
+        case .jockeyRaceTypeStrikeRate: return "Jockey strike rate by race type"
+        case .trainerRaceTypeStrikeRate: return "Trainer strike rate by race type"
+        case .jockeyGoingStrikeRate: return "Jockey strike rate by going"
+        case .trainerGoingStrikeRate: return "Trainer strike rate by going"
         case .horseGoingPlaceRate: return "Horse record by going"
+        case .jockeyRecentStrikeRate: return "Jockey recent strike rate"
+        case .trainerRecentStrikeRate: return "Trainer recent strike rate"
+        case .jockeyTrainerStrikeRate: return "Jockey and trainer record together"
+        case .classAdjustedForm: return "Class-adjusted horse form"
+        case .marketMovement: return "Market movement"
         }
     }
 
@@ -59,15 +81,37 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
         case .weightCarried:
             return "Pounds carried, negated so less is better."
         case .draw:
-            return "Stall number."
+            return "Historical win rate for the draw band in this course, distance, going, and field-size context."
         case .headgear:
             return "Blinkers, a visor, a hood, cheekpieces."
         case .jockeyStrikeRate:
             return "The jockey's win rate in the app's own archive, shrunk toward the field average."
         case .trainerStrikeRate:
             return "The trainer's win rate in the app's own archive, shrunk toward the field average."
+        case .jockeySurfaceStrikeRate:
+            return "The jockey's win rate on this surface, shrunk toward the jockey's overall record."
+        case .trainerSurfaceStrikeRate:
+            return "The trainer's win rate on this surface, shrunk toward the trainer's overall record."
+        case .jockeyRaceTypeStrikeRate:
+            return "The jockey's win rate in this type of race, shrunk toward the jockey's overall record."
+        case .trainerRaceTypeStrikeRate:
+            return "The trainer's win rate in this type of race, shrunk toward the trainer's overall record."
+        case .jockeyGoingStrikeRate:
+            return "The jockey's win rate on similar ground, shrunk toward the jockey's overall record."
+        case .trainerGoingStrikeRate:
+            return "The trainer's win rate on similar ground, shrunk toward the trainer's overall record."
         case .horseGoingPlaceRate:
             return "The horse's place rate on similar ground, shrunk toward its general record."
+        case .jockeyRecentStrikeRate:
+            return "The jockey's win rate from the latest 50 dated rides, shrunk toward the global record."
+        case .trainerRecentStrikeRate:
+            return "The trainer's win rate from the latest 50 dated runners, shrunk toward the global record."
+        case .jockeyTrainerStrikeRate:
+            return "The win rate when this jockey rides for this trainer, adjusted toward their individual records."
+        case .classAdjustedForm:
+            return "The horse's recent finishing performance, adjusted for the class of each race."
+        case .marketMovement:
+            return "The change in the horse's implied chance since the first observed exchange price."
         }
     }
 
@@ -82,13 +126,27 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
     public var rationale: String? {
         switch self {
         case .draw:
-            return "Draw bias is real, but it is a course × distance × going × field-size interaction. Without a bias table it is noise, so the code ships switched off."
+            return "The archive needs at least 100 comparable starters. The default weight is zero until replay supports it."
         case .headgear:
             return "The signal is *first-time* headgear, and the free tier has no headgear history to detect it with."
         case .jockeyStrikeRate, .trainerStrikeRate:
             return "Legitimate, but derived from an archive that starts empty. It switches on once enough race days have been collected."
+        case .jockeySurfaceStrikeRate, .trainerSurfaceStrikeRate:
+            return "Surface cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
+        case .jockeyRaceTypeStrikeRate, .trainerRaceTypeStrikeRate:
+            return "Race-type cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
+        case .jockeyGoingStrikeRate, .trainerGoingStrikeRate:
+            return "Going cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
         case .horseGoingPlaceRate:
             return "The archive needs at least three completed runs in a going bucket. Its default weight is zero until replay supports it."
+        case .jockeyRecentStrikeRate, .trainerRecentStrikeRate:
+            return "The recent window needs at least 30 dated runs. The default weight is zero until walk-forward replay supports it."
+        case .jockeyTrainerStrikeRate:
+            return "The pair needs 30 runs and both individual records need enough history. Its default weight is zero until coverage and walk-forward evidence support it."
+        case .classAdjustedForm:
+            return "The archive needs three classified runs with known race classes. Its default weight is zero until walk-forward evidence supports it."
+        case .marketMovement:
+            return "The first and current live exchange prices must span at least five minutes before seal. The default weight is zero until replay supports it."
         case .weightCarried:
             return "Near zero on purpose: in a handicap, weight is the handicapper's equaliser, so it substantially double-counts the official rating."
         case .officialRating, .handicapBandPosition, .recentForm, .wonLastTime,
@@ -163,16 +221,30 @@ public struct FactorContext: Sendable {
     /// Strike rates accumulated from the app's own archive. Nil until there is
     /// enough history to be worth consulting.
     public let strikeRates: (any StrikeRateProviding)?
+    public let surfaceStrikeRates: (any SurfaceStrikeRateProviding)?
+    public let raceTypeStrikeRates: (any RaceTypeStrikeRateProviding)?
+    public let goingStrikeRates: (any GoingStrikeRateProviding)?
     public let horseGoingRates: (any HorseGoingProviding)?
+    public let recentStrikeRates: (any RecentStrikeRateProviding)?
+    public let jockeyTrainerStrikeRates: (any JockeyTrainerStrikeRateProviding)?
+    public let drawBiasRates: (any DrawBiasProviding)?
+    public let classAdjustedFormRates: (any ClassAdjustedFormProviding)?
+    public let market: MarketSnapshot?
+    public let now: Date
 
-    public init(
-        race: Race,
-        strikeRates: (any StrikeRateProviding)? = nil,
-        horseGoingRates: (any HorseGoingProviding)? = nil
-    ) {
+    public init(race: Race, strikeRates: (any StrikeRateProviding)? = nil, surfaceStrikeRates: (any SurfaceStrikeRateProviding)? = nil, raceTypeStrikeRates: (any RaceTypeStrikeRateProviding)? = nil, goingStrikeRates: (any GoingStrikeRateProviding)? = nil, horseGoingRates: (any HorseGoingProviding)? = nil, recentStrikeRates: (any RecentStrikeRateProviding)? = nil, jockeyTrainerStrikeRates: (any JockeyTrainerStrikeRateProviding)? = nil, drawBiasRates: (any DrawBiasProviding)? = nil, classAdjustedFormRates: (any ClassAdjustedFormProviding)? = nil, market: MarketSnapshot? = nil, now: Date = Date()) {
         self.race = race
         self.strikeRates = strikeRates
+        self.surfaceStrikeRates = surfaceStrikeRates ?? (strikeRates as? any SurfaceStrikeRateProviding)
+        self.raceTypeStrikeRates = raceTypeStrikeRates ?? (strikeRates as? any RaceTypeStrikeRateProviding)
+        self.goingStrikeRates = goingStrikeRates ?? (strikeRates as? any GoingStrikeRateProviding)
         self.horseGoingRates = horseGoingRates ?? (strikeRates as? any HorseGoingProviding)
+        self.recentStrikeRates = recentStrikeRates ?? (strikeRates as? any RecentStrikeRateProviding)
+        self.jockeyTrainerStrikeRates = jockeyTrainerStrikeRates ?? (strikeRates as? any JockeyTrainerStrikeRateProviding)
+        self.drawBiasRates = drawBiasRates ?? (strikeRates as? any DrawBiasProviding)
+        self.classAdjustedFormRates = classAdjustedFormRates ?? (strikeRates as? any ClassAdjustedFormProviding)
+        self.market = market
+        self.now = now
     }
 }
 
@@ -221,6 +293,74 @@ public protocol StrikeRateProviding: Sendable {
     func trainerStrikeRate(id: String) -> StrikeRate?
     /// The population mean to shrink toward. Roughly 1/fieldSize in the long run.
     var baselineStrikeRate: Double { get }
+}
+
+public protocol SurfaceStrikeRateProviding: StrikeRateProviding {
+    func jockeySurfaceStrikeRate(id: String, surface: Surface) -> StrikeRate?
+    func trainerSurfaceStrikeRate(id: String, surface: Surface) -> StrikeRate?
+}
+
+public protocol RaceTypeStrikeRateProviding: StrikeRateProviding {
+    func jockeyRaceTypeStrikeRate(id: String, raceType: RaceType) -> StrikeRate?
+    func trainerRaceTypeStrikeRate(id: String, raceType: RaceType) -> StrikeRate?
+}
+
+public protocol GoingStrikeRateProviding: StrikeRateProviding {
+    func jockeyGoingStrikeRate(id: String, surface: Surface, bucket: HorseGoingBucket) -> StrikeRate?
+    func trainerGoingStrikeRate(id: String, surface: Surface, bucket: HorseGoingBucket) -> StrikeRate?
+}
+
+public protocol RecentStrikeRateProviding: StrikeRateProviding {
+    func jockeyRecentStrikeRate(id: String) -> StrikeRate?
+    func trainerRecentStrikeRate(id: String) -> StrikeRate?
+}
+
+public protocol JockeyTrainerStrikeRateProviding: StrikeRateProviding {
+    func jockeyTrainerStrikeRate(jockeyID: String, trainerID: String) -> StrikeRate?
+}
+
+public protocol DrawBiasProviding: StrikeRateProviding {
+    func drawBiasRate(race: Race, runner: Runner) -> DrawBiasRate?
+}
+
+public struct DrawBiasRate: Codable, Hashable, Sendable {
+    public let runs: Int
+    public let wins: Int
+    public let expectedWins: Double
+
+    public init(runs: Int, wins: Int, expectedWins: Double) {
+        self.runs = runs
+        self.wins = wins
+        self.expectedWins = expectedWins
+    }
+}
+
+public protocol ClassAdjustedFormProviding: Sendable {
+    func horseClassFormRate(horseID: String, targetClass: Int) -> ClassAdjustedFormRate?
+}
+
+public struct ClassRun: Codable, Hashable, Sendable {
+    public let date: String
+    public let raceID: String
+    public let raceClass: Int
+    public let score: Double
+
+    public init(date: String, raceID: String, raceClass: Int, score: Double) {
+        self.date = date
+        self.raceID = raceID
+        self.raceClass = raceClass
+        self.score = score
+    }
+}
+
+public struct ClassAdjustedFormRate: Codable, Hashable, Sendable {
+    public let runs: Int
+    public let score: Double
+
+    public init(runs: Int, score: Double) {
+        self.runs = runs
+        self.score = score
+    }
 }
 
 public struct HorseGoingPlaceRate: Codable, Hashable, Sendable {

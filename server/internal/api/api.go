@@ -379,12 +379,15 @@ type Record struct {
 	ActiveWeightsID string          `json:"activeWeightsID,omitempty"`
 	Commission      float64         `json:"commission"`
 	Report          tracking.Report `json:"report"`
+	RecentTips      []TipView       `json:"recentTips"`
 	WeightsInUse    map[string]int  `json:"weightsInUse"`
 	// Sources counts tips by where they came from, so a record that is mostly
 	// imported history says so.
 	Sources       map[string]int `json:"sources"`
 	ArchivedRaces int            `json:"archivedRaces"`
 }
+
+const recordTipDetailLimit = 30
 
 func (s *Server) record(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -412,12 +415,22 @@ func (s *Server) record(w http.ResponseWriter, r *http.Request) {
 		tips[i] = row.Tip
 		sources[row.Source]++
 	}
+	recentTips := make([]TipView, 0, min(len(rows), recordTipDetailLimit))
+	for _, row := range rows {
+		if row.Tip.Outcome == nil || !row.Tip.Outcome.IsSettled() {
+			continue
+		}
+		recentTips = append(recentTips, TipView{Tip: row.Tip, Source: row.Source})
+		if len(recentTips) == recordTipDetailLimit {
+			break
+		}
+	}
 	inUse, _ := s.Service.Store.WeightsIDsInUse(ctx)
 	activeID := ""
 	if active != nil {
 		activeID = active.ID
 	}
-	writeJSON(w, http.StatusOK, Record{WeightsID: weightsID, ActiveWeightsID: activeID, Commission: commission, Report: tracking.Accuracy(tips, commission), WeightsInUse: inUse, Sources: sources, ArchivedRaces: s.Service.ArchivedRaceCount(ctx)})
+	writeJSON(w, http.StatusOK, Record{WeightsID: weightsID, ActiveWeightsID: activeID, Commission: commission, Report: tracking.Accuracy(tips, commission), RecentTips: recentTips, WeightsInUse: inUse, Sources: sources, ArchivedRaces: s.Service.ArchivedRaceCount(ctx)})
 }
 
 // MARK: - Model

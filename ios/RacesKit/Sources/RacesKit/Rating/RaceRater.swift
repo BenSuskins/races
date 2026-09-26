@@ -31,7 +31,18 @@ public struct RaceRater: Sendable {
             HeadgearFactor(),
             StrikeRateFactor(subject: .jockey, minimumSample: weights.minimumStrikeRateSample),
             StrikeRateFactor(subject: .trainer, minimumSample: weights.minimumStrikeRateSample),
-            HorseGoingFactor(minimumSample: 3),
+            SurfaceStrikeRateFactor(subject: .jockey, minimumSample: weights.minimumStrikeRateSample),
+            SurfaceStrikeRateFactor(subject: .trainer, minimumSample: weights.minimumStrikeRateSample),
+            RaceTypeStrikeRateFactor(subject: .jockey, minimumSample: weights.minimumStrikeRateSample),
+            RaceTypeStrikeRateFactor(subject: .trainer, minimumSample: weights.minimumStrikeRateSample),
+            GoingStrikeRateFactor(subject: .jockey, minimumSample: weights.minimumStrikeRateSample),
+            GoingStrikeRateFactor(subject: .trainer, minimumSample: weights.minimumStrikeRateSample),
+            HorseGoingFactor(),
+            RecentStrikeRateFactor(subject: .jockey, minimumSample: weights.minimumStrikeRateSample),
+            RecentStrikeRateFactor(subject: .trainer, minimumSample: weights.minimumStrikeRateSample),
+            JockeyTrainerStrikeRateFactor(minimumSample: weights.minimumStrikeRateSample),
+            ClassAdjustedFormFactor(),
+            MarketMovementFactor(),
         ]
     }
 
@@ -52,7 +63,7 @@ public struct RaceRater: Sendable {
             )
         }
 
-        let context = FactorContext(race: race, strikeRates: strikeRates)
+        let context = FactorContext(race: race, strikeRates: strikeRates, market: market, now: now)
         let readings = factors.map { factor -> FactorReading in
             let values = runners.map { factor.value(for: $0, in: context) }
             return FactorReading(

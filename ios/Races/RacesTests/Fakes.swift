@@ -18,6 +18,7 @@ final class FakeRacesServer: RacesServing, @unchecked Sendable {
     private var _record: Result<ServerRecord, APIError>
     private var _model: Result<ServerModel, APIError>
     private var _status: Result<ServerStatus, APIError>
+    private var _backtests: Result<[ServerBacktest], APIError>
     private var _courses: Result<[Course], APIError>
 
     private var _racecardCalls = 0
@@ -32,6 +33,7 @@ final class FakeRacesServer: RacesServing, @unchecked Sendable {
         record: Result<ServerRecord, APIError> = .failure(FakeRacesServer.unscripted),
         model: Result<ServerModel, APIError> = .failure(FakeRacesServer.unscripted),
         status: Result<ServerStatus, APIError> = .failure(FakeRacesServer.unscripted),
+        backtests: Result<[ServerBacktest], APIError> = .failure(FakeRacesServer.unscripted),
         courses: Result<[Course], APIError> = .failure(FakeRacesServer.unscripted)
     ) {
         self._racecards = racecards
@@ -39,6 +41,7 @@ final class FakeRacesServer: RacesServing, @unchecked Sendable {
         self._record = record
         self._model = model
         self._status = status
+        self._backtests = backtests
         self._courses = courses
     }
 
@@ -55,6 +58,7 @@ final class FakeRacesServer: RacesServing, @unchecked Sendable {
     }
 
     func status() async throws -> ServerStatus { try lock.withLock { _status }.get() }
+    func backtests() async throws -> [ServerBacktest] { try lock.withLock { _backtests }.get() }
     func courses() async throws -> [Course] { try lock.withLock { _courses }.get() }
 
     func racecard(day: RaceDay) async throws -> ServerRacecard {
@@ -300,6 +304,7 @@ extension ServerRacecard {
 extension ServerRecord {
     static func fixture(
         tips: [TipRecord] = [],
+        recentTips: [TipRecord]? = nil,
         sources: [String: Int] = [:],
         archivedRaces: Int = 0,
         weightsInUse: [String: Int] = [:],
@@ -308,6 +313,7 @@ extension ServerRecord {
         ServerRecord(
             activeWeightsID: activeWeightsID,
             report: AccuracyCalculator.report(for: tips),
+            recentTips: recentTips,
             weightsInUse: weightsInUse,
             sources: sources,
             archivedRaces: archivedRaces)

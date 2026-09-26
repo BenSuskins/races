@@ -7,6 +7,7 @@ import RacesKit
 final class RecordViewModel {
 
     private(set) var state: ViewState<AccuracyReport> = .idle
+    private(set) var recentTips: [TipRecord] = []
     private(set) var archivedRaceCount = 0
     private(set) var isRefreshingResults = false
     /// Tips by where they came from: `server`, or `device:<name>` for history
@@ -60,6 +61,7 @@ final class RecordViewModel {
 
     private func apply(_ record: ServerRecord) {
         state = .loaded(record.report)
+        recentTips = (record.recentTips ?? []).filter { $0.outcome?.isSettled == true }
         archivedRaceCount = record.archivedRaces
         sources = record.sources
         weightsInUse = record.weightsInUse

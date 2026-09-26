@@ -11,6 +11,7 @@ package rating
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/bensuskins/races/server/internal/domain"
 )
@@ -19,25 +20,37 @@ import (
 type FactorID string
 
 const (
-	OfficialRating       FactorID = "officialRating"
-	HandicapBandPosition FactorID = "handicapBandPosition"
-	RecentForm           FactorID = "recentForm"
-	WonLastTime          FactorID = "wonLastTime"
-	CompletionRate       FactorID = "completionRate"
-	DaysSinceLastRun     FactorID = "daysSinceLastRun"
-	Age                  FactorID = "age"
-	WeightCarried        FactorID = "weightCarried"
-	Draw                 FactorID = "draw"
-	Headgear             FactorID = "headgear"
-	JockeyStrikeRate     FactorID = "jockeyStrikeRate"
-	TrainerStrikeRate    FactorID = "trainerStrikeRate"
-	HorseGoingPlaceRate  FactorID = "horseGoingPlaceRate"
+	OfficialRating            FactorID = "officialRating"
+	HandicapBandPosition      FactorID = "handicapBandPosition"
+	RecentForm                FactorID = "recentForm"
+	WonLastTime               FactorID = "wonLastTime"
+	CompletionRate            FactorID = "completionRate"
+	DaysSinceLastRun          FactorID = "daysSinceLastRun"
+	Age                       FactorID = "age"
+	WeightCarried             FactorID = "weightCarried"
+	Draw                      FactorID = "draw"
+	Headgear                  FactorID = "headgear"
+	JockeyStrikeRate          FactorID = "jockeyStrikeRate"
+	TrainerStrikeRate         FactorID = "trainerStrikeRate"
+	JockeySurfaceStrikeRate   FactorID = "jockeySurfaceStrikeRate"
+	TrainerSurfaceStrikeRate  FactorID = "trainerSurfaceStrikeRate"
+	JockeyRaceTypeStrikeRate  FactorID = "jockeyRaceTypeStrikeRate"
+	TrainerRaceTypeStrikeRate FactorID = "trainerRaceTypeStrikeRate"
+	JockeyGoingStrikeRate     FactorID = "jockeyGoingStrikeRate"
+	TrainerGoingStrikeRate    FactorID = "trainerGoingStrikeRate"
+	HorseGoingPlaceRate       FactorID = "horseGoingPlaceRate"
+	JockeyRecentStrikeRate    FactorID = "jockeyRecentStrikeRate"
+	TrainerRecentStrikeRate   FactorID = "trainerRecentStrikeRate"
+	JockeyTrainerStrikeRate   FactorID = "jockeyTrainerStrikeRate"
+	ClassAdjustedForm         FactorID = "classAdjustedForm"
+	MarketMovement            FactorID = "marketMovement"
 )
 
 // AllFactors in declaration order, which is also the rater's order.
 var AllFactors = []FactorID{
 	OfficialRating, HandicapBandPosition, RecentForm, WonLastTime, CompletionRate,
-	DaysSinceLastRun, Age, WeightCarried, Draw, Headgear, JockeyStrikeRate, TrainerStrikeRate, HorseGoingPlaceRate,
+	DaysSinceLastRun, Age, WeightCarried, Draw, Headgear, JockeyStrikeRate, TrainerStrikeRate,
+	JockeySurfaceStrikeRate, TrainerSurfaceStrikeRate, JockeyRaceTypeStrikeRate, TrainerRaceTypeStrikeRate, JockeyGoingStrikeRate, TrainerGoingStrikeRate, HorseGoingPlaceRate, JockeyRecentStrikeRate, TrainerRecentStrikeRate, JockeyTrainerStrikeRate, ClassAdjustedForm, MarketMovement,
 }
 
 // Label is the short name shown on screen.
@@ -60,15 +73,37 @@ func (f FactorID) Label() string {
 	case WeightCarried:
 		return "Weight carried"
 	case Draw:
-		return "Draw"
+		return "Draw bias"
 	case Headgear:
 		return "Headgear"
 	case JockeyStrikeRate:
 		return "Jockey strike rate"
 	case TrainerStrikeRate:
 		return "Trainer strike rate"
+	case JockeySurfaceStrikeRate:
+		return "Jockey strike rate by surface"
+	case TrainerSurfaceStrikeRate:
+		return "Trainer strike rate by surface"
+	case JockeyRaceTypeStrikeRate:
+		return "Jockey strike rate by race type"
+	case TrainerRaceTypeStrikeRate:
+		return "Trainer strike rate by race type"
+	case JockeyGoingStrikeRate:
+		return "Jockey strike rate by going"
+	case TrainerGoingStrikeRate:
+		return "Trainer strike rate by going"
 	case HorseGoingPlaceRate:
 		return "Horse record by going"
+	case JockeyRecentStrikeRate:
+		return "Jockey recent strike rate"
+	case TrainerRecentStrikeRate:
+		return "Trainer recent strike rate"
+	case JockeyTrainerStrikeRate:
+		return "Jockey and trainer record together"
+	case ClassAdjustedForm:
+		return "Class-adjusted horse form"
+	case MarketMovement:
+		return "Market movement"
 	}
 	return string(f)
 }
@@ -93,15 +128,37 @@ func (f FactorID) Summary() string {
 	case WeightCarried:
 		return "Pounds carried, negated so less is better."
 	case Draw:
-		return "Stall number."
+		return "Historical win rate for the draw band in this course, distance, going, and field-size context."
 	case Headgear:
 		return "Blinkers, a visor, a hood, cheekpieces."
 	case JockeyStrikeRate:
 		return "The jockey's win rate in the server's own archive, shrunk toward the field average."
 	case TrainerStrikeRate:
 		return "The trainer's win rate in the server's own archive, shrunk toward the field average."
+	case JockeySurfaceStrikeRate:
+		return "The jockey's win rate on this surface, shrunk toward the jockey's overall record."
+	case TrainerSurfaceStrikeRate:
+		return "The trainer's win rate on this surface, shrunk toward the trainer's overall record."
+	case JockeyRaceTypeStrikeRate:
+		return "The jockey's win rate in this type of race, shrunk toward the jockey's overall record."
+	case TrainerRaceTypeStrikeRate:
+		return "The trainer's win rate in this type of race, shrunk toward the trainer's overall record."
+	case JockeyGoingStrikeRate:
+		return "The jockey's win rate on similar ground, shrunk toward the jockey's overall record."
+	case TrainerGoingStrikeRate:
+		return "The trainer's win rate on similar ground, shrunk toward the trainer's overall record."
 	case HorseGoingPlaceRate:
 		return "The horse's place rate on similar ground, shrunk toward its general record."
+	case JockeyRecentStrikeRate:
+		return "The jockey's win rate from the latest 50 dated rides, shrunk toward the global record."
+	case TrainerRecentStrikeRate:
+		return "The trainer's win rate from the latest 50 dated runners, shrunk toward the global record."
+	case JockeyTrainerStrikeRate:
+		return "The win rate when this jockey rides for this trainer, adjusted toward their individual records."
+	case ClassAdjustedForm:
+		return "The horse's recent finishing performance, adjusted for the class of each race."
+	case MarketMovement:
+		return "The change in the horse's implied chance since the first observed exchange price."
 	}
 	return ""
 }
@@ -111,13 +168,27 @@ func (f FactorID) Summary() string {
 func (f FactorID) Rationale() string {
 	switch f {
 	case Draw:
-		return "Draw bias is real, but it is a course × distance × going × field-size interaction. Without a bias table it is noise, so the code ships switched off."
+		return "Draw bias uses course, distance, going, field-size, and draw bands. Cells need 100 comparable starters; the default weight is zero until walk-forward evidence supports it."
 	case Headgear:
 		return "The signal is *first-time* headgear, and the free tier has no headgear history to detect it with."
 	case JockeyStrikeRate, TrainerStrikeRate:
 		return "Legitimate, but derived from an archive that starts empty. It switches on once enough race days have been collected."
+	case JockeySurfaceStrikeRate, TrainerSurfaceStrikeRate:
+		return "Surface cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
+	case JockeyRaceTypeStrikeRate, TrainerRaceTypeStrikeRate:
+		return "Race-type cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
+	case JockeyGoingStrikeRate, TrainerGoingStrikeRate:
+		return "Going cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
 	case HorseGoingPlaceRate:
 		return "The archive needs at least three completed runs in a going bucket. Its default weight is zero until replay supports it."
+	case JockeyRecentStrikeRate, TrainerRecentStrikeRate:
+		return "The recent window needs at least 30 dated runs. The default weight is zero until walk-forward replay supports it."
+	case JockeyTrainerStrikeRate:
+		return "The pair needs 30 runs and both individual records need enough history. Its default weight is zero until coverage and walk-forward evidence support it."
+	case ClassAdjustedForm:
+		return "The archive needs three classified runs with known race classes. Its default weight is zero until walk-forward evidence supports it."
+	case MarketMovement:
+		return "The first and current live exchange prices must span at least five minutes before seal. The default weight is zero until replay supports it."
 	case WeightCarried:
 		return "Near zero on purpose: in a handicap, weight is the handicapper's equaliser, so it substantially double-counts the official rating."
 	}
@@ -218,6 +289,49 @@ type StrikeRates interface {
 	BaselineStrikeRate() float64
 }
 
+type SurfaceStrikeRates interface {
+	JockeySurfaceStrikeRate(id string, surface domain.Surface) (StrikeRate, bool)
+	TrainerSurfaceStrikeRate(id string, surface domain.Surface) (StrikeRate, bool)
+}
+
+type RaceTypeStrikeRates interface {
+	JockeyRaceTypeStrikeRate(id string, raceType domain.RaceType) (StrikeRate, bool)
+	TrainerRaceTypeStrikeRate(id string, raceType domain.RaceType) (StrikeRate, bool)
+}
+
+type GoingStrikeRates interface {
+	JockeyGoingStrikeRate(id string, surface domain.Surface, bucket domain.GoingBucket) (StrikeRate, bool)
+	TrainerGoingStrikeRate(id string, surface domain.Surface, bucket domain.GoingBucket) (StrikeRate, bool)
+}
+
+type DrawBiasRate struct {
+	Runs         int     `json:"runs"`
+	Wins         int     `json:"wins"`
+	ExpectedWins float64 `json:"expectedWins"`
+}
+
+type DrawBiasRates interface {
+	DrawBiasRate(race domain.Race, runner domain.Runner) (DrawBiasRate, bool)
+}
+
+type RecentStrikeRates interface {
+	JockeyRecentStrikeRate(id string) (StrikeRate, bool)
+	TrainerRecentStrikeRate(id string) (StrikeRate, bool)
+}
+
+type JockeyTrainerStrikeRates interface {
+	JockeyTrainerStrikeRate(jockeyID, trainerID string) (StrikeRate, bool)
+}
+
+type ClassAdjustedFormRate struct {
+	Runs  int     `json:"runs"`
+	Score float64 `json:"score"`
+}
+
+type ClassAdjustedFormRates interface {
+	HorseClassFormRate(horseID string, targetClass int) (ClassAdjustedFormRate, bool)
+}
+
 type PlaceRate struct {
 	Runs   int `json:"runs"`
 	Places int `json:"places"`
@@ -236,6 +350,8 @@ type HorseGoingProvider interface {
 type Context struct {
 	Race        domain.Race
 	StrikeRates StrikeRates
+	Market      *domain.MarketSnapshot
+	Now         time.Time
 }
 
 // Factor is a single, independently testable input to the rating.

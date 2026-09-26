@@ -120,6 +120,8 @@ public struct ServerRecord: Codable, Hashable, Sendable {
     public let activeWeightsID: String?
     public let commission: Double
     public let report: AccuracyReport
+    /// The 30 newest settled tips in this weight-set population, with their frozen rating details.
+    public let recentTips: [TipRecord]?
     public let weightsInUse: [String: Int]
     /// Tips by where they came from: `server`, or `device:<name>`.
     public let sources: [String: Int]
@@ -130,6 +132,7 @@ public struct ServerRecord: Codable, Hashable, Sendable {
         activeWeightsID: String? = nil,
         commission: Double = AccuracyCalculator.defaultCommission,
         report: AccuracyReport,
+        recentTips: [TipRecord]? = nil,
         weightsInUse: [String: Int] = [:],
         sources: [String: Int] = [:],
         archivedRaces: Int = 0
@@ -138,6 +141,7 @@ public struct ServerRecord: Codable, Hashable, Sendable {
         self.activeWeightsID = activeWeightsID
         self.commission = commission
         self.report = report
+        self.recentTips = recentTips
         self.weightsInUse = weightsInUse
         self.sources = sources
         self.archivedRaces = archivedRaces
@@ -220,6 +224,40 @@ public struct ServerJobRun: Codable, Hashable, Sendable, Identifiable {
     public let summary: String?
 
     public var id: String { name }
+}
+
+/// A stored back-test, or a named sweep, as returned by `GET /v1/backtests`.
+public struct ServerBacktest: Decodable, Hashable, Sendable, Identifiable {
+    public let id: Int64
+    public let createdAt: Date
+    public let weightsID: String
+    public let report: ServerBacktestReport
+}
+
+public struct ServerBacktestReport: Decodable, Hashable, Sendable {
+    public let from: String?
+    public let to: String?
+    public let corpusID: String?
+    public let sharedCorpusID: String?
+    public let highestProbability: ServerBacktestArm?
+    public let favourite: ServerBacktestArm?
+    public let marketLogLoss: Double?
+    public let reports: [ServerBacktestVariant]?
+}
+
+public struct ServerBacktestVariant: Decodable, Hashable, Sendable, Identifiable {
+    public let name: String
+    public let report: ServerBacktestReport
+
+    public var id: String { name }
+}
+
+public struct ServerBacktestArm: Decodable, Hashable, Sendable {
+    public let races: Int
+    public let wins: Int
+    public let strikeRate: Double?
+    public let logLoss: Double?
+    public let brier: Double?
 }
 
 /// `GET /v1/status`: what Settings shows under "Test connection".

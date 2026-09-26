@@ -25,9 +25,8 @@ final class RaceTimeTests: XCTestCase {
             offDateTime: offDateTime, date: "2026-09-22", runners: [])
     }
 
-    /// Pinned, because `Locale.current` on a CI runner decides whether "13:30"
-    /// comes back as "1:30 PM" — and then these assertions fail for a reason
-    /// that has nothing to do with the bug they cover.
+    /// Pin the clock style. Foundation may vary whether it pads a one-digit
+    /// hour across OS versions, but it must keep this locale in 24-hour time.
     private static let en_GB = Locale(identifier: "en_GB")
 
     // MARK: - Display
@@ -52,7 +51,7 @@ final class RaceTimeTests: XCTestCase {
         let shown = RaceTime.display(
             race(), timeZone: Self.newYork, locale: Self.en_GB)
 
-        XCTAssertEqual(shown, "08:30")
+        XCTAssertTrue(["8:30", "08:30"].contains(shown), "Unexpected New York time: \(shown)")
     }
 
     func test_withNoParsedInstantThePrintedStringIsShown() {

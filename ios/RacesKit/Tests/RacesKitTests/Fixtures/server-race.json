@@ -210,13 +210,13 @@
           },
           {
             "factor": "draw",
-            "label": "Draw",
-            "detail": "Stall 3",
+            "label": "Draw bias",
+            "detail": "—",
             "weight": 0,
             "probabilityDelta": 0,
             "availability": {
-              "notApplicable": {
-                "_0": "no draw-bias data for this course yet"
+              "missingData": {
+                "_0": "no comparable draw archive yet"
               }
             }
           },
@@ -257,6 +257,78 @@
             }
           },
           {
+            "factor": "jockeySurfaceStrikeRate",
+            "label": "Jockey strike rate by surface",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this surface archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerSurfaceStrikeRate",
+            "label": "Trainer strike rate by surface",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this surface archive yet"
+              }
+            }
+          },
+          {
+            "factor": "jockeyRaceTypeStrikeRate",
+            "label": "Jockey strike rate by race type",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this race-type archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerRaceTypeStrikeRate",
+            "label": "Trainer strike rate by race type",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this race-type archive yet"
+              }
+            }
+          },
+          {
+            "factor": "jockeyGoingStrikeRate",
+            "label": "Jockey strike rate by going",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this going archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerGoingStrikeRate",
+            "label": "Trainer strike rate by going",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this going archive yet"
+              }
+            }
+          },
+          {
             "factor": "horseGoingPlaceRate",
             "label": "Horse record by going",
             "detail": "Field place prior (75%)",
@@ -265,6 +337,66 @@
             "probabilityDelta": 0,
             "availability": {
               "available": {}
+            }
+          },
+          {
+            "factor": "jockeyRecentStrikeRate",
+            "label": "Jockey recent strike rate",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no dated runs in the recent archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerRecentStrikeRate",
+            "label": "Trainer recent strike rate",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no dated runs in the recent archive yet"
+              }
+            }
+          },
+          {
+            "factor": "jockeyTrainerStrikeRate",
+            "label": "Jockey and trainer record together",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record for this jockey-trainer pair yet"
+              }
+            }
+          },
+          {
+            "factor": "classAdjustedForm",
+            "label": "Class-adjusted horse form",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no classed race history for this horse"
+              }
+            }
+          },
+          {
+            "factor": "marketMovement",
+            "label": "Market movement",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no market prices for this race"
+              }
             }
           }
         ]
@@ -367,13 +499,13 @@
           },
           {
             "factor": "draw",
-            "label": "Draw",
-            "detail": "Stall 1",
+            "label": "Draw bias",
+            "detail": "—",
             "weight": 0,
             "probabilityDelta": 0,
             "availability": {
-              "notApplicable": {
-                "_0": "no draw-bias data for this course yet"
+              "missingData": {
+                "_0": "no comparable draw archive yet"
               }
             }
           },
@@ -414,6 +546,78 @@
             }
           },
           {
+            "factor": "jockeySurfaceStrikeRate",
+            "label": "Jockey strike rate by surface",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this surface archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerSurfaceStrikeRate",
+            "label": "Trainer strike rate by surface",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this surface archive yet"
+              }
+            }
+          },
+          {
+            "factor": "jockeyRaceTypeStrikeRate",
+            "label": "Jockey strike rate by race type",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this race-type archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerRaceTypeStrikeRate",
+            "label": "Trainer strike rate by race type",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this race-type archive yet"
+              }
+            }
+          },
+          {
+            "factor": "jockeyGoingStrikeRate",
+            "label": "Jockey strike rate by going",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this going archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerGoingStrikeRate",
+            "label": "Trainer strike rate by going",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this going archive yet"
+              }
+            }
+          },
+          {
             "factor": "horseGoingPlaceRate",
             "label": "Horse record by going",
             "detail": "Field place prior (75%)",
@@ -422,6 +626,66 @@
             "probabilityDelta": 0,
             "availability": {
               "available": {}
+            }
+          },
+          {
+            "factor": "jockeyRecentStrikeRate",
+            "label": "Jockey recent strike rate",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no dated runs in the recent archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerRecentStrikeRate",
+            "label": "Trainer recent strike rate",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no dated runs in the recent archive yet"
+              }
+            }
+          },
+          {
+            "factor": "jockeyTrainerStrikeRate",
+            "label": "Jockey and trainer record together",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record for this jockey-trainer pair yet"
+              }
+            }
+          },
+          {
+            "factor": "classAdjustedForm",
+            "label": "Class-adjusted horse form",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no classed race history for this horse"
+              }
+            }
+          },
+          {
+            "factor": "marketMovement",
+            "label": "Market movement",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no market prices for this race"
+              }
             }
           }
         ]
@@ -529,13 +793,13 @@
           },
           {
             "factor": "draw",
-            "label": "Draw",
-            "detail": "Stall 4",
+            "label": "Draw bias",
+            "detail": "—",
             "weight": 0,
             "probabilityDelta": 0,
             "availability": {
-              "notApplicable": {
-                "_0": "no draw-bias data for this course yet"
+              "missingData": {
+                "_0": "no comparable draw archive yet"
               }
             }
           },
@@ -576,6 +840,78 @@
             }
           },
           {
+            "factor": "jockeySurfaceStrikeRate",
+            "label": "Jockey strike rate by surface",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this surface archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerSurfaceStrikeRate",
+            "label": "Trainer strike rate by surface",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this surface archive yet"
+              }
+            }
+          },
+          {
+            "factor": "jockeyRaceTypeStrikeRate",
+            "label": "Jockey strike rate by race type",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this race-type archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerRaceTypeStrikeRate",
+            "label": "Trainer strike rate by race type",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this race-type archive yet"
+              }
+            }
+          },
+          {
+            "factor": "jockeyGoingStrikeRate",
+            "label": "Jockey strike rate by going",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this going archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerGoingStrikeRate",
+            "label": "Trainer strike rate by going",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this going archive yet"
+              }
+            }
+          },
+          {
             "factor": "horseGoingPlaceRate",
             "label": "Horse record by going",
             "detail": "Field place prior (75%)",
@@ -584,6 +920,66 @@
             "probabilityDelta": 0,
             "availability": {
               "available": {}
+            }
+          },
+          {
+            "factor": "jockeyRecentStrikeRate",
+            "label": "Jockey recent strike rate",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no dated runs in the recent archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerRecentStrikeRate",
+            "label": "Trainer recent strike rate",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no dated runs in the recent archive yet"
+              }
+            }
+          },
+          {
+            "factor": "jockeyTrainerStrikeRate",
+            "label": "Jockey and trainer record together",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record for this jockey-trainer pair yet"
+              }
+            }
+          },
+          {
+            "factor": "classAdjustedForm",
+            "label": "Class-adjusted horse form",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no classed race history for this horse"
+              }
+            }
+          },
+          {
+            "factor": "marketMovement",
+            "label": "Market movement",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no market prices for this race"
+              }
             }
           }
         ]
@@ -686,13 +1082,13 @@
           },
           {
             "factor": "draw",
-            "label": "Draw",
-            "detail": "Stall 2",
+            "label": "Draw bias",
+            "detail": "—",
             "weight": 0,
             "probabilityDelta": 0,
             "availability": {
-              "notApplicable": {
-                "_0": "no draw-bias data for this course yet"
+              "missingData": {
+                "_0": "no comparable draw archive yet"
               }
             }
           },
@@ -733,6 +1129,78 @@
             }
           },
           {
+            "factor": "jockeySurfaceStrikeRate",
+            "label": "Jockey strike rate by surface",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this surface archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerSurfaceStrikeRate",
+            "label": "Trainer strike rate by surface",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this surface archive yet"
+              }
+            }
+          },
+          {
+            "factor": "jockeyRaceTypeStrikeRate",
+            "label": "Jockey strike rate by race type",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this race-type archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerRaceTypeStrikeRate",
+            "label": "Trainer strike rate by race type",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this race-type archive yet"
+              }
+            }
+          },
+          {
+            "factor": "jockeyGoingStrikeRate",
+            "label": "Jockey strike rate by going",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this going archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerGoingStrikeRate",
+            "label": "Trainer strike rate by going",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record in this going archive yet"
+              }
+            }
+          },
+          {
             "factor": "horseGoingPlaceRate",
             "label": "Horse record by going",
             "detail": "Field place prior (75%)",
@@ -741,6 +1209,66 @@
             "probabilityDelta": 0,
             "availability": {
               "available": {}
+            }
+          },
+          {
+            "factor": "jockeyRecentStrikeRate",
+            "label": "Jockey recent strike rate",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no dated runs in the recent archive yet"
+              }
+            }
+          },
+          {
+            "factor": "trainerRecentStrikeRate",
+            "label": "Trainer recent strike rate",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no dated runs in the recent archive yet"
+              }
+            }
+          },
+          {
+            "factor": "jockeyTrainerStrikeRate",
+            "label": "Jockey and trainer record together",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no record for this jockey-trainer pair yet"
+              }
+            }
+          },
+          {
+            "factor": "classAdjustedForm",
+            "label": "Class-adjusted horse form",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no classed race history for this horse"
+              }
+            }
+          },
+          {
+            "factor": "marketMovement",
+            "label": "Market movement",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no market prices for this race"
+              }
             }
           }
         ]
@@ -857,13 +1385,13 @@
       },
       {
         "factor": "draw",
-        "label": "Draw",
-        "detail": "Stall 3",
+        "label": "Draw bias",
+        "detail": "—",
         "weight": 0,
         "probabilityDelta": 0,
         "availability": {
-          "notApplicable": {
-            "_0": "no draw-bias data for this course yet"
+          "missingData": {
+            "_0": "no comparable draw archive yet"
           }
         }
       },
@@ -904,6 +1432,78 @@
         }
       },
       {
+        "factor": "jockeySurfaceStrikeRate",
+        "label": "Jockey strike rate by surface",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "no record in this surface archive yet"
+          }
+        }
+      },
+      {
+        "factor": "trainerSurfaceStrikeRate",
+        "label": "Trainer strike rate by surface",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "no record in this surface archive yet"
+          }
+        }
+      },
+      {
+        "factor": "jockeyRaceTypeStrikeRate",
+        "label": "Jockey strike rate by race type",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "no record in this race-type archive yet"
+          }
+        }
+      },
+      {
+        "factor": "trainerRaceTypeStrikeRate",
+        "label": "Trainer strike rate by race type",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "no record in this race-type archive yet"
+          }
+        }
+      },
+      {
+        "factor": "jockeyGoingStrikeRate",
+        "label": "Jockey strike rate by going",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "no record in this going archive yet"
+          }
+        }
+      },
+      {
+        "factor": "trainerGoingStrikeRate",
+        "label": "Trainer strike rate by going",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "no record in this going archive yet"
+          }
+        }
+      },
+      {
         "factor": "horseGoingPlaceRate",
         "label": "Horse record by going",
         "detail": "Field place prior (75%)",
@@ -912,6 +1512,66 @@
         "probabilityDelta": 0,
         "availability": {
           "available": {}
+        }
+      },
+      {
+        "factor": "jockeyRecentStrikeRate",
+        "label": "Jockey recent strike rate",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "no dated runs in the recent archive yet"
+          }
+        }
+      },
+      {
+        "factor": "trainerRecentStrikeRate",
+        "label": "Trainer recent strike rate",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "no dated runs in the recent archive yet"
+          }
+        }
+      },
+      {
+        "factor": "jockeyTrainerStrikeRate",
+        "label": "Jockey and trainer record together",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "no record for this jockey-trainer pair yet"
+          }
+        }
+      },
+      {
+        "factor": "classAdjustedForm",
+        "label": "Class-adjusted horse form",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "no classed race history for this horse"
+          }
+        }
+      },
+      {
+        "factor": "marketMovement",
+        "label": "Market movement",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "no market prices for this race"
+          }
         }
       }
     ],
