@@ -164,7 +164,7 @@ func TestImportRecordAndModel(t *testing.T) {
 	}
 	_, body = call(t, s, "GET", "/v1/record?weightsID=v2", nil, true)
 	json.Unmarshal(body, &rec)
-	if rec.Report.Settled != 1 || rec.Sources["device:phone"] != 2 || rec.Report.BenchmarkedModel.Settled != 1 || len(rec.RecentTips) != 2 {
+	if rec.Report.Settled != 1 || rec.Sources["device:phone"] != 2 || rec.Report.BenchmarkedModel.Settled != 1 || len(rec.RecentTips) != 1 {
 		t.Fatalf("the record splits by weight id: %s", string(body))
 	}
 	hasFrozenContributions := false

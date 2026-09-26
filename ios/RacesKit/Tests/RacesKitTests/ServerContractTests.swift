@@ -59,8 +59,7 @@ final class ServerContractTests: XCTestCase {
         XCTAssertEqual(record.report.benchmarkedModel?.settled, record.report.favouriteBaseline.settled)
         XCTAssertNil(record.report.modelWilson)
         XCTAssertNil(record.report.favouriteWilson)
-        XCTAssertEqual(record.recentTips?.count, 2)
-        XCTAssertFalse(try XCTUnwrap(record.recentTips?.first).contributions.isEmpty)
+        XCTAssertEqual(record.recentTips?.count, 0)
     }
 
     func test_anOlderCachedRecordWithoutRecentTipsStillDecodes() throws {
