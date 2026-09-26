@@ -418,8 +418,14 @@ func (s *Server) record(w http.ResponseWriter, r *http.Request) {
 		sources[row.Source]++
 	}
 	recentTips := make([]TipView, 0, min(len(rows), recordTipDetailLimit))
-	for _, row := range rows[:min(len(rows), recordTipDetailLimit)] {
+	for _, row := range rows {
+		if row.Tip.Outcome == nil || !row.Tip.Outcome.IsSettled() {
+			continue
+		}
 		recentTips = append(recentTips, TipView{Tip: row.Tip, Source: row.Source})
+		if len(recentTips) == recordTipDetailLimit {
+			break
+		}
 	}
 	inUse, _ := s.Service.Store.WeightsIDsInUse(ctx)
 	activeID := ""
