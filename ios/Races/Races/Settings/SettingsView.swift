@@ -1,7 +1,7 @@
 import SwiftUI
 import RacesKit
 
-/// Where the server is, its token, and the one-off history upload.
+/// Where the server is and its token.
 struct SettingsView: View {
     @State private var model: SettingsViewModel
 
@@ -58,31 +58,6 @@ struct SettingsView: View {
                 if let saveError = model.saveError {
                     Section {
                         Text(saveError).foregroundStyle(.red)
-                    }
-                }
-
-                if model.hasHistoryToUpload {
-                    Section {
-                        Button {
-                            Task { await model.uploadHistory() }
-                        } label: {
-                            if model.isUploading {
-                                HStack { ProgressView(); Text("Uploading…") }
-                            } else {
-                                Text(model.historyUploadedAt == nil ? "Upload history" : "Upload history again")
-                            }
-                        }
-                        .disabled(!model.isConfigured || model.isUploading)
-
-                        UploadRow(result: model.uploadResult)
-                    } header: {
-                        Text("History from before the server")
-                    } footer: {
-                        if let uploadedAt = model.historyUploadedAt {
-                            Text("Uploaded \(uploadedAt.formatted(date: .abbreviated, time: .shortened)). Sending it again is safe — the server keeps what it already has.")
-                        } else {
-                            Text("The tips, results archive and training data this phone collected on its own. Free results are today-only, so this is the only copy — send it once so the record and the model can use it.")
-                        }
                     }
                 }
 
@@ -177,39 +152,5 @@ private struct ProviderLine: View {
         if !status.configured { return "\(name): not configured on the server" }
         if status.healthy { return "\(name): working" }
         return "\(name): \(status.detail ?? "failing")"
-    }
-}
-
-private struct UploadRow: View {
-    let result: SettingsViewModel.UploadResult
-
-    var body: some View {
-        switch result {
-        case .idle, .uploading:
-            EmptyView()
-
-        case .succeeded(let summary):
-            VStack(alignment: .leading, spacing: 4) {
-                Label("Uploaded — \(summary.tipsAdded + summary.tipsReplaced) new tips", systemImage: "checkmark.circle")
-                    .foregroundStyle(Color.green)
-                Text(detail(summary))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .textSelection(.enabled)
-
-        case .failed(let error):
-            Label(error.errorDescription ?? "Couldn't upload", systemImage: "xmark.circle")
-                .foregroundStyle(Color.red)
-                .textSelection(.enabled)
-        }
-    }
-
-    private func detail(_ s: ServerImportSummary) -> String {
-        var parts = ["\(s.tipsKept) already on the server", "\(s.samplesAdded + s.pendingAdded) training races"]
-        if s.archiveRacesAdded > 0 { parts.append("\(s.archiveRacesAdded) archived results") }
-        if s.archiveSkipped { parts.append("results archive overlapped the server's and was not merged") }
-        if !s.unreadableDocuments.isEmpty { parts.append("unreadable: \(s.unreadableDocuments.joined(separator: "; "))") }
-        return parts.joined(separator: " · ") + "."
     }
 }

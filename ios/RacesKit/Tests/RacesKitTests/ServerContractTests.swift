@@ -77,9 +77,7 @@ final class ServerContractTests: XCTestCase {
         XCTAssertEqual(status.activeWeightsID, "v3")
     }
 
-    func test_theImportSummaryAndCoursesDecode() throws {
-        let summary = try decode(ServerImportSummary.self, "server-import.json")
-        XCTAssertEqual(summary.tipsAdded, 3)
+    func test_coursesDecode() throws {
         let courses = try Fixture.data("server-courses.json")
         XCTAssertFalse(courses.isEmpty)
     }
@@ -119,19 +117,6 @@ final class ServerContractTests: XCTestCase {
         } catch {
             XCTAssertEqual(APIError.from(error), .unauthorized)
         }
-    }
-
-    // MARK: - Upload
-
-    func test_theUploadEmbedsTheDocumentsByteForByte() throws {
-        let tips = Data(#"{"schemaVersion":1,"payload":{"storage":{}}}"#.utf8)
-        let upload = ServerHistoryUpload(device: "Ben's \"iPhone\"", tips: tips, archive: nil, training: Data("not json".utf8))
-        let body = try upload.body()
-        let text = String(decoding: body, as: UTF8.self)
-        XCTAssertTrue(text.contains(#""tips":{"schemaVersion":1,"payload":{"storage":{}}}"#))
-        XCTAssertTrue(text.contains(#""archive":null"#))
-        XCTAssertTrue(text.contains(#""training":null"#), "an unreadable document is sent as null, not as broken JSON")
-        XCTAssertNotNil(try JSONSerialization.jsonObject(with: body), "the device name is escaped")
     }
 
     // MARK: - Configuration

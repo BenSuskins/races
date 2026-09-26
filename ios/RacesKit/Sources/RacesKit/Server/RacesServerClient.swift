@@ -15,7 +15,6 @@ public protocol RacesServing: AnyObject, Sendable {
     func race(id: String) async throws -> ServerRaceDetail
     func record(weightsID: String?) async throws -> ServerRecord
     func model() async throws -> ServerModel
-    func importHistory(_ upload: ServerHistoryUpload) async throws -> ServerImportSummary
     /// Ask the server to run a job now — `results`, `cards`, `tips`.
     func runJob(_ name: String) async throws
 }
@@ -85,14 +84,6 @@ public final class RacesServerClient: RacesServing, @unchecked Sendable {
 
     public func model() async throws -> ServerModel {
         try await http.get("v1/model", authorization: authorization)
-    }
-
-    public func importHistory(_ upload: ServerHistoryUpload) async throws -> ServerImportSummary {
-        try await http.post(
-            "v1/import",
-            body: try upload.body(),
-            contentType: "application/json",
-            authorization: authorization)
     }
 
     public func runJob(_ name: String) async throws {

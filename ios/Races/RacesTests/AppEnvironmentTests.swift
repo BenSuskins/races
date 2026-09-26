@@ -13,7 +13,6 @@ final class AppEnvironmentTests: XCTestCase {
         AppEnvironment(
             credentials: store,
             store: RacesStore(documents: InMemoryDocumentStore()),
-            history: try temporaryHistory(),
             makeServer: { _ in
                 built.increment()
                 return FakeRacesServer()

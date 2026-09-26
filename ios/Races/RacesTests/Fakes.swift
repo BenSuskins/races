@@ -19,12 +19,10 @@ final class FakeRacesServer: RacesServing, @unchecked Sendable {
     private var _model: Result<ServerModel, APIError>
     private var _status: Result<ServerStatus, APIError>
     private var _courses: Result<[Course], APIError>
-    private var _import: Result<ServerImportSummary, APIError>
 
     private var _racecardCalls = 0
     private var _jobs: [String] = []
     private var _recordRequests: [String?] = []
-    private var _uploads: [ServerHistoryUpload] = []
 
     static let unscripted = APIError.server(status: 599, serverMessage: "FakeRacesServer: not scripted")
 
@@ -34,8 +32,7 @@ final class FakeRacesServer: RacesServing, @unchecked Sendable {
         record: Result<ServerRecord, APIError> = .failure(FakeRacesServer.unscripted),
         model: Result<ServerModel, APIError> = .failure(FakeRacesServer.unscripted),
         status: Result<ServerStatus, APIError> = .failure(FakeRacesServer.unscripted),
-        courses: Result<[Course], APIError> = .failure(FakeRacesServer.unscripted),
-        importSummary: Result<ServerImportSummary, APIError> = .failure(FakeRacesServer.unscripted)
+        courses: Result<[Course], APIError> = .failure(FakeRacesServer.unscripted)
     ) {
         self._racecards = racecards
         self._race = race
@@ -43,13 +40,11 @@ final class FakeRacesServer: RacesServing, @unchecked Sendable {
         self._model = model
         self._status = status
         self._courses = courses
-        self._import = importSummary
     }
 
     var racecardCalls: Int { lock.withLock { _racecardCalls } }
     var jobs: [String] { lock.withLock { _jobs } }
     var recordRequests: [String?] { lock.withLock { _recordRequests } }
-    var uploads: [ServerHistoryUpload] { lock.withLock { _uploads } }
 
     func setRacecard(_ result: Result<ServerRacecard, APIError>, for day: RaceDay = .today) {
         lock.withLock { _racecards[day] = result }
@@ -79,14 +74,6 @@ final class FakeRacesServer: RacesServing, @unchecked Sendable {
         return try result.get()
     }
     func model() async throws -> ServerModel { try lock.withLock { _model }.get() }
-
-    func importHistory(_ upload: ServerHistoryUpload) async throws -> ServerImportSummary {
-        let result = lock.withLock { () -> Result<ServerImportSummary, APIError> in
-            _uploads.append(upload)
-            return _import
-        }
-        return try result.get()
-    }
 
     func runJob(_ name: String) async throws {
         lock.withLock { _jobs.append(name) }
@@ -327,20 +314,6 @@ extension ServerRecord {
     }
 }
 
-extension ServerImportSummary {
-    /// Decoded, because the server is the only thing that ever builds one.
-    static func fixture(tipsAdded: Int = 3, tipsKept: Int = 0) -> ServerImportSummary {
-        let json = """
-        {"device":"phone","tipsReceived":\(tipsAdded + tipsKept),"tipsAdded":\(tipsAdded),"tipsReplaced":0,
-         "tipsKept":\(tipsKept),"archiveRacesAdded":0,"archiveSkipped":false,"samplesReceived":0,
-         "samplesAdded":0,"pendingAdded":0,"weightsAdded":[],"unreadableDocuments":[]}
-        """
-        // A literal the test controls; force-unwrapping it is a test bug, not
-        // a runtime path.
-        return try! RacesServerClient.decoder.decode(ServerImportSummary.self, from: Data(json.utf8))
-    }
-}
-
 extension ServerStatus {
     static func fixture(betfairConfigured: Bool = true) -> ServerStatus {
         ServerStatus(
@@ -348,16 +321,4 @@ extension ServerStatus {
             betfair: ServerProviderStatus(configured: betfairConfigured, healthy: betfairConfigured),
             counts: ["tips": 12, "results": 40])
     }
-}
-
-/// A `LegacyHistory` over a fresh temporary directory, optionally seeded with
-/// documents.
-func temporaryHistory(documents: [String: String] = [:]) throws -> LegacyHistory {
-    let directory = FileManager.default.temporaryDirectory
-        .appendingPathComponent("races-history-\(UUID().uuidString)")
-    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    for (name, body) in documents {
-        try Data(body.utf8).write(to: directory.appendingPathComponent(name))
-    }
-    return LegacyHistory(directory: directory)
 }

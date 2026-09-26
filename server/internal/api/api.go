@@ -26,7 +26,6 @@ import (
 	"github.com/bensuskins/races/server/internal/backtest"
 	"github.com/bensuskins/races/server/internal/betfair"
 	"github.com/bensuskins/races/server/internal/domain"
-	"github.com/bensuskins/races/server/internal/importer"
 	"github.com/bensuskins/races/server/internal/rating"
 	"github.com/bensuskins/races/server/internal/service"
 	"github.com/bensuskins/races/server/internal/store"
@@ -59,7 +58,6 @@ func (s *Server) Handler() http.Handler {
 	v1.HandleFunc("GET /v1/tips", s.tips)
 	v1.HandleFunc("GET /v1/record", s.record)
 	v1.HandleFunc("GET /v1/model", s.model)
-	v1.HandleFunc("POST /v1/import", s.importHistory)
 	v1.HandleFunc("POST /v1/backtests", s.runBacktest)
 	v1.HandleFunc("POST /v1/admin/weights", s.installWeights)
 	v1.HandleFunc("GET /v1/backtests", s.backtests)
@@ -465,23 +463,6 @@ func (s *Server) model(w http.ResponseWriter, r *http.Request) {
 }
 
 // MARK: - Import
-
-// maxUpload bounds a device upload. A year of tips is a few megabytes.
-const maxUpload = 64 << 20
-
-func (s *Server) importHistory(w http.ResponseWriter, r *http.Request) {
-	var up importer.Upload
-	if err := json.NewDecoder(io.LimitReader(r.Body, maxUpload)).Decode(&up); err != nil {
-		writeError(w, http.StatusBadRequest, "badRequest", "Couldn't read the upload: "+err.Error())
-		return
-	}
-	sum, err := importer.Import(r.Context(), s.Service.Store, up, s.now())
-	if err != nil {
-		s.internal(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, sum)
-}
 
 // MARK: - Back-tests
 

@@ -16,7 +16,6 @@ import (
 
 	"github.com/bensuskins/races/server/internal/backtest"
 	"github.com/bensuskins/races/server/internal/domain"
-	"github.com/bensuskins/races/server/internal/importer"
 	"github.com/bensuskins/races/server/internal/racingapi"
 	"github.com/bensuskins/races/server/internal/rating"
 	"github.com/bensuskins/races/server/internal/service"
@@ -138,43 +137,6 @@ func TestRacecardAndRaceDetail(t *testing.T) {
 	}
 }
 
-func TestImportRecordAndModel(t *testing.T) {
-	s, _ := setup(t)
-	read := func(n string) json.RawMessage {
-		b, _ := os.ReadFile("../importer/testdata/" + n)
-		return b
-	}
-	up := importer.Upload{Device: "phone", Tips: read("device-tips.json"), Archive: read("device-archive.json"), Training: read("device-training.json")}
-	code, body := call(t, s, "POST", "/v1/import", up, true)
-	var sum importer.Summary
-	json.Unmarshal(body, &sum)
-	if code != 200 || sum.TipsAdded != 3 {
-		t.Fatal(code, string(body))
-	}
-	_, body = call(t, s, "POST", "/v1/import", up, true)
-	json.Unmarshal(body, &sum)
-	if sum.TipsAdded != 0 || sum.TipsKept != 3 {
-		t.Fatal("a second upload adds nothing", string(body))
-	}
-	code, body = call(t, s, "GET", "/v1/record", nil, true)
-	var rec Record
-	json.Unmarshal(body, &rec)
-	if code != 200 || rec.WeightsID != "v3" || rec.ActiveWeightsID != "v3" || rec.Report.Total != 0 {
-		t.Fatalf("the default record uses the active population: %s", string(body))
-	}
-	_, body = call(t, s, "GET", "/v1/record?weightsID=v2", nil, true)
-	json.Unmarshal(body, &rec)
-	if rec.Report.Settled != 1 || rec.Sources["device:phone"] != 2 || rec.Report.BenchmarkedModel.Settled != 1 {
-		t.Fatalf("the record splits by weight id: %s", string(body))
-	}
-	code, body = call(t, s, "GET", "/v1/model", nil, true)
-	var m Model
-	json.Unmarshal(body, &m)
-	if code != 200 || m.Active.ID != "v3" || len(m.Factors) != 13 || len(m.Weights) != 5 {
-		t.Fatal(string(body))
-	}
-}
-
 func TestBacktestAndJobs(t *testing.T) {
 	s, _ := setup(t)
 	if code, body := call(t, s, "POST", "/v1/admin/jobs/all", nil, true); code != 200 {
@@ -272,15 +234,9 @@ var update = flag.Bool("update", false, "rewrite the app's contract fixtures")
 // the kit's tests before merging.
 func TestContractFixtures(t *testing.T) {
 	s, svc := setup(t)
-	read := func(n string) json.RawMessage {
-		b, _ := os.ReadFile("../importer/testdata/" + n)
-		return b
-	}
-	up := importer.Upload{Device: "phone", Tips: read("device-tips.json"), Archive: read("device-archive.json"), Training: read("device-training.json")}
-	_, importBody := call(t, s, "POST", "/v1/import", up, true)
 	svc.Execute(context.Background(), service.Everything)
 
-	responses := map[string][]byte{"server-import.json": importBody}
+	responses := map[string][]byte{}
 	for name, path := range map[string]string{
 		"server-racecard.json": "/v1/racecards?day=today",
 		"server-race.json":     "/v1/races/rac_1001",
