@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/bensuskins/races/server/internal/domain"
 )
@@ -150,7 +151,7 @@ func (weightCarried) Value(r domain.Runner, _ Context) FactorValue {
 	return value(-float64(*r.WeightPounds), display)
 }
 
-// draw is present but deliberately inert: there is no bias data to use.
+// draw reads historical performance from comparable course and race contexts.
 type draw struct{}
 
 func (draw) ID() FactorID { return Draw }
@@ -161,7 +162,23 @@ func (draw) Value(r domain.Runner, ctx Context) FactorValue {
 	if r.Draw == nil {
 		return missing("no draw published")
 	}
-	return notApplicable("no draw-bias data for this course yet", fmt.Sprintf("Stall %d", *r.Draw))
+	if ctx.StrikeRates == nil {
+		return missing("no results archive yet")
+	}
+	provider, ok := ctx.StrikeRates.(DrawBiasRates)
+	if !ok {
+		return missing("no draw-bias archive yet")
+	}
+	record, ok := provider.DrawBiasRate(ctx.Race, r)
+	if !ok {
+		return missing("no comparable draw archive yet")
+	}
+	if record.Runs < 100 {
+		return missing(fmt.Sprintf("only %d comparable starters for this draw", record.Runs))
+	}
+	prior := record.ExpectedWins / float64(record.Runs)
+	smoothed := (float64(record.Wins) + prior*20) / (float64(record.Runs) + 20)
+	return value(smoothed, fmt.Sprintf("%d%% from %d comparable starters", int(math.Round(smoothed*100)), record.Runs))
 }
 
 // headgear is inert: the signal is first-time headgear, which needs history.
@@ -174,6 +191,18 @@ func (headgear) Value(r domain.Runner, _ Context) FactorValue {
 		display = "Wearing " + *r.Headgear
 	}
 	return requiresPaidTier("first-time headgear needs a headgear history", display)
+}
+
+// strikeRate reads the server's own archive, silent until the sample is worth
+// consulting and shrunk toward the field mean even then.
+type strikeRate struct {
+	jockey        bool
+	minimumSample int
+}
+
+type surfaceStrikeRate struct {
+	jockey        bool
+	minimumSample int
 }
 
 type horseGoing struct{ minimumSample int }
@@ -207,6 +236,56 @@ func (f horseGoing) Value(r domain.Runner, ctx Context) FactorValue {
 	return value(prior, fmt.Sprintf("Field place prior (%d%%)", int(math.Round(prior*100))))
 }
 
+type classAdjustedForm struct{ minimumSample int }
+
+func (classAdjustedForm) ID() FactorID { return ClassAdjustedForm }
+func (f classAdjustedForm) Value(r domain.Runner, ctx Context) FactorValue {
+	if ctx.Race.RaceClass == nil || *ctx.Race.RaceClass < 1 || *ctx.Race.RaceClass > 7 {
+		return missing("race class is unknown")
+	}
+	provider, ok := ctx.StrikeRates.(ClassAdjustedFormRates)
+	if !ok {
+		return missing("no class-adjusted form archive yet")
+	}
+	record, ok := provider.HorseClassFormRate(r.ID, *ctx.Race.RaceClass)
+	if !ok {
+		return missing("no classed race history for this horse")
+	}
+	if record.Runs < f.minimumSample {
+		return missing(fmt.Sprintf("only %d classed runs for this horse", record.Runs))
+	}
+	smoothed := (record.Score*float64(record.Runs) + 0.5*3) / (float64(record.Runs) + 3)
+	return value(smoothed, fmt.Sprintf("%d%% class-adjusted form from %d runs", int(math.Round(smoothed*100)), record.Runs))
+}
+
+type marketMovement struct{}
+
+func (marketMovement) ID() FactorID { return MarketMovement }
+func (marketMovement) Value(r domain.Runner, ctx Context) FactorValue {
+	if ctx.Market == nil {
+		return missing("no market prices for this race")
+	}
+	if ctx.Market.Source != domain.SourceLiveExchange {
+		return notApplicable("market movement needs exchange prices")
+	}
+	if ctx.Now.IsZero() || ctx.Market.CapturedAt.After(ctx.Now) || ctx.Market.FirstObservedAt != nil && ctx.Market.FirstObservedAt.After(ctx.Now) {
+		return missing("market movement includes prices after the rating time")
+	}
+	if ctx.Market.FirstObservedAt == nil {
+		return missing("no first observed market prices")
+	}
+	if ctx.Market.CapturedAt.Sub(ctx.Market.FirstObservedAt.Time) < 5*time.Minute {
+		return missing("market movement needs at least five minutes of prices")
+	}
+	first, hasFirst := ctx.Market.FirstObservedPrices[r.ID]
+	current, hasCurrent := ctx.Market.Prices[r.ID]
+	if !hasFirst || !hasCurrent || !first.IsActive || !current.IsActive || first.BackPrice == nil || current.BackPrice == nil || *first.BackPrice <= 1 || *current.BackPrice <= 1 || math.IsNaN(*first.BackPrice) || math.IsNaN(*current.BackPrice) || math.IsInf(*first.BackPrice, 0) || math.IsInf(*current.BackPrice, 0) {
+		return missing("no comparable exchange prices for this runner")
+	}
+	change := 1 / *current.BackPrice - 1 / *first.BackPrice
+	return value(change, fmt.Sprintf("%+.1f percentage points since first seen", change*100))
+}
+
 func fieldPlacePrior(fieldSize *int) float64 {
 	if fieldSize == nil || *fieldSize < 3 {
 		return 0.25
@@ -214,11 +293,254 @@ func fieldPlacePrior(fieldSize *int) float64 {
 	return math.Min(1, 3/float64(*fieldSize))
 }
 
-// strikeRate reads the server's own archive, silent until the sample is worth
-// consulting and shrunk toward the field mean even then.
-type strikeRate struct {
+type raceTypeStrikeRate struct {
 	jockey        bool
 	minimumSample int
+}
+
+type goingStrikeRate struct {
+	jockey        bool
+	minimumSample int
+}
+
+type recentStrikeRate struct {
+	jockey        bool
+	minimumSample int
+}
+
+type jockeyTrainerStrikeRate struct{ minimumSample int }
+
+func (jockeyTrainerStrikeRate) ID() FactorID { return JockeyTrainerStrikeRate }
+
+func (f jockeyTrainerStrikeRate) Value(r domain.Runner, ctx Context) FactorValue {
+	if ctx.StrikeRates == nil {
+		return missing("no results archive yet")
+	}
+	provider, ok := ctx.StrikeRates.(JockeyTrainerStrikeRates)
+	if !ok {
+		return missing("no jockey-trainer archive yet")
+	}
+	if r.JockeyID == nil || r.TrainerID == nil {
+		return missing("jockey and trainer must both be identified")
+	}
+	pair, ok := provider.JockeyTrainerStrikeRate(*r.JockeyID, *r.TrainerID)
+	if !ok {
+		return missing("no record for this jockey-trainer pair yet")
+	}
+	if pair.Runs < f.minimumSample {
+		return missing(fmt.Sprintf("only %d runs for this jockey-trainer pair", pair.Runs))
+	}
+	jockey, jockeyOK := ctx.StrikeRates.JockeyStrikeRate(*r.JockeyID)
+	trainer, trainerOK := ctx.StrikeRates.TrainerStrikeRate(*r.TrainerID)
+	if !jockeyOK || jockey.Runs < f.minimumSample || !trainerOK || trainer.Runs < f.minimumSample {
+		return missing("jockey and trainer need enough individual runs")
+	}
+	baseline := ctx.StrikeRates.BaselineStrikeRate()
+	prior := (jockey.Smoothed(baseline, 20) + trainer.Smoothed(baseline, 20)) / 2
+	smoothed := pair.Smoothed(prior, 20)
+	return value(smoothed, fmt.Sprintf("%d%% from %d runs together", int(math.Round(smoothed*100)), pair.Runs))
+}
+
+func (f recentStrikeRate) ID() FactorID {
+	if f.jockey {
+		return JockeyRecentStrikeRate
+	}
+	return TrainerRecentStrikeRate
+}
+
+func (f recentStrikeRate) Value(r domain.Runner, ctx Context) FactorValue {
+	if ctx.StrikeRates == nil {
+		return missing("no results archive yet")
+	}
+	provider, ok := ctx.StrikeRates.(RecentStrikeRates)
+	if !ok {
+		return missing("no recent results archive yet")
+	}
+	subject := r.TrainerID
+	if f.jockey {
+		subject = r.JockeyID
+	}
+	if subject == nil {
+		return missing("not identified")
+	}
+	var record StrikeRate
+	if f.jockey {
+		record, ok = provider.JockeyRecentStrikeRate(*subject)
+	} else {
+		record, ok = provider.TrainerRecentStrikeRate(*subject)
+	}
+	if !ok {
+		return missing("no dated runs in the recent archive yet")
+	}
+	if record.Runs < f.minimumSample {
+		return missing(fmt.Sprintf("only %d dated runs in the recent window", record.Runs))
+	}
+	prior := ctx.StrikeRates.BaselineStrikeRate()
+	var overall StrikeRate
+	if f.jockey {
+		overall, ok = ctx.StrikeRates.JockeyStrikeRate(*subject)
+	} else {
+		overall, ok = ctx.StrikeRates.TrainerStrikeRate(*subject)
+	}
+	if ok {
+		prior = overall.Smoothed(prior, 20)
+	}
+	smoothed := record.Smoothed(prior, 20)
+	return value(smoothed, fmt.Sprintf("%d%% from %d recent runs", int(math.Round(smoothed*100)), record.Runs))
+}
+
+func (f goingStrikeRate) ID() FactorID {
+	if f.jockey {
+		return JockeyGoingStrikeRate
+	}
+	return TrainerGoingStrikeRate
+}
+
+func (f goingStrikeRate) Value(r domain.Runner, ctx Context) FactorValue {
+	if ctx.StrikeRates == nil {
+		return missing("no results archive yet")
+	}
+	provider, ok := ctx.StrikeRates.(GoingStrikeRates)
+	if !ok {
+		return missing("no going archive yet")
+	}
+	bucket := ctx.Race.Going.Bucket(ctx.Race.Surface)
+	if bucket == "" {
+		return missing("going or surface is unknown")
+	}
+	subject := r.TrainerID
+	if f.jockey {
+		subject = r.JockeyID
+	}
+	if subject == nil {
+		return missing("not identified")
+	}
+	var record StrikeRate
+	if f.jockey {
+		record, ok = provider.JockeyGoingStrikeRate(*subject, ctx.Race.Surface, bucket)
+	} else {
+		record, ok = provider.TrainerGoingStrikeRate(*subject, ctx.Race.Surface, bucket)
+	}
+	if !ok {
+		return missing("no record in this going archive yet")
+	}
+	if record.Runs < f.minimumSample {
+		return missing(fmt.Sprintf("only %d runs on similar ground", record.Runs))
+	}
+	prior := ctx.StrikeRates.BaselineStrikeRate()
+	var overall StrikeRate
+	if f.jockey {
+		overall, ok = ctx.StrikeRates.JockeyStrikeRate(*subject)
+	} else {
+		overall, ok = ctx.StrikeRates.TrainerStrikeRate(*subject)
+	}
+	if ok {
+		prior = overall.Smoothed(prior, 20)
+	}
+	smoothed := record.Smoothed(prior, 20)
+	return value(smoothed, fmt.Sprintf("%d%% from %d %s going runs", int(math.Round(smoothed*100)), record.Runs, bucket))
+}
+
+func (f raceTypeStrikeRate) ID() FactorID {
+	if f.jockey {
+		return JockeyRaceTypeStrikeRate
+	}
+	return TrainerRaceTypeStrikeRate
+}
+
+func (f raceTypeStrikeRate) Value(r domain.Runner, ctx Context) FactorValue {
+	if ctx.StrikeRates == nil {
+		return missing("no results archive yet")
+	}
+	provider, ok := ctx.StrikeRates.(RaceTypeStrikeRates)
+	if !ok {
+		return missing("no race-type archive yet")
+	}
+	if ctx.Race.Type == domain.RaceTypeUnknown {
+		return missing("race type is unknown")
+	}
+	subject := r.TrainerID
+	if f.jockey {
+		subject = r.JockeyID
+	}
+	if subject == nil {
+		return missing("not identified")
+	}
+	var record StrikeRate
+	if f.jockey {
+		record, ok = provider.JockeyRaceTypeStrikeRate(*subject, ctx.Race.Type)
+	} else {
+		record, ok = provider.TrainerRaceTypeStrikeRate(*subject, ctx.Race.Type)
+	}
+	if !ok {
+		return missing("no record in this race-type archive yet")
+	}
+	if record.Runs < f.minimumSample {
+		return missing(fmt.Sprintf("only %d runs in this race type", record.Runs))
+	}
+	prior := ctx.StrikeRates.BaselineStrikeRate()
+	var overall StrikeRate
+	if f.jockey {
+		overall, ok = ctx.StrikeRates.JockeyStrikeRate(*subject)
+	} else {
+		overall, ok = ctx.StrikeRates.TrainerStrikeRate(*subject)
+	}
+	if ok {
+		prior = overall.Smoothed(prior, 20)
+	}
+	smoothed := record.Smoothed(prior, 20)
+	return value(smoothed, fmt.Sprintf("%d%% from %d %s runs", int(math.Round(smoothed*100)), record.Runs, ctx.Race.Type))
+}
+
+func (f surfaceStrikeRate) ID() FactorID {
+	if f.jockey {
+		return JockeySurfaceStrikeRate
+	}
+	return TrainerSurfaceStrikeRate
+}
+
+func (f surfaceStrikeRate) Value(r domain.Runner, ctx Context) FactorValue {
+	if ctx.StrikeRates == nil {
+		return missing("no results archive yet")
+	}
+	provider, ok := ctx.StrikeRates.(SurfaceStrikeRates)
+	if !ok {
+		return missing("no surface archive yet")
+	}
+	if ctx.Race.Surface == domain.SurfaceUnknown {
+		return missing("surface is unknown")
+	}
+	subject := r.TrainerID
+	if f.jockey {
+		subject = r.JockeyID
+	}
+	if subject == nil {
+		return missing("not identified")
+	}
+	var record StrikeRate
+	if f.jockey {
+		record, ok = provider.JockeySurfaceStrikeRate(*subject, ctx.Race.Surface)
+	} else {
+		record, ok = provider.TrainerSurfaceStrikeRate(*subject, ctx.Race.Surface)
+	}
+	if !ok {
+		return missing("no record in this surface archive yet")
+	}
+	if record.Runs < f.minimumSample {
+		return missing(fmt.Sprintf("only %d runs recorded on this surface", record.Runs))
+	}
+	prior := ctx.StrikeRates.BaselineStrikeRate()
+	var overall StrikeRate
+	if f.jockey {
+		overall, ok = ctx.StrikeRates.JockeyStrikeRate(*subject)
+	} else {
+		overall, ok = ctx.StrikeRates.TrainerStrikeRate(*subject)
+	}
+	if ok {
+		prior = overall.Smoothed(prior, 20)
+	}
+	smoothed := record.Smoothed(prior, 20)
+	return value(smoothed, fmt.Sprintf("%d%% from %d %s runs", int(math.Round(smoothed*100)), record.Runs, ctx.Race.Surface))
 }
 
 func (s strikeRate) ID() FactorID {
@@ -262,6 +584,18 @@ func DefaultFactors(w Weights) []Factor {
 		officialRating{}, handicapBandPosition{}, recentForm{scorer: w.Scorer()}, wonLastTime{},
 		completionRate{}, daysSinceLastRun{}, age{}, weightCarried{}, draw{}, headgear{},
 		strikeRate{jockey: true, minimumSample: w.MinimumStrikeRateSample},
-		strikeRate{jockey: false, minimumSample: w.MinimumStrikeRateSample}, horseGoing{minimumSample: 3},
+		strikeRate{jockey: false, minimumSample: w.MinimumStrikeRateSample},
+		surfaceStrikeRate{jockey: true, minimumSample: w.MinimumStrikeRateSample},
+		surfaceStrikeRate{jockey: false, minimumSample: w.MinimumStrikeRateSample},
+		raceTypeStrikeRate{jockey: true, minimumSample: w.MinimumStrikeRateSample},
+		raceTypeStrikeRate{jockey: false, minimumSample: w.MinimumStrikeRateSample},
+		goingStrikeRate{jockey: true, minimumSample: w.MinimumStrikeRateSample},
+		goingStrikeRate{jockey: false, minimumSample: w.MinimumStrikeRateSample},
+		horseGoing{minimumSample: 3},
+		recentStrikeRate{jockey: true, minimumSample: w.MinimumStrikeRateSample},
+		recentStrikeRate{jockey: false, minimumSample: w.MinimumStrikeRateSample},
+		jockeyTrainerStrikeRate{minimumSample: w.MinimumStrikeRateSample},
+		classAdjustedForm{minimumSample: 3},
+		marketMovement{},
 	}
 }

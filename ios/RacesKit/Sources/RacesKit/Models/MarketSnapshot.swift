@@ -62,19 +62,25 @@ public struct MarketSnapshot: Codable, Hashable, Sendable {
     /// ranking runners; worth saying out loud wherever a price is shown.
     public let isDelayed: Bool
     public let prices: [String: RunnerPrice]
+    public let firstObservedAt: Date?
+    public let firstObservedPrices: [String: RunnerPrice]?
 
     public init(
         marketID: String? = nil,
         source: Source = .liveExchange,
         capturedAt: Date = Date(),
         isDelayed: Bool = true,
-        prices: [String: RunnerPrice]
+        prices: [String: RunnerPrice],
+        firstObservedAt: Date? = nil,
+        firstObservedPrices: [String: RunnerPrice]? = nil
     ) {
         self.marketID = marketID
         self.source = source
         self.capturedAt = capturedAt
         self.isDelayed = isDelayed
         self.prices = prices
+        self.firstObservedAt = firstObservedAt
+        self.firstObservedPrices = firstObservedPrices
     }
 
     public func price(for horseID: String) -> RunnerPrice? {

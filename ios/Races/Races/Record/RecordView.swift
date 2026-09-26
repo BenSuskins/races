@@ -30,6 +30,7 @@ struct RecordView: View {
                         split(report)
                         calibration(report)
                         coverage(report)
+                        recentRaces
                         footer
                     }
                     .refreshable { await model.refresh() }
@@ -202,6 +203,96 @@ struct RecordView: View {
             Text("Coverage")
         } footer: {
             Text("Free results cover today only. The server polls them all evening, but a day it misses is a result lost for good. Those tips expire and are counted here rather than dropped — otherwise the record would quietly become a flattering subsample.")
+        }
+    }
+
+    @ViewBuilder
+    private var recentRaces: some View {
+        if !model.recentTips.isEmpty {
+            Section {
+                ForEach(model.recentTips) { tip in
+                    DisclosureGroup {
+                        LabeledContent("Result", value: outcomeLabel(tip.outcome))
+                        LabeledContent("Model chance", value: percent(tip.predictedProbability))
+                        if let marketProbability = tip.marketProbabilityAtTip {
+                            LabeledContent("Market chance", value: percent(marketProbability))
+                        }
+                        if let marketBackPrice = tip.marketBackPriceAtTip {
+                            LabeledContent("Price at tip", value: marketBackPrice.formatted(.number.precision(.fractionLength(2))))
+                        }
+                        if let outcome = tip.outcome, let price = outcome.betfairSP {
+                            LabeledContent("Starting price", value: price.formatted(.number.precision(.fractionLength(2))))
+                        }
+                        if let agreed = tip.agreedWithFavourite {
+                            LabeledContent("Market favourite", value: agreed ? "Model selected the favourite" : "Model selected another horse")
+                        }
+                        LabeledContent("Weight set", value: tip.weightsID)
+                        if !tip.contributions.isEmpty {
+                            Text("Why the model chose this horse")
+                                .font(.subheadline.weight(.semibold))
+                                .padding(.top, 6)
+                            ForEach(tip.contributions) { contribution in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(contribution.label)
+                                        .font(.subheadline)
+                                    Text(contribution.detail)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(.vertical, 2)
+                            }
+                        }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack {
+                                Text(tip.courseName)
+                                    .font(.subheadline.weight(.semibold))
+                                Spacer()
+                                Text(outcomeLabel(tip.outcome))
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(outcomeColor(tip.outcome))
+                            }
+                            Text(tip.raceName)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            HStack {
+                                Text(tip.selectionHorseName)
+                                Spacer()
+                                Text(tip.offAt?.formatted(date: .abbreviated, time: .shortened) ?? tip.raceDate)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .font(.caption)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+            } header: {
+                Text("Recent races")
+            } footer: {
+                Text("The latest 30 races in this weight set. Expand a race to see the frozen chances and rating details recorded at tip time.")
+            }
+        }
+    }
+
+    private func outcomeLabel(_ outcome: TipOutcome?) -> String {
+        guard let outcome else { return "Pending" }
+        switch outcome {
+        case .won: return "Won"
+        case .lost(let position, _):
+            return position.map { "Finished \($0)" } ?? "Lost"
+        case .nonRunner: return "Non-runner"
+        case .abandoned: return "Abandoned"
+        case .unresolved: return "Awaiting result"
+        case .expired: return "Expired"
+        }
+    }
+
+    private func outcomeColor(_ outcome: TipOutcome?) -> Color {
+        guard let outcome else { return .secondary }
+        switch outcome {
+        case .won: return .green
+        case .lost: return .primary
+        case .nonRunner, .abandoned, .unresolved, .expired: return .secondary
         }
     }
 

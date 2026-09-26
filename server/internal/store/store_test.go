@@ -65,6 +65,34 @@ func TestSealCardIsImmutableAndStoredWithTip(t *testing.T) {
 	}
 }
 
+func TestDisplaySnapshotsKeepFirstAndLatestPricesForMovement(t *testing.T) {
+	ctx := context.Background()
+	s := open(t)
+	firstAt := time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC)
+	first := domain.MarketSnapshot{Source: domain.SourceLiveExchange, CapturedAt: domain.At(firstAt), Prices: map[string]domain.RunnerPrice{"horse": {BackPrice: floatPointer(3), IsActive: true}}}
+	if err := s.SaveSnapshot(ctx, "race", "display", first); err != nil {
+		t.Fatal(err)
+	}
+	latest := first
+	latest.CapturedAt = domain.At(firstAt.Add(10 * time.Minute))
+	latest.Prices = map[string]domain.RunnerPrice{"horse": {BackPrice: floatPointer(2), IsActive: true}}
+	latest.FirstObservedAt = &first.CapturedAt
+	latest.FirstObservedPrices = first.Prices
+	if err := s.SaveSnapshot(ctx, "race", "display", latest); err != nil {
+		t.Fatal(err)
+	}
+	opening, err := s.LatestSnapshot(ctx, "race", "display-opening")
+	if err != nil || opening == nil || opening.CapturedAt.Time != firstAt || *opening.Prices["horse"].BackPrice != 3 {
+		t.Fatalf("first observed prices changed: %+v, %v", opening, err)
+	}
+	display, err := s.LatestSnapshot(ctx, "race", "display")
+	if err != nil || display == nil || display.CapturedAt.Time != firstAt.Add(10*time.Minute) || *display.FirstObservedPrices["horse"].BackPrice != 3 {
+		t.Fatalf("latest display snapshot lost its movement base: %+v, %v", display, err)
+	}
+}
+
+func floatPointer(value float64) *float64 { return &value }
+
 func TestSaveRecoveredSealCardIsInsertOnlyAndAudited(t *testing.T) {
 	ctx := context.Background()
 	s := open(t)
@@ -104,9 +132,10 @@ func TestResultFactsRespectKnownTime(t *testing.T) {
 	firstKnown := time.Date(2026, 9, 20, 12, 0, 0, 0, time.UTC)
 	secondKnown := firstKnown.Add(24 * time.Hour)
 	jockey := "jockey"
-	first := domain.RaceResult{ID: "prior-race", Date: "2026-09-20", Going: domain.GoingSoft, Surface: domain.SurfaceTurf, Finishers: []domain.Finisher{{HorseID: "horse", Position: domain.Finished(4), JockeyID: &jockey}}}
-	second := domain.RaceResult{ID: "prior-race", Date: "2026-09-20", Going: domain.GoingSoft, Surface: domain.SurfaceTurf, Finishers: []domain.Finisher{{HorseID: "horse", Position: domain.Finished(1), JockeyID: &jockey}, {HorseID: "extra", Position: domain.Finished(2)}}}
-	future := domain.RaceResult{ID: "future-race", Date: "2026-09-21", Finishers: []domain.Finisher{{HorseID: "future-winner", Position: domain.Finished(1), JockeyID: &jockey}}}
+	trainer := "trainer"
+	first := domain.RaceResult{ID: "prior-race", Date: "2026-09-20", Surface: domain.SurfaceTurf, Going: domain.GoingGoodToSoft, Type: domain.RaceTypeFlat, Finishers: []domain.Finisher{{HorseID: "first-version", Position: domain.Finished(2), JockeyID: &jockey, TrainerID: &trainer}}}
+	second := domain.RaceResult{ID: "prior-race", Date: "2026-09-20", Surface: domain.SurfaceTurf, Going: domain.GoingGoodToSoft, Type: domain.RaceTypeFlat, Finishers: []domain.Finisher{{HorseID: "second-version", Position: domain.Finished(1), JockeyID: &jockey, TrainerID: &trainer}, {HorseID: "extra", Position: domain.Finished(2)}}}
+	future := domain.RaceResult{ID: "future-race", Date: "2026-09-21", Surface: domain.SurfaceAllWeather, Going: domain.GoingStandardToFast, Type: domain.RaceTypeHurdle, Finishers: []domain.Finisher{{HorseID: "future-winner", Position: domain.Finished(1), JockeyID: &jockey, TrainerID: &trainer}}}
 	if _, err := s.SaveResults(ctx, []domain.RaceResult{first}, firstKnown); err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +143,7 @@ func TestResultFactsRespectKnownTime(t *testing.T) {
 		t.Fatal(err)
 	}
 	before, err := s.ResultFactsKnownBefore(ctx, firstKnown.Add(time.Hour))
-	if err != nil || len(before) != 1 || before[0].Finishers[0].HorseID != "horse" {
+	if err != nil || len(before) != 1 || before[0].Finishers[0].HorseID != "first-version" {
 		t.Fatalf("as-of query returned later fact: %+v, %v", before, err)
 	}
 	archive := tracking.NewArchive()
@@ -124,17 +153,32 @@ func TestResultFactsRespectKnownTime(t *testing.T) {
 	if rate, _ := archive.JockeyStrikeRate(jockey); rate.Runs != 1 || rate.Wins != 0 {
 		t.Fatalf("future win changed the earlier jockey rate: %+v", rate)
 	}
-	if rate, _ := archive.HorseGoingRate("horse", domain.SurfaceTurf, domain.GoingBucketSoft); rate.Runs != 1 || rate.Places != 0 {
-		t.Fatalf("future placing changed the earlier going record: %+v", rate)
+	if rate, _ := archive.JockeySurfaceStrikeRate(jockey, domain.SurfaceTurf); rate.Runs != 1 || rate.Wins != 0 {
+		t.Fatalf("future win changed the earlier surface rate: %+v", rate)
+	}
+	if rate, _ := archive.JockeyRaceTypeStrikeRate(jockey, domain.RaceTypeFlat); rate.Runs != 1 || rate.Wins != 0 {
+		t.Fatalf("future win changed the earlier race-type rate: %+v", rate)
+	}
+	if rate, _ := archive.JockeyGoingStrikeRate(jockey, domain.SurfaceTurf, domain.GoingBucketGood); rate.Runs != 1 || rate.Wins != 0 {
+		t.Fatalf("future win changed the earlier going rate: %+v", rate)
+	}
+	if rate, _ := archive.JockeyRecentStrikeRate(jockey); rate.Runs != 1 || rate.Wins != 0 {
+		t.Fatalf("future win changed the earlier recent jockey rate: %+v", rate)
+	}
+	if rate, _ := archive.TrainerRecentStrikeRate(trainer); rate.Runs != 1 || rate.Wins != 0 {
+		t.Fatalf("future win changed the earlier recent trainer rate: %+v", rate)
+	}
+	if rate, _ := archive.JockeyTrainerStrikeRate(jockey, trainer); rate.Runs != 1 || rate.Wins != 0 {
+		t.Fatalf("future win changed the earlier interaction rate: %+v", rate)
 	}
 	after, err := s.ResultFactsKnownBefore(ctx, secondKnown.Add(time.Second))
-	latestPriorPosition := 0
+	latestPrior := ""
 	for _, result := range after {
 		if result.ID == "prior-race" && len(result.Finishers) > 0 {
-			latestPriorPosition = result.Finishers[0].Position.Position
+			latestPrior = result.Finishers[0].HorseID
 		}
 	}
-	if err != nil || len(after) != 2 || latestPriorPosition != 1 {
+	if err != nil || len(after) != 2 || latestPrior != "second-version" {
 		t.Fatalf("query did not return latest known fact: %+v, %v", after, err)
 	}
 	laterArchive := tracking.NewArchive()
@@ -144,7 +188,28 @@ func TestResultFactsRespectKnownTime(t *testing.T) {
 	if rate, _ := laterArchive.JockeyStrikeRate(jockey); rate.Runs != 2 || rate.Wins != 2 {
 		t.Fatalf("newer facts were not available after collection: %+v", rate)
 	}
-	if rate, _ := laterArchive.HorseGoingRate("horse", domain.SurfaceTurf, domain.GoingBucketSoft); rate.Runs != 1 || rate.Places != 1 {
-		t.Fatalf("newer going facts were not available after collection: %+v", rate)
+	if rate, _ := laterArchive.JockeyRecentStrikeRate(jockey); rate.Runs != 2 || rate.Wins != 2 {
+		t.Fatalf("later facts were not available to the recent jockey rate: %+v", rate)
+	}
+	if rate, _ := laterArchive.TrainerRecentStrikeRate(trainer); rate.Runs != 2 || rate.Wins != 2 {
+		t.Fatalf("later facts were not available to the recent trainer rate: %+v", rate)
+	}
+	if rate, _ := laterArchive.JockeyTrainerStrikeRate(jockey, trainer); rate.Runs != 2 || rate.Wins != 2 {
+		t.Fatalf("later facts were not available to the interaction rate: %+v", rate)
+	}
+	if rate, _ := laterArchive.JockeySurfaceStrikeRate(jockey, domain.SurfaceTurf); rate.Runs != 1 || rate.Wins != 1 {
+		t.Fatalf("updated surface fact was not available after collection: %+v", rate)
+	}
+	if rate, _ := laterArchive.JockeySurfaceStrikeRate(jockey, domain.SurfaceAllWeather); rate.Runs != 1 || rate.Wins != 1 {
+		t.Fatalf("later all-weather fact was not available after collection: %+v", rate)
+	}
+	if rate, _ := laterArchive.JockeyRaceTypeStrikeRate(jockey, domain.RaceTypeFlat); rate.Runs != 1 || rate.Wins != 1 {
+		t.Fatalf("updated race-type fact was not available after collection: %+v", rate)
+	}
+	if rate, _ := laterArchive.JockeyRaceTypeStrikeRate(jockey, domain.RaceTypeHurdle); rate.Runs != 1 || rate.Wins != 1 {
+		t.Fatalf("later hurdle fact was not available after collection: %+v", rate)
+	}
+	if rate, _ := laterArchive.JockeyGoingStrikeRate(jockey, domain.SurfaceAllWeather, domain.GoingBucketFast); rate.Runs != 1 || rate.Wins != 1 {
+		t.Fatalf("later going fact was not available after collection: %+v", rate)
 	}
 }

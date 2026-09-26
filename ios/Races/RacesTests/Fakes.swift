@@ -313,6 +313,7 @@ extension ServerRacecard {
 extension ServerRecord {
     static func fixture(
         tips: [TipRecord] = [],
+        recentTips: [TipRecord]? = nil,
         sources: [String: Int] = [:],
         archivedRaces: Int = 0,
         weightsInUse: [String: Int] = [:],
@@ -321,6 +322,7 @@ extension ServerRecord {
         ServerRecord(
             activeWeightsID: activeWeightsID,
             report: AccuracyCalculator.report(for: tips),
+            recentTips: recentTips,
             weightsInUse: weightsInUse,
             sources: sources,
             archivedRaces: archivedRaces)

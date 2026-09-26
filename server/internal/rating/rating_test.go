@@ -69,10 +69,19 @@ func fullMarket() *domain.MarketSnapshot {
 var epoch = time.Unix(0, 0)
 
 type fakeStrikeRates struct {
-	jockeys, trainers map[string]StrikeRate
-	horseGoings       map[string]PlaceRate
-	horseOverall      map[string]PlaceRate
-	baseline          float64
+	jockeys, trainers                 map[string]StrikeRate
+	jockeySurfaces, trainerSurfaces   map[string]StrikeRate
+	jockeyRaceTypes, trainerRaceTypes map[string]StrikeRate
+	jockeyGoings, trainerGoings       map[string]StrikeRate
+	jockeyRecent, trainerRecent       map[string]StrikeRate
+	jockeyTrainer                     map[string]StrikeRate
+	drawBiasRecord                    DrawBiasRate
+	drawBiasExists                    bool
+	horseClassRate                    ClassAdjustedFormRate
+	horseClassExists                  bool
+	horseGoings                       map[string]PlaceRate
+	horseOverall                      map[string]PlaceRate
+	baseline                          float64
 }
 
 func (f fakeStrikeRates) JockeyStrikeRate(id string) (StrikeRate, bool) {
@@ -84,6 +93,48 @@ func (f fakeStrikeRates) TrainerStrikeRate(id string) (StrikeRate, bool) {
 	return s, ok
 }
 func (f fakeStrikeRates) BaselineStrikeRate() float64 { return f.baseline }
+func (f fakeStrikeRates) JockeyRecentStrikeRate(id string) (StrikeRate, bool) {
+	rate, ok := f.jockeyRecent[id]
+	return rate, ok
+}
+func (f fakeStrikeRates) TrainerRecentStrikeRate(id string) (StrikeRate, bool) {
+	rate, ok := f.trainerRecent[id]
+	return rate, ok
+}
+func (f fakeStrikeRates) JockeyTrainerStrikeRate(jockeyID, trainerID string) (StrikeRate, bool) {
+	rate, ok := f.jockeyTrainer[jockeyID+"|"+trainerID]
+	return rate, ok
+}
+func (f fakeStrikeRates) DrawBiasRate(domain.Race, domain.Runner) (DrawBiasRate, bool) {
+	return f.drawBiasRecord, f.drawBiasExists
+}
+func (f fakeStrikeRates) HorseClassFormRate(string, int) (ClassAdjustedFormRate, bool) {
+	return f.horseClassRate, f.horseClassExists
+}
+func (f fakeStrikeRates) JockeySurfaceStrikeRate(id string, surface domain.Surface) (StrikeRate, bool) {
+	rate, ok := f.jockeySurfaces[id+"|"+string(surface)]
+	return rate, ok
+}
+func (f fakeStrikeRates) TrainerSurfaceStrikeRate(id string, surface domain.Surface) (StrikeRate, bool) {
+	rate, ok := f.trainerSurfaces[id+"|"+string(surface)]
+	return rate, ok
+}
+func (f fakeStrikeRates) JockeyRaceTypeStrikeRate(id string, raceType domain.RaceType) (StrikeRate, bool) {
+	rate, ok := f.jockeyRaceTypes[id+"|"+string(raceType)]
+	return rate, ok
+}
+func (f fakeStrikeRates) TrainerRaceTypeStrikeRate(id string, raceType domain.RaceType) (StrikeRate, bool) {
+	rate, ok := f.trainerRaceTypes[id+"|"+string(raceType)]
+	return rate, ok
+}
+func (f fakeStrikeRates) JockeyGoingStrikeRate(id string, surface domain.Surface, bucket domain.GoingBucket) (StrikeRate, bool) {
+	rate, ok := f.jockeyGoings[id+"|"+string(surface)+"|"+string(bucket)]
+	return rate, ok
+}
+func (f fakeStrikeRates) TrainerGoingStrikeRate(id string, surface domain.Surface, bucket domain.GoingBucket) (StrikeRate, bool) {
+	rate, ok := f.trainerGoings[id+"|"+string(surface)+"|"+string(bucket)]
+	return rate, ok
+}
 func (f fakeStrikeRates) HorseGoingRate(horseID string, surface domain.Surface, bucket domain.GoingBucket) (PlaceRate, bool) {
 	rate, ok := f.horseGoings[horseID+"|"+string(surface)+"|"+string(bucket)]
 	return rate, ok
@@ -307,8 +358,8 @@ func TestFactorReadings(t *testing.T) {
 	if v := (weightCarried{}).Value(runner("a", runnerOpts{weight: ip(133)}), ctx); v.Display != "9-07" {
 		t.Fatal(v.Display)
 	}
-	if v := (draw{}).Value(runner("a", runnerOpts{draw: ip(3)}), ctx); v.Raw != nil || v.Display != "Stall 3" {
-		t.Fatal("draw is shown, not used")
+	if v := (draw{}).Value(runner("a", runnerOpts{draw: ip(3)}), ctx); v.Raw != nil || v.Availability.Kind != MissingData {
+		t.Fatal("draw without an archive must remain missing")
 	}
 	if v := (headgear{}).Value(runner("a", runnerOpts{headgear: sp("b")}), ctx); v.Display != "Wearing b" || v.Availability.Kind != RequiresPaidTier {
 		t.Fatal("headgear")
@@ -507,6 +558,51 @@ func TestStrikeRateFactorsStaySilentOnThinArchive(t *testing.T) {
 	}
 }
 
+func TestSurfaceStrikeRateShrinksMatureCellsToTheGeneralRecord(t *testing.T) {
+	archive := fakeStrikeRates{
+		jockeys:        map[string]StrikeRate{"jockey": {Runs: 100, Wins: 20}},
+		jockeySurfaces: map[string]StrikeRate{"jockey|turf": {Runs: 30, Wins: 10}},
+		baseline:       0.125,
+	}
+	factor := surfaceStrikeRate{jockey: true, minimumSample: 30}
+	r := runner("horse", runnerOpts{jockey: sp("jockey")})
+	context := Context{Race: domain.Race{Surface: domain.SurfaceTurf}, StrikeRates: archive}
+	reading := factor.Value(r, context)
+	if reading.Raw == nil || !near(*reading.Raw, 0.275, 1e-9) || reading.Availability.Kind != Available {
+		t.Fatalf("surface record was not shrunk to the general record: %#v", reading)
+	}
+	context.Race.Surface = domain.SurfaceAllWeather
+	if reading := factor.Value(r, context); reading.Availability.Kind != MissingData || reading.Raw != nil {
+		t.Fatalf("missing surface history must remain distinct from a neutral prior: %#v", reading)
+	}
+}
+
+func TestRaceTypeStrikeRateRequiresThirtyRunsAndShrinksToTheGeneralRecord(t *testing.T) {
+	archive := fakeStrikeRates{
+		jockeys:         map[string]StrikeRate{"jockey": {Runs: 100, Wins: 20}},
+		jockeyRaceTypes: map[string]StrikeRate{"jockey|flat": {Runs: 30, Wins: 10}},
+		baseline:        0.125,
+	}
+	factor := raceTypeStrikeRate{jockey: true, minimumSample: 30}
+	r := runner("horse", runnerOpts{jockey: sp("jockey")})
+	context := Context{Race: domain.Race{Type: domain.RaceTypeFlat}, StrikeRates: archive}
+	reading := factor.Value(r, context)
+	if reading.Raw == nil || !near(*reading.Raw, 0.275, 1e-9) || reading.Availability.Kind != Available {
+		t.Fatalf("race-type record was not shrunk to the general record: %#v", reading)
+	}
+	archive.jockeyRaceTypes["jockey|flat"] = StrikeRate{Runs: 29, Wins: 10}
+	context.StrikeRates = archive
+	reading = factor.Value(r, context)
+	if reading.Raw != nil || reading.Availability.Kind != MissingData {
+		t.Fatalf("race-type record below the sample floor must be missing: %#v", reading)
+	}
+	context.Race.Type = domain.RaceTypeUnknown
+	reading = factor.Value(r, context)
+	if reading.Raw != nil || reading.Availability.Reason != "race type is unknown" {
+		t.Fatalf("unknown race type must be missing: %#v", reading)
+	}
+}
+
 func TestHorseGoingFactorUsesOnlyMatureBucketHistory(t *testing.T) {
 	factor := horseGoing{minimumSample: 3}
 	archive := fakeStrikeRates{
@@ -524,6 +620,136 @@ func TestHorseGoingFactorUsesOnlyMatureBucketHistory(t *testing.T) {
 	}
 	if got := factor.Value(runner("new-horse", runnerOpts{}), context); got.Availability.Kind != Available || got.Raw == nil || !near(*got.Raw, 0.25, 1e-9) {
 		t.Fatalf("no mature history must use the field prior: %#v", got)
+	}
+}
+
+func TestGoingStrikeRateRequiresThirtyRunsAndShrinksToTheGeneralRecord(t *testing.T) {
+	archive := fakeStrikeRates{
+		jockeys:      map[string]StrikeRate{"jockey": {Runs: 100, Wins: 20}},
+		jockeyGoings: map[string]StrikeRate{"jockey|turf|good": {Runs: 30, Wins: 10}},
+		baseline:     0.125,
+	}
+	factor := goingStrikeRate{jockey: true, minimumSample: 30}
+	r := runner("horse", runnerOpts{jockey: sp("jockey")})
+	context := Context{Race: domain.Race{Surface: domain.SurfaceTurf, Going: domain.GoingGood}, StrikeRates: archive}
+	reading := factor.Value(r, context)
+	if reading.Raw == nil || !near(*reading.Raw, 0.275, 1e-9) || reading.Availability.Kind != Available {
+		t.Fatalf("going record was not shrunk to the general record: %#v", reading)
+	}
+	context.Race.Going = domain.GoingUnknown
+	reading = factor.Value(r, context)
+	if reading.Raw != nil || reading.Availability.Reason != "going or surface is unknown" {
+		t.Fatalf("unknown going must be missing: %#v", reading)
+	}
+}
+
+func TestRecentStrikeRateRequiresThirtyDatedRunsAndShrinksTowardTheGeneralRate(t *testing.T) {
+	archive := fakeStrikeRates{
+		jockeys:      map[string]StrikeRate{"jockey": {Runs: 100, Wins: 20}},
+		jockeyRecent: map[string]StrikeRate{"jockey": {Runs: 30, Wins: 10}},
+		baseline:     0.125,
+	}
+	factor := recentStrikeRate{jockey: true, minimumSample: 30}
+	r := runner("horse", runnerOpts{jockey: sp("jockey")})
+	reading := factor.Value(r, Context{StrikeRates: archive})
+	if reading.Raw == nil || !near(*reading.Raw, 0.275, 1e-9) || reading.Availability.Kind != Available {
+		t.Fatalf("recent rate was not shrunk to the general record: %#v", reading)
+	}
+	archive.jockeyRecent["jockey"] = StrikeRate{Runs: 29, Wins: 10}
+	reading = factor.Value(r, Context{StrikeRates: archive})
+	if reading.Raw != nil || reading.Availability != (Availability{MissingData, "only 29 dated runs in the recent window"}) {
+		t.Fatalf("recent rate below the sample floor must be missing: %#v", reading)
+	}
+}
+
+func TestJockeyTrainerInteractionNeedsMaturePairAndIndividualRecords(t *testing.T) {
+	factor := jockeyTrainerStrikeRate{minimumSample: 30}
+	r := runner("horse", runnerOpts{jockey: sp("jockey"), trainer: sp("trainer")})
+	archive := fakeStrikeRates{
+		jockeys:       map[string]StrikeRate{"jockey": {Runs: 100, Wins: 20}},
+		trainers:      map[string]StrikeRate{"trainer": {Runs: 100, Wins: 30}},
+		jockeyTrainer: map[string]StrikeRate{"jockey|trainer": {Runs: 30, Wins: 12}},
+		baseline:      0.125,
+	}
+	reading := factor.Value(r, Context{StrikeRates: archive})
+	if reading.Raw == nil || reading.Availability.Kind != Available || !near(*reading.Raw, 0.33166666666666667, 1e-9) {
+		t.Fatalf("mature interaction did not use the individual prior: %#v", reading)
+	}
+	archive.jockeyTrainer["jockey|trainer"] = StrikeRate{Runs: 29, Wins: 12}
+	reading = factor.Value(r, Context{StrikeRates: archive})
+	if reading.Raw != nil || reading.Availability.Kind != MissingData {
+		t.Fatalf("thin interaction must be missing: %#v", reading)
+	}
+	archive.jockeyTrainer["jockey|trainer"] = StrikeRate{Runs: 30, Wins: 12}
+	archive.trainers["trainer"] = StrikeRate{Runs: 29, Wins: 10}
+	reading = factor.Value(r, Context{StrikeRates: archive})
+	if reading.Raw != nil || reading.Availability.Reason != "jockey and trainer need enough individual runs" {
+		t.Fatalf("interaction must require mature individual records: %#v", reading)
+	}
+}
+
+func TestDrawBiasUsesComparableStartsAndRequiresOneHundred(t *testing.T) {
+	factor := draw{}
+	r := runner("horse", runnerOpts{draw: ip(2)})
+	context := Context{Race: domain.Race{Type: domain.RaceTypeFlat}, StrikeRates: fakeStrikeRates{
+		drawBiasRecord: DrawBiasRate{Runs: 100, Wins: 20, ExpectedWins: 10}, drawBiasExists: true,
+	}}
+	reading := factor.Value(r, context)
+	if reading.Raw == nil || reading.Availability.Kind != Available || !near(*reading.Raw, 22.0/120.0, 1e-9) {
+		t.Fatalf("mature draw cell was not shrunk to its expected rate: %#v", reading)
+	}
+	archive := context.StrikeRates.(fakeStrikeRates)
+	archive.drawBiasRecord.Runs = 99
+	context.StrikeRates = archive
+	reading = factor.Value(r, context)
+	if reading.Raw != nil || reading.Availability.Reason != "only 99 comparable starters for this draw" {
+		t.Fatalf("thin draw cell must remain missing: %#v", reading)
+	}
+}
+
+func TestClassAdjustedFormUsesHistoryOnlyAboveThreeRuns(t *testing.T) {
+	factor := classAdjustedForm{minimumSample: 3}
+	context := Context{Race: domain.Race{RaceClass: ip(3)}, StrikeRates: fakeStrikeRates{
+		horseClassRate: ClassAdjustedFormRate{Runs: 3, Score: 0.6}, horseClassExists: true,
+	}}
+	reading := factor.Value(runner("horse", runnerOpts{}), context)
+	if reading.Raw == nil || !near(*reading.Raw, 0.55, 1e-9) || reading.Availability.Kind != Available {
+		t.Fatalf("class-adjusted form did not shrink to neutral: %#v", reading)
+	}
+	archive := context.StrikeRates.(fakeStrikeRates)
+	archive.horseClassRate.Runs = 2
+	context.StrikeRates = archive
+	reading = factor.Value(runner("horse", runnerOpts{}), context)
+	if reading.Raw != nil || reading.Availability.Reason != "only 2 classed runs for this horse" {
+		t.Fatalf("thin class history must be missing: %#v", reading)
+	}
+}
+
+func TestMarketMovementRequiresFiveMinutesOfPreSealExchangePrices(t *testing.T) {
+	start := time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC)
+	finish := start.Add(6 * time.Minute)
+	firstObserved := domain.At(start)
+	current := domain.MarketSnapshot{
+		Source: domain.SourceLiveExchange, CapturedAt: domain.At(finish),
+		FirstObservedAt:     &firstObserved,
+		FirstObservedPrices: map[string]domain.RunnerPrice{"horse": {BackPrice: fp(2.0), IsActive: true}},
+		Prices:              map[string]domain.RunnerPrice{"horse": {BackPrice: fp(1.8), IsActive: true}},
+	}
+	factor := marketMovement{}
+	r := runner("horse", runnerOpts{})
+	reading := factor.Value(r, Context{Market: &current, Now: finish})
+	if reading.Raw == nil || !near(*reading.Raw, 1.0/1.8-0.5, 1e-9) || reading.Availability.Kind != Available {
+		t.Fatalf("market movement was not the change in implied chance: %#v", reading)
+	}
+	tooEarly := current
+	tooEarly.CapturedAt = domain.At(start.Add(4 * time.Minute))
+	reading = factor.Value(r, Context{Market: &tooEarly, Now: finish})
+	if reading.Raw != nil || reading.Availability.Reason != "market movement needs at least five minutes of prices" {
+		t.Fatalf("short market window must be missing: %#v", reading)
+	}
+	reading = factor.Value(r, Context{Market: &current, Now: start.Add(5 * time.Minute)})
+	if reading.Raw != nil || reading.Availability.Reason != "market movement includes prices after the rating time" {
+		t.Fatalf("post-seal prices must not be used: %#v", reading)
 	}
 }
 
@@ -546,7 +772,7 @@ func TestFactorDescriptions(t *testing.T) {
 			}
 		}
 	}
-	want := map[FactorID]bool{Draw: true, Headgear: true, JockeyStrikeRate: true, TrainerStrikeRate: true, HorseGoingPlaceRate: true}
+	want := map[FactorID]bool{Draw: true, Headgear: true, JockeyStrikeRate: true, TrainerStrikeRate: true, JockeySurfaceStrikeRate: true, TrainerSurfaceStrikeRate: true, JockeyRaceTypeStrikeRate: true, TrainerRaceTypeStrikeRate: true, JockeyGoingStrikeRate: true, TrainerGoingStrikeRate: true, HorseGoingPlaceRate: true, JockeyRecentStrikeRate: true, TrainerRecentStrikeRate: true, JockeyTrainerStrikeRate: true, ClassAdjustedForm: true, MarketMovement: true}
 	if len(zeros) != len(want) {
 		t.Fatal("the set of deliberate zeros changed", zeros)
 	}

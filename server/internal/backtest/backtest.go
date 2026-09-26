@@ -77,6 +77,13 @@ func ApplyOverrides(base rating.Weights, variant SweepVariant) (rating.Weights, 
 			}
 			out.OverroundMethod = method
 			continue
+		case "formPoints":
+			var points map[string]float64
+			if err := json.Unmarshal(raw, &points); err != nil || !validFormPoints(points) {
+				return rating.Weights{}, fmt.Errorf("invalid formPoints curve")
+			}
+			out.FormPoints = points
+			continue
 		case "marketExponent", "formInfluence", "formInfluenceNoMarket", "clip", "minimumMarketCoverage", "formDecay", "formSeasonBreakPenalty", "formLongBreakPenalty", "minimumValueEdge", "minimumValueProbability":
 			if err := json.Unmarshal(raw, &number); err != nil || math.IsNaN(number) || math.IsInf(number, 0) {
 				return rating.Weights{}, fmt.Errorf("invalid numeric override %q", field)
@@ -159,6 +166,31 @@ func ApplyOverrides(base rating.Weights, variant SweepVariant) (rating.Weights, 
 	return out, nil
 }
 
+func validFormPoints(points map[string]float64) bool {
+	defaults := rating.DefaultFormPoints()
+	if len(points) != len(defaults) {
+		return false
+	}
+	for key := range defaults {
+		value, ok := points[key]
+		if !ok || math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value > 1 {
+			return false
+		}
+	}
+	previous := 1.0
+	for position := 1; position <= 9; position++ {
+		value := points[fmt.Sprint(position)]
+		if value > previous {
+			return false
+		}
+		previous = value
+	}
+	if points["tenOrWorse"] > previous || points["nonCompletion"] != 0 {
+		return false
+	}
+	return true
+}
+
 // Arm is one model's performance over the replayed races.
 type Arm struct {
 	Races                  int           `json:"races"`
@@ -185,7 +217,11 @@ type Report struct {
 	// Favourite: backing the market favourite in those same races.
 	Favourite Arm `json:"favourite"`
 	// MarketLogLoss: the de-vigged market's own log loss on those races.
-	MarketLogLoss *float64 `json:"marketLogLoss,omitempty"`
+	MarketLogLoss          *float64       `json:"marketLogLoss,omitempty"`
+	JockeyTrainerCoverage  FactorCoverage `json:"jockeyTrainerCoverage"`
+	DrawBiasCoverage       FactorCoverage `json:"drawBiasCoverage"`
+	ClassFormCoverage      FactorCoverage `json:"classAdjustedFormCoverage"`
+	MarketMovementCoverage FactorCoverage `json:"marketMovementCoverage"`
 	// Snapshots: log loss over every frozen snapshot, device ones included.
 	Snapshots             int      `json:"snapshots"`
 	SnapshotLogLoss       *float64 `json:"snapshotLogLoss,omitempty"`
@@ -194,6 +230,38 @@ type Report struct {
 	// logLoss(model) ≤ logLoss(market) + 0.005.
 	BeatsMarket *bool    `json:"beatsMarket,omitempty"`
 	Notes       []string `json:"notes"`
+}
+
+// FactorCoverage counts rated runners for which a factor has a usable value.
+type FactorCoverage struct {
+	EligibleRunners  int      `json:"eligibleRunners"`
+	AvailableRunners int      `json:"availableRunners"`
+	Rate             *float64 `json:"rate,omitempty"`
+}
+
+type factorCoverageAccumulator struct{ eligible, available int }
+
+func (c *factorCoverageAccumulator) add(assessment rating.Assessment, factor rating.FactorID) {
+	for _, runner := range assessment.Runners {
+		for _, contribution := range runner.Contributions {
+			if contribution.Factor != factor {
+				continue
+			}
+			c.eligible++
+			if contribution.Availability.Kind == rating.Available {
+				c.available++
+			}
+			break
+		}
+	}
+}
+
+func (c factorCoverageAccumulator) report() FactorCoverage {
+	coverage := FactorCoverage{EligibleRunners: c.eligible, AvailableRunners: c.available}
+	if c.eligible > 0 {
+		coverage.Rate = finite(float64(c.available) / float64(c.eligible))
+	}
+	return coverage
 }
 
 // Run replays the stored history.
@@ -217,6 +285,10 @@ func Run(ctx context.Context, st *store.Store, w rating.Weights, req Request) (R
 	archive := tracking.NewArchive()
 	rater := rating.NewRater(w)
 	var highest, value, fav, market acc
+	var jockeyTrainerCoverage factorCoverageAccumulator
+	var drawBiasCoverage factorCoverageAccumulator
+	var classFormCoverage factorCoverageAccumulator
+	var marketMovementCoverage factorCoverageAccumulator
 	var corpus []string
 	var raceDates []string
 	missingSealCards := 0
@@ -254,6 +326,10 @@ func Run(ctx context.Context, st *store.Store, w rating.Weights, req Request) (R
 		if highestSelection == nil || valueSelection == nil {
 			continue
 		}
+		jockeyTrainerCoverage.add(a, rating.JockeyTrainerStrikeRate)
+		drawBiasCoverage.add(a, rating.Draw)
+		classFormCoverage.add(a, rating.ClassAdjustedForm)
+		marketMovementCoverage.add(a, rating.MarketMovement)
 		corpus = append(corpus, t.RaceID)
 		raceDates = append(raceDates, t.RaceDate)
 		winner := result.Winner().HorseID
@@ -281,6 +357,10 @@ func Run(ctx context.Context, st *store.Store, w rating.Weights, req Request) (R
 		rep.Notes = append(rep.Notes, fmt.Sprintf("Excluded %d sealed tips without a stored seal card.", missingSealCards))
 	}
 	rep.HighestProbability, rep.ValueSelection = highest.arm(), value.arm()
+	rep.JockeyTrainerCoverage = jockeyTrainerCoverage.report()
+	rep.DrawBiasCoverage = drawBiasCoverage.report()
+	rep.ClassFormCoverage = classFormCoverage.report()
+	rep.MarketMovementCoverage = marketMovementCoverage.report()
 	rep.Rerated, rep.Favourite = rep.HighestProbability, fav.arm()
 	rep.MarketLogLoss = market.logLoss()
 	sort.Strings(corpus)

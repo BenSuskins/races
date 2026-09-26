@@ -174,17 +174,7 @@ public struct WeightCarriedFactor: RatingFactor {
     }
 }
 
-/// Draw bias — **present but deliberately inert**.
-///
-/// Draw bias is real and can be decisive over sprint trips. But it is a
-/// course × distance × going × field-size interaction, and the free tier gives us
-/// no bias data at all. Inventing a table from memory would produce confident
-/// nonsense, which is the worst possible failure for an app that tells you what to
-/// back. So the factor reports honestly that it has nothing to say.
-///
-/// Once `ResultStore` holds enough British Flat racing, an empirical table derived
-/// from the app's own archive can fill this in — and only then does the weight
-/// come off zero.
+/// Draw bias from the latest comparable race results.
 public struct DrawFactor: RatingFactor {
     public let id = FactorID.draw
     public init() {}
@@ -193,10 +183,19 @@ public struct DrawFactor: RatingFactor {
         guard context.race.type == .flat else {
             return .notApplicable("the draw doesn't apply over obstacles")
         }
-        guard let draw = runner.draw else {
+        guard runner.draw != nil else {
             return .missing("no draw published")
         }
-        return .notApplicable("no draw-bias data for this course yet", display: "Stall \(draw)")
+        guard let provider = context.drawBiasRates else { return .missing("no draw-bias archive yet") }
+        guard let record = provider.drawBiasRate(race: context.race, runner: runner) else {
+            return .missing("no comparable draw archive yet")
+        }
+        guard record.runs >= 100 else {
+            return .missing("only \(record.runs) comparable starters for this draw")
+        }
+        let prior = record.expectedWins / Double(record.runs)
+        let smoothed = (Double(record.wins) + prior * 20) / (Double(record.runs) + 20)
+        return .value(smoothed, "\(Int((smoothed * 100).rounded()))% from \(record.runs) comparable starters")
     }
 }
 
@@ -259,9 +258,129 @@ public struct StrikeRateFactor: RatingFactor {
             return .missing("only \(record.runs) runs recorded so far")
         }
 
-        let smoothed = record.smoothed(towards: provider.baselineStrikeRate)
+        let overall = subject == .jockey
+            ? provider.jockeyStrikeRate(id: subjectID)
+            : provider.trainerStrikeRate(id: subjectID)
+        let prior = overall?.smoothed(towards: provider.baselineStrikeRate) ?? provider.baselineStrikeRate
+        let smoothed = record.smoothed(towards: prior)
         let percent = Int((smoothed * 100).rounded())
         return .value(smoothed, "\(percent)% from \(record.runs) runs")
+    }
+}
+
+public struct SurfaceStrikeRateFactor: RatingFactor {
+    public enum Subject: Sendable {
+        case jockey
+        case trainer
+    }
+
+    public let id: FactorID
+    public let minimumSample: Int
+    private let subject: Subject
+
+    public init(subject: Subject, minimumSample: Int = 30) {
+        self.subject = subject
+        self.minimumSample = minimumSample
+        self.id = subject == .jockey ? .jockeySurfaceStrikeRate : .trainerSurfaceStrikeRate
+    }
+
+    public func value(for runner: Runner, in context: FactorContext) -> FactorValue {
+        guard let provider = context.surfaceStrikeRates else { return .missing("no surface archive yet") }
+        guard context.race.surface != .unknown else { return .missing("surface is unknown") }
+        let subjectID = subject == .jockey ? runner.jockeyID : runner.trainerID
+        guard let subjectID else { return .missing("not identified") }
+        let record = subject == .jockey
+            ? provider.jockeySurfaceStrikeRate(id: subjectID, surface: context.race.surface)
+            : provider.trainerSurfaceStrikeRate(id: subjectID, surface: context.race.surface)
+        guard let record else { return .missing("no record in this surface archive yet") }
+        guard record.runs >= minimumSample else {
+            return .missing("only \(record.runs) runs recorded on this surface")
+        }
+        let overall = subject == .jockey
+            ? provider.jockeyStrikeRate(id: subjectID)
+            : provider.trainerStrikeRate(id: subjectID)
+        let prior = overall?.smoothed(towards: provider.baselineStrikeRate) ?? provider.baselineStrikeRate
+        let smoothed = record.smoothed(towards: prior)
+        let percent = Int((smoothed * 100).rounded())
+        return .value(smoothed, "\(percent)% from \(record.runs) \(context.race.surface.displayName.lowercased()) runs")
+    }
+}
+
+public struct RaceTypeStrikeRateFactor: RatingFactor {
+    public enum Subject: Sendable {
+        case jockey
+        case trainer
+    }
+
+    public let id: FactorID
+    public let minimumSample: Int
+    private let subject: Subject
+
+    public init(subject: Subject, minimumSample: Int = 30) {
+        self.subject = subject
+        self.minimumSample = minimumSample
+        self.id = subject == .jockey ? .jockeyRaceTypeStrikeRate : .trainerRaceTypeStrikeRate
+    }
+
+    public func value(for runner: Runner, in context: FactorContext) -> FactorValue {
+        guard let provider = context.raceTypeStrikeRates else { return .missing("no race-type archive yet") }
+        guard context.race.type != .unknown else { return .missing("race type is unknown") }
+        let subjectID = subject == .jockey ? runner.jockeyID : runner.trainerID
+        guard let subjectID else { return .missing("not identified") }
+        let record = subject == .jockey
+            ? provider.jockeyRaceTypeStrikeRate(id: subjectID, raceType: context.race.type)
+            : provider.trainerRaceTypeStrikeRate(id: subjectID, raceType: context.race.type)
+        guard let record else { return .missing("no record in this race-type archive yet") }
+        guard record.runs >= minimumSample else {
+            return .missing("only \(record.runs) runs in this race type")
+        }
+        let overall = subject == .jockey
+            ? provider.jockeyStrikeRate(id: subjectID)
+            : provider.trainerStrikeRate(id: subjectID)
+        let prior = overall?.smoothed(towards: provider.baselineStrikeRate) ?? provider.baselineStrikeRate
+        let smoothed = record.smoothed(towards: prior)
+        let percent = Int((smoothed * 100).rounded())
+        return .value(smoothed, "\(percent)% from \(record.runs) \(context.race.type.displayName.lowercased()) runs")
+    }
+}
+
+public struct GoingStrikeRateFactor: RatingFactor {
+    public enum Subject: Sendable {
+        case jockey
+        case trainer
+    }
+
+    public let id: FactorID
+    public let minimumSample: Int
+    private let subject: Subject
+
+    public init(subject: Subject, minimumSample: Int = 30) {
+        self.subject = subject
+        self.minimumSample = minimumSample
+        self.id = subject == .jockey ? .jockeyGoingStrikeRate : .trainerGoingStrikeRate
+    }
+
+    public func value(for runner: Runner, in context: FactorContext) -> FactorValue {
+        guard let provider = context.goingStrikeRates else { return .missing("no going archive yet") }
+        guard let bucket = context.race.going.bucket(on: context.race.surface) else {
+            return .missing("going or surface is unknown")
+        }
+        let subjectID = subject == .jockey ? runner.jockeyID : runner.trainerID
+        guard let subjectID else { return .missing("not identified") }
+        let record = subject == .jockey
+            ? provider.jockeyGoingStrikeRate(id: subjectID, surface: context.race.surface, bucket: bucket)
+            : provider.trainerGoingStrikeRate(id: subjectID, surface: context.race.surface, bucket: bucket)
+        guard let record else { return .missing("no record in this going archive yet") }
+        guard record.runs >= minimumSample else {
+            return .missing("only \(record.runs) runs on similar ground")
+        }
+        let overall = subject == .jockey
+            ? provider.jockeyStrikeRate(id: subjectID)
+            : provider.trainerStrikeRate(id: subjectID)
+        let prior = overall?.smoothed(towards: provider.baselineStrikeRate) ?? provider.baselineStrikeRate
+        let smoothed = record.smoothed(towards: prior)
+        let percent = Int((smoothed * 100).rounded())
+        return .value(smoothed, "\(percent)% from \(record.runs) \(bucket.rawValue) going runs")
     }
 }
 
@@ -292,5 +411,130 @@ public struct HorseGoingFactor: RatingFactor {
             return .value(smoothed, "\(Int((smoothed * 100).rounded()))% placed from \(overall.runs) runs")
         }
         return .value(fieldPrior, "Field place prior (\(Int((fieldPrior * 100).rounded()))%)")
+    }
+}
+
+public struct ClassAdjustedFormFactor: RatingFactor {
+    public let id = FactorID.classAdjustedForm
+    public let minimumSample: Int
+
+    public init(minimumSample: Int = 3) {
+        self.minimumSample = minimumSample
+    }
+
+    public func value(for runner: Runner, in context: FactorContext) -> FactorValue {
+        guard let targetClass = context.race.raceClass, (1...7).contains(targetClass) else {
+            return .missing("race class is unknown")
+        }
+        guard let provider = context.classAdjustedFormRates else {
+            return .missing("no class-adjusted form archive yet")
+        }
+        guard let record = provider.horseClassFormRate(horseID: runner.id, targetClass: targetClass) else {
+            return .missing("no classed race history for this horse")
+        }
+        guard record.runs >= minimumSample else {
+            return .missing("only \(record.runs) classed runs for this horse")
+        }
+        let smoothed = (record.score * Double(record.runs) + 0.5 * 3) / (Double(record.runs) + 3)
+        return .value(smoothed, "\(Int((smoothed * 100).rounded()))% class-adjusted form from \(record.runs) runs")
+    }
+}
+
+public struct MarketMovementFactor: RatingFactor {
+    public let id = FactorID.marketMovement
+    public let minimumElapsed: TimeInterval
+
+    public init(minimumElapsed: TimeInterval = 5 * 60) {
+        self.minimumElapsed = minimumElapsed
+    }
+
+    public func value(for runner: Runner, in context: FactorContext) -> FactorValue {
+        guard let market = context.market else { return .missing("no market prices for this race") }
+        guard market.source == .liveExchange else { return .notApplicable("market movement needs exchange prices") }
+        guard market.capturedAt <= context.now,
+              let firstObservedAt = market.firstObservedAt,
+              firstObservedAt <= context.now else {
+            return .missing("market movement includes prices after the rating time")
+        }
+        guard market.capturedAt.timeIntervalSince(firstObservedAt) >= minimumElapsed else {
+            return .missing("market movement needs at least five minutes of prices")
+        }
+        guard let first = market.firstObservedPrices?[runner.id], let current = market.price(for: runner.id),
+              first.isActive, current.isActive,
+              let firstPrice = first.backPrice, let currentPrice = current.backPrice,
+              firstPrice.isFinite, currentPrice.isFinite,
+              firstPrice > 1, currentPrice > 1 else {
+            return .missing("no comparable exchange prices for this runner")
+        }
+        let change = 1 / currentPrice - 1 / firstPrice
+        let display = String(
+            format: "%+.1f percentage points since first seen",
+            locale: Locale(identifier: "en_US_POSIX"),
+            change * 100
+        )
+        return .value(change, display)
+    }
+}
+
+public struct RecentStrikeRateFactor: RatingFactor {
+    public enum Subject: Sendable { case jockey, trainer }
+    public let id: FactorID
+    public let minimumSample: Int
+    private let subject: Subject
+
+    public init(subject: Subject, minimumSample: Int = 30) {
+        self.subject = subject
+        self.minimumSample = minimumSample
+        self.id = subject == .jockey ? .jockeyRecentStrikeRate : .trainerRecentStrikeRate
+    }
+
+    public func value(for runner: Runner, in context: FactorContext) -> FactorValue {
+        guard let provider = context.recentStrikeRates else { return .missing("no recent results archive yet") }
+        let subjectID = subject == .jockey ? runner.jockeyID : runner.trainerID
+        guard let subjectID else { return .missing("not identified") }
+        let record = subject == .jockey
+            ? provider.jockeyRecentStrikeRate(id: subjectID)
+            : provider.trainerRecentStrikeRate(id: subjectID)
+        guard let record else { return .missing("no dated runs in the recent archive yet") }
+        guard record.runs >= minimumSample else {
+            return .missing("only \(record.runs) dated runs in the recent window")
+        }
+        let overall = subject == .jockey
+            ? provider.jockeyStrikeRate(id: subjectID)
+            : provider.trainerStrikeRate(id: subjectID)
+        let prior = overall?.smoothed(towards: provider.baselineStrikeRate) ?? provider.baselineStrikeRate
+        let smoothed = record.smoothed(towards: prior)
+        return .value(smoothed, "\(Int((smoothed * 100).rounded()))% from \(record.runs) recent runs")
+    }
+}
+
+public struct JockeyTrainerStrikeRateFactor: RatingFactor {
+    public let id: FactorID = .jockeyTrainerStrikeRate
+    public let minimumSample: Int
+
+    public init(minimumSample: Int = 30) {
+        self.minimumSample = minimumSample
+    }
+
+    public func value(for runner: Runner, in context: FactorContext) -> FactorValue {
+        guard let provider = context.jockeyTrainerStrikeRates else { return .missing("no jockey-trainer archive yet") }
+        guard let jockeyID = runner.jockeyID, let trainerID = runner.trainerID else {
+            return .missing("jockey and trainer must both be identified")
+        }
+        guard let pair = provider.jockeyTrainerStrikeRate(jockeyID: jockeyID, trainerID: trainerID) else {
+            return .missing("no record for this jockey-trainer pair yet")
+        }
+        guard pair.runs >= minimumSample else {
+            return .missing("only \(pair.runs) runs for this jockey-trainer pair")
+        }
+        guard let jockey = provider.jockeyStrikeRate(id: jockeyID), jockey.runs >= minimumSample,
+              let trainer = provider.trainerStrikeRate(id: trainerID), trainer.runs >= minimumSample else {
+            return .missing("jockey and trainer need enough individual runs")
+        }
+        let jockeyPrior = jockey.smoothed(towards: provider.baselineStrikeRate)
+        let trainerPrior = trainer.smoothed(towards: provider.baselineStrikeRate)
+        let prior = (jockeyPrior + trainerPrior) / 2
+        let smoothed = pair.smoothed(towards: prior)
+        return .value(smoothed, "\(Int((smoothed * 100).rounded()))% from \(pair.runs) runs together")
     }
 }

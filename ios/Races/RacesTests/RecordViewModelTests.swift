@@ -50,6 +50,25 @@ final class RecordViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_recordKeepsTheRecentFrozenRaceDetails() async throws {
+        let tip = TipRecord(
+            raceID: "race-1", raceDate: "2026-09-20", offAt: nil,
+            courseName: "Ascot", raceName: "Novice Stakes", raceType: .flat,
+            fieldSizeAtTip: 8, selectionHorseID: "horse-1", selectionHorseName: "Example",
+            predictedProbability: 0.25, marketProbabilityAtTip: 0.2, marketBackPriceAtTip: 5,
+            marketFavouriteHorseID: "horse-2", agreedWithFavourite: false, wasFormOnly: false,
+            confidence: .medium, modelVersion: "v3", weightsID: "v3", contributions: [],
+            createdAt: Date(timeIntervalSince1970: 1_758_348_000), outcome: .won(betfairSP: 4)
+        )
+        let record = ServerRecord.fixture(tips: [tip], recentTips: [tip])
+        let model = RecordViewModel(link: ServerLink(server: FakeRacesServer(record: .success(record))), store: nil)
+
+        await model.load()
+
+        XCTAssertEqual(model.recentTips, [tip])
+    }
+
+    @MainActor
     func test_refreshAsksTheServerToCollectResults() async throws {
         let server = FakeRacesServer(record: .success(.fixture()))
         let model = RecordViewModel(link: ServerLink(server: server), store: nil)

@@ -10,16 +10,27 @@
     "minimumMarketCoverage": 0.8,
     "factorWeights": {
       "age": 0.04,
+      "classAdjustedForm": 0,
       "completionRate": 0.08,
       "daysSinceLastRun": 0.06,
       "draw": 0,
       "handicapBandPosition": 0.2,
       "headgear": 0,
       "horseGoingPlaceRate": 0,
+      "jockeyGoingStrikeRate": 0,
+      "jockeyRaceTypeStrikeRate": 0,
+      "jockeyRecentStrikeRate": 0,
       "jockeyStrikeRate": 0,
+      "jockeySurfaceStrikeRate": 0,
+      "jockeyTrainerStrikeRate": 0,
+      "marketMovement": 0,
       "officialRating": 0.3,
       "recentForm": 0.25,
+      "trainerGoingStrikeRate": 0,
+      "trainerRaceTypeStrikeRate": 0,
+      "trainerRecentStrikeRate": 0,
       "trainerStrikeRate": 0,
+      "trainerSurfaceStrikeRate": 0,
       "weightCarried": 0.02,
       "wonLastTime": 0.1
     },
@@ -123,16 +134,27 @@
         "minimumMarketCoverage": 0.8,
         "factorWeights": {
           "age": 0.04,
+          "classAdjustedForm": 0,
           "completionRate": 0.08,
           "daysSinceLastRun": 0.06,
           "draw": 0,
           "handicapBandPosition": 0.2,
           "headgear": 0,
           "horseGoingPlaceRate": 0,
+          "jockeyGoingStrikeRate": 0,
+          "jockeyRaceTypeStrikeRate": 0,
+          "jockeyRecentStrikeRate": 0,
           "jockeyStrikeRate": 0,
+          "jockeySurfaceStrikeRate": 0,
+          "jockeyTrainerStrikeRate": 0,
+          "marketMovement": 0,
           "officialRating": 0.3,
           "recentForm": 0.25,
+          "trainerGoingStrikeRate": 0,
+          "trainerRaceTypeStrikeRate": 0,
+          "trainerRecentStrikeRate": 0,
           "trainerStrikeRate": 0,
+          "trainerSurfaceStrikeRate": 0,
           "weightCarried": 0.02,
           "wonLastTime": 0.1
         },
@@ -172,16 +194,27 @@
         "minimumMarketCoverage": 0.8,
         "factorWeights": {
           "age": 0.04,
+          "classAdjustedForm": 0,
           "completionRate": 0.08,
           "daysSinceLastRun": 0.06,
           "draw": 0,
           "handicapBandPosition": 0.2,
           "headgear": 0,
           "horseGoingPlaceRate": 0,
+          "jockeyGoingStrikeRate": 0,
+          "jockeyRaceTypeStrikeRate": 0,
+          "jockeyRecentStrikeRate": 0,
           "jockeyStrikeRate": 0,
+          "jockeySurfaceStrikeRate": 0,
+          "jockeyTrainerStrikeRate": 0,
+          "marketMovement": 0,
           "officialRating": 0.3,
           "recentForm": 0.25,
+          "trainerGoingStrikeRate": 0,
+          "trainerRaceTypeStrikeRate": 0,
+          "trainerRecentStrikeRate": 0,
           "trainerStrikeRate": 0,
+          "trainerSurfaceStrikeRate": 0,
           "weightCarried": 0.02,
           "wonLastTime": 0.1
         },
@@ -221,16 +254,27 @@
         "minimumMarketCoverage": 0.8,
         "factorWeights": {
           "age": 0.04,
+          "classAdjustedForm": 0,
           "completionRate": 0.08,
           "daysSinceLastRun": 0.06,
           "draw": 0,
           "handicapBandPosition": 0.2,
           "headgear": 0,
           "horseGoingPlaceRate": 0,
+          "jockeyGoingStrikeRate": 0,
+          "jockeyRaceTypeStrikeRate": 0,
+          "jockeyRecentStrikeRate": 0,
           "jockeyStrikeRate": 0,
+          "jockeySurfaceStrikeRate": 0,
+          "jockeyTrainerStrikeRate": 0,
+          "marketMovement": 0,
           "officialRating": 0.3,
           "recentForm": 0.25,
+          "trainerGoingStrikeRate": 0,
+          "trainerRaceTypeStrikeRate": 0,
+          "trainerRecentStrikeRate": 0,
           "trainerStrikeRate": 0,
+          "trainerSurfaceStrikeRate": 0,
           "weightCarried": 0.02,
           "wonLastTime": 0.1
         },
@@ -304,9 +348,9 @@
     },
     {
       "id": "draw",
-      "label": "Draw",
-      "summary": "Stall number.",
-      "rationale": "Draw bias is real, but it is a course × distance × going × field-size interaction. Without a bias table it is noise, so the code ships switched off."
+      "label": "Draw bias",
+      "summary": "Historical win rate for the draw band in this course, distance, going, and field-size context.",
+      "rationale": "Draw bias uses course, distance, going, field-size, and draw bands. Cells need 100 comparable starters; the default weight is zero until walk-forward evidence supports it."
     },
     {
       "id": "headgear",
@@ -327,10 +371,76 @@
       "rationale": "Legitimate, but derived from an archive that starts empty. It switches on once enough race days have been collected."
     },
     {
+      "id": "jockeySurfaceStrikeRate",
+      "label": "Jockey strike rate by surface",
+      "summary": "The jockey's win rate on this surface, shrunk toward the jockey's overall record.",
+      "rationale": "Surface cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
+    },
+    {
+      "id": "trainerSurfaceStrikeRate",
+      "label": "Trainer strike rate by surface",
+      "summary": "The trainer's win rate on this surface, shrunk toward the trainer's overall record.",
+      "rationale": "Surface cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
+    },
+    {
+      "id": "jockeyRaceTypeStrikeRate",
+      "label": "Jockey strike rate by race type",
+      "summary": "The jockey's win rate in this type of race, shrunk toward the jockey's overall record.",
+      "rationale": "Race-type cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
+    },
+    {
+      "id": "trainerRaceTypeStrikeRate",
+      "label": "Trainer strike rate by race type",
+      "summary": "The trainer's win rate in this type of race, shrunk toward the trainer's overall record.",
+      "rationale": "Race-type cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
+    },
+    {
+      "id": "jockeyGoingStrikeRate",
+      "label": "Jockey strike rate by going",
+      "summary": "The jockey's win rate on similar ground, shrunk toward the jockey's overall record.",
+      "rationale": "Going cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
+    },
+    {
+      "id": "trainerGoingStrikeRate",
+      "label": "Trainer strike rate by going",
+      "summary": "The trainer's win rate on similar ground, shrunk toward the trainer's overall record.",
+      "rationale": "Going cells need at least 30 runs. The default weight is zero until walk-forward replay supports it."
+    },
+    {
       "id": "horseGoingPlaceRate",
       "label": "Horse record by going",
       "summary": "The horse's place rate on similar ground, shrunk toward its general record.",
       "rationale": "The archive needs at least three completed runs in a going bucket. Its default weight is zero until replay supports it."
+    },
+    {
+      "id": "jockeyRecentStrikeRate",
+      "label": "Jockey recent strike rate",
+      "summary": "The jockey's win rate from the latest 50 dated rides, shrunk toward the global record.",
+      "rationale": "The recent window needs at least 30 dated runs. The default weight is zero until walk-forward replay supports it."
+    },
+    {
+      "id": "trainerRecentStrikeRate",
+      "label": "Trainer recent strike rate",
+      "summary": "The trainer's win rate from the latest 50 dated runners, shrunk toward the global record.",
+      "rationale": "The recent window needs at least 30 dated runs. The default weight is zero until walk-forward replay supports it."
+    },
+    {
+      "id": "jockeyTrainerStrikeRate",
+      "label": "Jockey and trainer record together",
+      "summary": "The win rate when this jockey rides for this trainer, adjusted toward their individual records.",
+      "rationale": "The pair needs 30 runs and both individual records need enough history. Its default weight is zero until coverage and walk-forward evidence support it."
+    },
+    {
+      "id": "classAdjustedForm",
+      "label": "Class-adjusted horse form",
+      "summary": "The horse's recent finishing performance, adjusted for the class of each race.",
+      "rationale": "The archive needs three classified runs with known race classes. Its default weight is zero until walk-forward evidence supports it."
+    },
+    {
+      "id": "marketMovement",
+      "label": "Market movement",
+      "summary": "The change in the horse's implied chance since the first observed exchange price.",
+      "rationale": "The first and current live exchange prices must span at least five minutes before seal. The default weight is zero until replay supports it."
     }
   ],
   "samples": {

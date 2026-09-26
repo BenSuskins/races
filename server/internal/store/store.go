@@ -354,6 +354,17 @@ func (s *Store) Matches(ctx context.Context, raceIDs []string) (map[string]Match
 }
 
 func (s *Store) SaveSnapshot(ctx context.Context, raceID, kind string, snap domain.MarketSnapshot) error {
+	if kind == "display" {
+		opening, err := s.LatestSnapshot(ctx, raceID, "display-opening")
+		if err != nil {
+			return err
+		}
+		if opening == nil {
+			if _, err := s.db.ExecContext(ctx, `INSERT INTO market_snapshots (race_id, kind, captured_at, json) VALUES (?,?,?,?)`, raceID, "display-opening", ts(snap.CapturedAt.Time), mustJSON(snap)); err != nil {
+				return err
+			}
+		}
+	}
 	_, err := s.db.ExecContext(ctx, `INSERT INTO market_snapshots (race_id, kind, captured_at, json) VALUES (?,?,?,?)`, raceID, kind, ts(snap.CapturedAt.Time), mustJSON(snap))
 	if err == nil && kind == "display" {
 		// Only the latest display snapshot is worth keeping.

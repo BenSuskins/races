@@ -50,24 +50,35 @@ enum TestResult {
     /// provider would send it, so "PU" and friends are expressible.
     static func result(
         id: String = "rac_1",
+        date: String = "2026-09-20",
+        courseName: String = "Ascot",
+        distance: Distance? = nil,
+        surface: Surface = .turf,
         finishing: [(String, String)],
+        draws: [String: Int] = [:],
         startingPrices: [String: Double] = [:],
         jockeys: [String: String] = [:],
-        trainers: [String: String] = [:]
+        trainers: [String: String] = [:],
+        type: RaceType = .flat,
+        going: Going = .good,
+        raceClass: Int? = nil
     ) -> RaceResult {
         RaceResult(
             id: id,
-            courseName: "Ascot",
+            courseName: courseName,
             name: "Test Handicap",
-            date: "2026-09-20",
-            going: .good,
-            surface: .turf,
-            type: .flat,
+            date: date,
+            distance: distance,
+            going: going,
+            surface: surface,
+            type: type,
+            raceClass: raceClass,
             finishers: finishing.map { horseID, position in
                 Finisher(
                     horseID: horseID,
                     horseName: horseID.capitalized,
                     position: FinishPosition(raw: position),
+                    draw: draws[horseID],
                     jockeyID: jockeys[horseID],
                     trainerID: trainers[horseID],
                     startingPriceDecimal: startingPrices[horseID]
