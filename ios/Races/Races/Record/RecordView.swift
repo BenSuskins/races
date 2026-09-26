@@ -267,9 +267,9 @@ struct RecordView: View {
                     }
                 }
             } header: {
-                Text("Recent races")
+                Text("Recent completed races")
             } footer: {
-                Text("The latest 30 races in this weight set. Expand a race to see the frozen chances and rating details recorded at tip time.")
+                Text("The latest 30 races with a settled result in this weight set. Expand a race to compare the frozen tip with the result.")
             }
         }
     }

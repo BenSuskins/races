@@ -61,7 +61,7 @@ final class RecordViewModel {
 
     private func apply(_ record: ServerRecord) {
         state = .loaded(record.report)
-        recentTips = record.recentTips ?? []
+        recentTips = (record.recentTips ?? []).filter { $0.outcome?.isSettled == true }
         archivedRaceCount = record.archivedRaces
         sources = record.sources
         weightsInUse = record.weightsInUse

@@ -120,7 +120,7 @@ public struct ServerRecord: Codable, Hashable, Sendable {
     public let activeWeightsID: String?
     public let commission: Double
     public let report: AccuracyReport
-    /// The 30 newest tips in this weight-set population, with their frozen rating details.
+    /// The 30 newest settled tips in this weight-set population, with their frozen rating details.
     public let recentTips: [TipRecord]?
     public let weightsInUse: [String: Int]
     /// Tips by where they came from: `server`, or `device:<name>`.
