@@ -54,7 +54,7 @@ func DefaultConfiguration() Configuration {
 	return Configuration{
 		MinimumRaces: 500, ValidationRaces: 100, TrainingWindow: 2000, Epochs: 160,
 		LearningRate: 0.025, Regularisation: 0.02, MinimumImprovement: 0.002,
-		MarketExponentRange: FloatRange{0.5, 1.5}, FormInfluenceRange: FloatRange{0.05, 0.90},
+		MarketExponentRange: FloatRange{0.5, 1.5}, FormInfluenceRange: FloatRange{0, 0.90},
 	}
 }
 
@@ -72,7 +72,7 @@ type Report struct {
 // Train fits factor weights and the market/form blend by minimising multiclass
 // log loss with L2 pull toward the current weights. The newest races are held
 // out, never fitted, and the candidate is promoted only if it beats the current
-// weights on them.
+// weights on them and passes the market benchmark.
 func Train(samples []Race, current rating.Weights, cfg Configuration) Report {
 	var eligible []Race
 	for _, s := range samples {
@@ -104,10 +104,11 @@ func Train(samples []Race, current rating.Weights, cfg Configuration) Report {
 	fitted := fit(train, base, cfg)
 	candidate := fitted.makeWeights(current)
 
-	baseline := logLoss(validation, base)
-	candidateLoss := logLoss(validation, fitted)
-	trainingLoss := logLoss(train, fitted)
-	promoted := candidateLoss+cfg.MinimumImprovement < baseline
+	baseline := LogLoss(validation, current)
+	candidateLoss := LogLoss(validation, candidate)
+	trainingLoss := LogLoss(train, candidate)
+	marketLoss := LogLoss(validation, rating.MarketOnly())
+	promoted := candidateLoss+cfg.MinimumImprovement < baseline && candidateLoss <= marketLoss+0.005
 
 	weights := current
 	if promoted {
@@ -131,38 +132,16 @@ type parameters struct {
 
 func newParameters(w rating.Weights, ids []rating.FactorID) parameters {
 	p := parameters{factorIDs: ids, marketExponent: w.MarketExponent, formInfluence: w.FormInfluence}
-	total := 0.0
-	raw := make([]float64, len(ids))
-	for i, id := range ids {
-		raw[i] = math.Max(0, w.Weight(id))
-		total += raw[i]
-	}
-	p.weights = make([]float64, len(ids))
-	for i := range raw {
-		if total > 0 {
-			p.weights[i] = raw[i] / total
-		} else {
-			p.weights[i] = 1 / float64(max(1, len(ids)))
-		}
+	for _, id := range ids {
+		p.weights = append(p.weights, math.Max(0, w.Weight(id)))
 	}
 	return p
 }
 
 func (p parameters) makeWeights(original rating.Weights) rating.Weights {
 	result := original.Clone()
-	originalTotal, total := 0.0, 0.0
-	for _, id := range p.factorIDs {
-		originalTotal += math.Max(0, original.Weight(id))
-	}
-	for _, w := range p.weights {
-		total += w
-	}
-	scale := 1.0
-	if originalTotal > 0 && total > 0 {
-		scale = originalTotal / total
-	}
 	for i, id := range p.factorIDs {
-		result.FactorWeights[string(id)] = p.weights[i] * scale
+		result.FactorWeights[string(id)] = p.weights[i]
 	}
 	result.MarketExponent = p.marketExponent
 	result.FormInfluence = p.formInfluence
@@ -204,6 +183,10 @@ func fit(samples []Race, start parameters, cfg Configuration) parameters {
 	if len(p.factorIDs) == 0 {
 		return p
 	}
+	totalWeight := 0.0
+	for _, weight := range start.weights {
+		totalWeight += weight
+	}
 	n := float64(len(samples))
 	for range cfg.Epochs {
 		gw := make([]float64, len(p.weights))
@@ -230,7 +213,7 @@ func fit(samples []Race, start parameters, cfg Configuration) parameters {
 			gw[i] = gw[i]/n + cfg.Regularisation*2*(p.weights[i]-start.weights[i])
 			p.weights[i] -= cfg.LearningRate * gw[i]
 		}
-		projectSimplex(p.weights)
+		projectSimplex(p.weights, totalWeight)
 		ga = ga/n + cfg.Regularisation*2*(p.marketExponent-start.marketExponent)
 		gb = gb/n + cfg.Regularisation*2*(p.formInfluence-start.formInfluence)
 		p.marketExponent -= cfg.LearningRate * ga
@@ -294,10 +277,19 @@ func LogLoss(samples []Race, w rating.Weights) float64 {
 	return logLoss(samples, newParametersRaw(w, samples))
 }
 
-// newParametersRaw keeps the weights as given rather than renormalising, so a
-// back-test scores exactly what the rater would.
+// Include every factor present in the corpus. A missing factor contributes zero
+// only to the snapshots that lack it.
 func newParametersRaw(w rating.Weights, samples []Race) parameters {
-	ids := commonFactorIDs(samples)
+	var ids []rating.FactorID
+	seen := map[rating.FactorID]bool{}
+	for _, sample := range samples {
+		for _, id := range sample.Snapshot.FactorIDs {
+			if !seen[id] {
+				ids = append(ids, id)
+				seen[id] = true
+			}
+		}
+	}
 	p := parameters{factorIDs: ids, marketExponent: w.MarketExponent, formInfluence: w.FormInfluence}
 	for _, id := range ids {
 		p.weights = append(p.weights, w.Weight(id))
@@ -318,7 +310,7 @@ func valid(s Race) bool {
 	return indexOf(s.Snapshot.RunnerIDs, s.WinnerID) >= 0
 }
 
-func projectSimplex(values []float64) {
+func projectSimplex(values []float64, total float64) {
 	if len(values) == 0 {
 		return
 	}
@@ -328,13 +320,13 @@ func projectSimplex(values []float64) {
 	rho := -1
 	for i, v := range sorted {
 		cumulative += v
-		if v+(1-cumulative)/float64(i+1) > 0 {
+		if v+(total-cumulative)/float64(i+1) > 0 {
 			rho = i
 		}
 	}
 	if rho < 0 {
 		for i := range values {
-			values[i] = 1 / float64(len(values))
+			values[i] = total / float64(len(values))
 		}
 		return
 	}
@@ -342,7 +334,7 @@ func projectSimplex(values []float64) {
 	for _, v := range sorted[:rho+1] {
 		sum += v
 	}
-	theta := (sum - 1) / float64(rho+1)
+	theta := (sum - total) / float64(rho+1)
 	for i := range values {
 		values[i] = math.Max(0, values[i]-theta)
 	}

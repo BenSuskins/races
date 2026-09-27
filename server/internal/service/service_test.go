@@ -400,3 +400,30 @@ func TestBootstrapMovesV2OntoV3AndLeavesTrainedSetsAlone(t *testing.T) {
 		t.Fatal("a trained set stays active", w)
 	}
 }
+
+func TestReplayMarketGateUsesTheSameRaces(t *testing.T) {
+	ctx := context.Background()
+	service, racing, _, clock, priced, unpriced := setup(t)
+	service.Execute(ctx, Everything)
+	for _, race := range []domain.Race{priced, unpriced} {
+		clock.t = race.OffDateTime.Add(-3 * time.Minute)
+		if err := service.SealTips(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	racing.results = []domain.RaceResult{result(priced, priced.Runners[0].ID), result(unpriced, unpriced.Runners[0].ID)}
+	clock.t = unpriced.OffDateTime.Add(time.Hour)
+	if _, err := service.CollectResults(ctx); err != nil {
+		t.Fatal(err)
+	}
+	report, err := backtest.Run(ctx, service.Store, rating.MarketOnly(), backtest.Request{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.HighestProbability.Races != 2 || report.Favourite.Races != 1 {
+		t.Fatalf("unexpected cohort: %+v", report)
+	}
+	if report.BeatsMarket == nil || !*report.BeatsMarket {
+		t.Fatalf("market control must pass its own benchmark: %+v", report)
+	}
+}

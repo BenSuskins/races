@@ -217,11 +217,13 @@ type Report struct {
 	// Favourite: backing the market favourite in those same races.
 	Favourite Arm `json:"favourite"`
 	// MarketLogLoss: the de-vigged market's own log loss on those races.
-	MarketLogLoss          *float64       `json:"marketLogLoss,omitempty"`
-	JockeyTrainerCoverage  FactorCoverage `json:"jockeyTrainerCoverage"`
-	DrawBiasCoverage       FactorCoverage `json:"drawBiasCoverage"`
-	ClassFormCoverage      FactorCoverage `json:"classAdjustedFormCoverage"`
-	MarketMovementCoverage FactorCoverage `json:"marketMovementCoverage"`
+	BenchmarkedModelLogLoss *float64       `json:"benchmarkedModelLogLoss,omitempty"`
+	MarketComparisons       int            `json:"marketComparisons"`
+	MarketLogLoss           *float64       `json:"marketLogLoss,omitempty"`
+	JockeyTrainerCoverage   FactorCoverage `json:"jockeyTrainerCoverage"`
+	DrawBiasCoverage        FactorCoverage `json:"drawBiasCoverage"`
+	ClassFormCoverage       FactorCoverage `json:"classAdjustedFormCoverage"`
+	MarketMovementCoverage  FactorCoverage `json:"marketMovementCoverage"`
 	// Snapshots: log loss over every frozen snapshot, device ones included.
 	Snapshots             int      `json:"snapshots"`
 	SnapshotLogLoss       *float64 `json:"snapshotLogLoss,omitempty"`
@@ -284,7 +286,7 @@ func Run(ctx context.Context, st *store.Store, w rating.Weights, req Request) (R
 	}
 	archive := tracking.NewArchive()
 	rater := rating.NewRater(w)
-	var highest, value, fav, market acc
+	var highest, value, fav, market, benchmarkedModel acc
 	var jockeyTrainerCoverage factorCoverageAccumulator
 	var drawBiasCoverage factorCoverageAccumulator
 	var classFormCoverage factorCoverageAccumulator
@@ -347,6 +349,7 @@ func Run(ctx context.Context, st *store.Store, w rating.Weights, req Request) (R
 			for _, r := range a.Runners {
 				if r.HorseID == winner && r.MarketProbability != nil {
 					market.addLoss(*r.MarketProbability)
+					benchmarkedModel.addLoss(r.WinProbability)
 				}
 			}
 		}
@@ -363,6 +366,8 @@ func Run(ctx context.Context, st *store.Store, w rating.Weights, req Request) (R
 	rep.MarketMovementCoverage = marketMovementCoverage.report()
 	rep.Rerated, rep.Favourite = rep.HighestProbability, fav.arm()
 	rep.MarketLogLoss = market.logLoss()
+	rep.BenchmarkedModelLogLoss = benchmarkedModel.logLoss()
+	rep.MarketComparisons = market.lossN
 	sort.Strings(corpus)
 	sort.Strings(raceDates)
 	if rep.From == "" && len(raceDates) > 0 {
@@ -387,8 +392,8 @@ func Run(ctx context.Context, st *store.Store, w rating.Weights, req Request) (R
 	}
 
 	switch {
-	case rep.HighestProbability.LogLoss != nil && rep.MarketLogLoss != nil:
-		b := *rep.HighestProbability.LogLoss <= *rep.MarketLogLoss+0.005
+	case rep.BenchmarkedModelLogLoss != nil && rep.MarketLogLoss != nil:
+		b := *rep.BenchmarkedModelLogLoss <= *rep.MarketLogLoss+0.005
 		rep.BeatsMarket = &b
 	}
 	return rep, nil

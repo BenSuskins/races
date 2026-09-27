@@ -568,6 +568,20 @@ func (s *Store) AwaitingReconciliation(ctx context.Context, now time.Time) ([]Ti
 	return s.tipRows(ctx, `WHERE off_at IS NOT NULL AND off_at <= ? AND (outcome_kind IS NULL OR outcome_kind = 'unresolved')`, ts(now))
 }
 
+func (s *Store) AwaitingStartingPrices(ctx context.Context) ([]TipRow, error) {
+	rows, err := s.tipRows(ctx, `WHERE outcome_kind IN ('won', 'lost')`)
+	if err != nil {
+		return nil, err
+	}
+	var waiting []TipRow
+	for _, row := range rows {
+		if tracking.NeedsStartingPrice(row.Tip) {
+			waiting = append(waiting, row)
+		}
+	}
+	return waiting, nil
+}
+
 func (s *Store) tipRows(ctx context.Context, where string, args ...any) ([]TipRow, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT json, source FROM tips `+where, args...)
 	if err != nil {

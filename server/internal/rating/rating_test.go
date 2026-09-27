@@ -777,3 +777,14 @@ func TestFactorDescriptions(t *testing.T) {
 		t.Fatal("the set of deliberate zeros changed", zeros)
 	}
 }
+
+func TestFavouriteTieDoesNotDependOnModelOrder(t *testing.T) {
+	probability := 0.5
+	assessment := Assessment{Runners: []RunnerAssessment{
+		{HorseID: "b", MarketProbability: &probability, WinProbability: 0.7},
+		{HorseID: "a", MarketProbability: &probability, WinProbability: 0.3},
+	}}
+	if assessment.MarketFavourite().HorseID != "a" {
+		t.Fatal("tied market favourite must use horse ID, not model order")
+	}
+}

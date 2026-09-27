@@ -170,7 +170,7 @@ func TestAwaitingReconciliation(t *testing.T) {
 	if waiting != 2 {
 		t.Fatal(waiting)
 	}
-	if ids := MarketIDsAwaitingStartingPrice(tips, off); len(ids) != 2 || ids[0] != "1.050" || ids[1] != "1.100" {
+	if ids := MarketIDsAwaitingStartingPrice(tips, off); len(ids) != 3 || ids[0] != "1.050" || ids[1] != "1.100" || ids[2] != "1.999" {
 		t.Fatal(ids)
 	}
 }

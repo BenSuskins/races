@@ -247,24 +247,19 @@ All calls are `POST` with a JSON body.
   without this call the Record tab has a strike rate and no ROI, permanently.
 - **Source:** `listMarketBook` with `priceProjection.priceData` including `SP_TRADED`
   after the off, read once a market is settled.
-- **Implemented by** `betfair.Client.StartingPrices`. An absent or
-  zero `actualSP` is **omitted rather than defaulted**: a zero would read as a
-  starting price and wreck the ROI figure, and a missing one just means the race
-  has not settled yet.
-- **Called by** `service.CollectResults`, in the same pass as the Racing API
-  results, for the market ids of tips still awaiting an outcome
-  (`tracking.MarketIDsAwaitingStartingPrice`). Settled prices are kept in
-  `starting_prices`. A settled BSP never changes, so a
-  tip that has one is never re-requested, and a race that never matched a market
-  is never asked about.
-- **Not cached.** The two calls are independent: a failure here costs the ROI
-  figure for those tips and nothing else, because the results pass settles them
-  on the result alone. Losing the strike rate as well would be the bug, and the
-  results endpoint is today-only so there is no second chance at it.
-- **Keyed by selection id**, so `MarketReference` — frozen onto the tip when the
-  match was made — is what turns the reply back into our horse ids. The catalogue
-  that produced the match may be gone by the time a race settles, which is why
-  the mapping is stored rather than re-derived.
+- **Implemented by** `betfair.Client.StartingPrices`. The client omits absent or
+  zero `actualSP` values. Missing prices can indicate publication delays, provider
+  failures, or unavailable markets. They do not prove that a race is unsettled.
+- Betfair can omit closed markets from a batch that contains open markets.
+  The client retries each omitted market separately.
+- **Called by** `service.CollectResults` for pending tips and settled tips with
+  a missing selection or favourite price. The server stores prices in
+  `starting_prices` and fills missing prices without changing settled outcomes.
+  A fully priced tip needs no retry. A tip without a market reference cannot
+  request a price. Historical recovery depends on Betfair still serving the market.
+- The results job summary includes the price count and price fetch failure state.
+- Betfair keys prices by selection ID. The server uses the tip's frozen
+  `MarketReference` to map each selection ID to a horse ID.
 
 ---
 

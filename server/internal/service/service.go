@@ -459,7 +459,33 @@ func (s *Service) CollectResults(ctx context.Context) (Ingestion, error) {
 		if err != nil {
 			return "", err
 		}
-		sps := s.startingPrices(ctx, waiting, now, &ing)
+		missingPrices, err := s.Store.AwaitingStartingPrices(ctx)
+		if err != nil {
+			return "", err
+		}
+		priceRequests := append(append([]store.TipRow(nil), waiting...), missingPrices...)
+		sps := s.startingPrices(ctx, priceRequests, now, &ing)
+		for _, row := range missingPrices {
+			tip := row.Tip
+			prices := tip.MarketReference.StartingPrices(sps)
+			changed := false
+			if price, ok := prices[tip.SelectionHorseID]; ok && tip.Outcome.BetfairSP == nil {
+				tip.Outcome.BetfairSP = &price
+				changed = true
+			}
+			if favourite := tip.FavouriteOutcome; favourite != nil && favourite.BetfairSP == nil {
+				if price, ok := prices[favourite.HorseID]; ok {
+					favourite.BetfairSP = &price
+					changed = true
+				}
+			}
+			if !changed {
+				continue
+			}
+			if err := s.Store.SaveTip(ctx, tip, row.Source, now); err != nil {
+				return "", err
+			}
+		}
 		for _, row := range waiting {
 			tip := row.Tip
 			var result *domain.RaceResult
@@ -489,7 +515,11 @@ func (s *Service) CollectResults(ctx context.Context) (Ingestion, error) {
 				}
 			}
 		}
-		return fmt.Sprintf("%d results, %d archived, %d tips settled, %d samples", ing.ResultsStored, ing.RacesArchived, ing.TipsSettled, ing.SamplesSettled), nil
+		summary := fmt.Sprintf("%d results, %d archived, %d tips settled, %d samples", ing.ResultsStored, ing.RacesArchived, ing.TipsSettled, ing.SamplesSettled)
+		if len(priceRequests) > 0 {
+			summary += fmt.Sprintf(", %d starting prices, price fetch failed=%t", ing.StartingPrices, ing.PricesFailed)
+		}
+		return summary, nil
 	})
 	return ing, err
 }

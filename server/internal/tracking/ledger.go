@@ -149,7 +149,7 @@ func AwaitingReconciliation(t Tip, now time.Time) bool {
 func MarketIDsAwaitingStartingPrice(tips []Tip, now time.Time) []string {
 	set := map[string]bool{}
 	for _, t := range tips {
-		if AwaitingReconciliation(t, now) && t.MarketReference != nil {
+		if (AwaitingReconciliation(t, now) || NeedsStartingPrice(t)) && t.MarketReference != nil {
 			set[t.MarketReference.MarketID] = true
 		}
 	}
@@ -159,4 +159,12 @@ func MarketIDsAwaitingStartingPrice(tips []Tip, now time.Time) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// NeedsStartingPrice keeps price collection independent of result settlement.
+func NeedsStartingPrice(t Tip) bool {
+	if t.MarketReference == nil || t.Outcome == nil || !t.Outcome.IsSettled() {
+		return false
+	}
+	return t.Outcome.BetfairSP == nil || (t.FavouriteOutcome != nil && t.FavouriteOutcome.BetfairSP == nil)
 }

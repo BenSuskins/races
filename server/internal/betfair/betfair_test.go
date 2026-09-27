@@ -281,3 +281,15 @@ func TestClothNumberMetadata(t *testing.T) {
 		t.Fatal("numeric metadata", err)
 	}
 }
+
+func TestStartingPricesRetriesMarketsOmittedFromMixedBatch(t *testing.T) {
+	f := newFake()
+	f.replies["/listMarketBook/"] = []string{
+		`[{"marketId":"open","runners":[]}]`,
+		`[{"marketId":"closed","runners":[{"selectionId":123,"sp":{"actualSP":3.1}}]}]`,
+	}
+	prices, err := client(t, f, creds).StartingPrices(context.Background(), []string{"open", "closed"})
+	if err != nil || prices["closed"][123] != 3.1 {
+		t.Fatalf("missing closed market price: %v, %v", prices, err)
+	}
+}

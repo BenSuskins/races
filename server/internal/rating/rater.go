@@ -123,8 +123,9 @@ func (a Assessment) MarketFavourite() *RunnerAssessment {
 		if r.MarketProbability == nil {
 			continue
 		}
-		// The first of equal maxima, as Swift's max(by:) returns.
-		if fav == nil || *r.MarketProbability > *fav.MarketProbability {
+		// Break ties independently of the model probability order.
+		if fav == nil || *r.MarketProbability > *fav.MarketProbability ||
+			(*r.MarketProbability == *fav.MarketProbability && r.HorseID < fav.HorseID) {
 			fav = r
 		}
 	}

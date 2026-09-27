@@ -108,6 +108,24 @@ func (c *Client) StartingPrices(ctx context.Context, marketIDs []string) (map[st
 	if err != nil {
 		return nil, err
 	}
+	// Betfair omits closed markets when a request also contains open markets.
+	seen := map[string]bool{}
+	for _, book := range books {
+		seen[book.MarketID] = true
+	}
+	if len(marketIDs) > 1 {
+		for _, marketID := range marketIDs {
+			if seen[marketID] {
+				continue
+			}
+			seen[marketID] = true
+			recovered, err := c.books(ctx, []string{marketID}, []string{"SP_TRADED"})
+			if err != nil {
+				return nil, err
+			}
+			books = append(books, recovered...)
+		}
+	}
 	out := map[string]map[int64]float64{}
 	for _, b := range books {
 		settled := map[int64]float64{}

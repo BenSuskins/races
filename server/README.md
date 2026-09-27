@@ -141,6 +141,22 @@ The Record tab selects the active weight set by default. It can show earlier
 sets as separate populations. The all-tip model report remains distinct from
 the model and favourite subset with matching benchmark coverage.
 
+## Model validation and late prices
+
+Training keeps the factor weight scale used by the live model. Validation scores
+exactly the weights that the server can activate. A candidate must improve on
+the current model and have log loss at most 0.005 above the market baseline.
+The minimum remains 500 settled samples. The form influence range includes zero.
+
+Replay reports retain all eligible races in `highestProbability` and `rerated`.
+`benchmarkedModelLogLoss` and `marketLogLoss` use the same `marketComparisons`
+races. `beatsMarket` uses those paired losses. Horse ID breaks market probability
+ties, so model weights cannot change the favourite.
+
+Each results pass retries missing prices for settled tips. It preserves the
+selection, probabilities, seal, and settled outcome. This includes older tips
+whose markets Betfair still serves. The results job summary shows price failures.
+
 ## The contract with the app
 
 The app decodes responses with RacesKit's own models, so the JSON here is
