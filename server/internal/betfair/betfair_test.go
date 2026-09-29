@@ -201,8 +201,26 @@ func TestStartingPrices(t *testing.T) {
 	if m[12345678] != 2.64 || m[22345678] != 5.2 || len(m) != 2 {
 		t.Fatal("absent or zero SPs are omitted, not defaulted", m)
 	}
-	if !strings.Contains(f.bodies["/listMarketBook/"][0], "SP_TRADED") {
-		t.Fatal("asks for SP_TRADED")
+	assertStartingPriceProjection(t, f.bodies["/listMarketBook/"])
+}
+
+func assertStartingPriceProjection(t *testing.T, bodies []string) {
+	t.Helper()
+	if len(bodies) == 0 {
+		t.Fatal("no starting price request")
+	}
+	for _, body := range bodies {
+		var request struct {
+			PriceProjection struct {
+				PriceData []string `json:"priceData"`
+			} `json:"priceProjection"`
+		}
+		if err := json.Unmarshal([]byte(body), &request); err != nil {
+			t.Fatal(err)
+		}
+		if len(request.PriceProjection.PriceData) != 1 || request.PriceProjection.PriceData[0] != "SP_AVAILABLE" {
+			t.Fatalf("actualSP requires SP_AVAILABLE: %v", request.PriceProjection.PriceData)
+		}
 	}
 }
 
@@ -292,4 +310,5 @@ func TestStartingPricesRetriesMarketsOmittedFromMixedBatch(t *testing.T) {
 	if err != nil || prices["closed"][123] != 3.1 {
 		t.Fatalf("missing closed market price: %v, %v", prices, err)
 	}
+	assertStartingPriceProjection(t, f.bodies["/listMarketBook/"])
 }

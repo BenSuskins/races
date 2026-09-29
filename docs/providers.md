@@ -245,8 +245,9 @@ All calls are `POST` with a JSON body.
 - **Usecase:** Settled starting price → ROI to level stakes in the tracker. The
   **only** source of one: `/v1/results/today/free` carries no starting price, so
   without this call the Record tab has a strike rate and no ROI, permanently.
-- **Source:** `listMarketBook` with `priceProjection.priceData` including `SP_TRADED`
-  after the off, read once a market is settled.
+- **Source:** `listMarketBook` with `priceProjection.priceData` set to `SP_AVAILABLE`
+  after the off. `SP_TRADED` returns stake ladders but did not return `actualSP`
+  in the live settled market books. The server retries missing prices.
 - **Implemented by** `betfair.Client.StartingPrices`. The client omits absent or
   zero `actualSP` values. Missing prices can indicate publication delays, provider
   failures, or unavailable markets. They do not prove that a race is unsettled.
