@@ -104,7 +104,7 @@ func (c *Client) Prices(ctx context.Context, marketIDs []string) ([]matching.Exc
 // StartingPrices are [marketID][selectionID] actual SPs for settled markets.
 // An absent or zero SP is omitted: a zero would wreck the ROI figure.
 func (c *Client) StartingPrices(ctx context.Context, marketIDs []string) (map[string]map[int64]float64, error) {
-	books, err := c.books(ctx, marketIDs, []string{"SP_TRADED"})
+	books, err := c.books(ctx, marketIDs, []string{"SP_AVAILABLE"})
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func (c *Client) StartingPrices(ctx context.Context, marketIDs []string) (map[st
 				continue
 			}
 			seen[marketID] = true
-			recovered, err := c.books(ctx, []string{marketID}, []string{"SP_TRADED"})
+			recovered, err := c.books(ctx, []string{marketID}, []string{"SP_AVAILABLE"})
 			if err != nil {
 				return nil, err
 			}
