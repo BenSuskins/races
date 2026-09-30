@@ -123,9 +123,7 @@ public final class HTTPClient: @unchecked Sendable {
         )
     }
 
-    /// POST an already-encoded body. For the history upload, which forwards
-    /// the device's stored JSON documents byte for byte rather than decoding
-    /// and re-encoding them on the way through.
+    /// POST an already-encoded body.
     public func post<T: Decodable>(
         _ path: String,
         body: Data,

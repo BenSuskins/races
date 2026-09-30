@@ -31,7 +31,6 @@ The app reads. It holds the server's address and an API token, nothing else.
 | `internal/racingapi`, `internal/betfair` | The two provider clients. **`docs/providers.md` must change with them** |
 | `internal/store` | SQLite (pure-Go driver), migrations embedded |
 | `internal/service` | The jobs and the timetable |
-| `internal/importer` | Folds a phone's pre-server history into the database |
 | `internal/backtest` | Replays history through any weights, against the market |
 | `internal/api` | The HTTP API |
 | `internal/parity` | Pins the Go rater to the Swift one while both exist |
@@ -88,7 +87,6 @@ Everything under `/v1` needs `Authorization: Bearer $RACES_API_TOKEN`.
 | `GET /v1/tips?weightsID=&date=` | Tips, with their source |
 | `GET /v1/record?weightsID=&commission=` | The selected weight set's accuracy report, shared favourite benchmark, and Wilson intervals. Defaults to the active set |
 | `GET /v1/model` | Active weights, every stored set, factor copy, training progress |
-| `POST /v1/import` | A phone's pre-server documents. Idempotent |
 | `POST /v1/backtests` | `{"weightsID": …}` or `{"weights": {…}}`, optional `from`/`to` dates and named `variants` |
 | `GET /v1/backtests[/{id}]` | Stored back-tests |
 | `POST /v1/admin/weights` | Install and activate a validated immutable weight set |

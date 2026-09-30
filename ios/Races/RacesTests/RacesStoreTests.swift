@@ -2,10 +2,8 @@ import XCTest
 @testable import Races
 import RacesKit
 
-/// The store is only a cache now, and the legacy history is only read. Both
-/// are tested against real encoding: `InMemoryDocumentStore` round-trips
-/// through JSON exactly as `JSONFileStore` does, and `LegacyHistory` reads a
-/// real temporary directory.
+/// The store is only a cache now. `InMemoryDocumentStore` round-trips through
+/// JSON exactly as `JSONFileStore` does.
 final class RacesStoreTests: XCTestCase {
 
     func test_aSavedCardSurvivesARelaunch() async throws {
@@ -31,32 +29,4 @@ final class RacesStoreTests: XCTestCase {
         XCTAssertEqual(restored, record)
     }
 
-    func test_legacyHistoryIsReadByteForByte() throws {
-        let tips = #"{"schemaVersion":1,"savedAt":"2026-09-20T18:00:00Z","payload":{"storage":{}}}"#
-        let history = try temporaryHistory(documents: [LegacyHistory.tips: tips])
-
-        let upload = history.upload(device: "phone")
-
-        XCTAssertTrue(history.exists)
-        XCTAssertEqual(upload.tips, Data(tips.utf8))
-        XCTAssertNil(upload.archive)
-        XCTAssertNil(upload.training)
-    }
-
-    func test_noHistoryMeansNothingToOffer() throws {
-        let history = try temporaryHistory()
-        XCTAssertFalse(history.exists)
-        XCTAssertFalse(LegacyHistory(directory: nil).exists)
-    }
-
-    func test_theUploadMarkerRecordsWhen() throws {
-        let history = try temporaryHistory(documents: [LegacyHistory.archive: "{}"])
-        XCTAssertNil(history.uploadedAt)
-
-        let moment = Date(timeIntervalSince1970: 1_800_000_000)
-        try history.markUploaded(at: moment)
-
-        XCTAssertEqual(history.uploadedAt, moment)
-        XCTAssertTrue(history.exists, "the documents themselves are never deleted")
-    }
 }

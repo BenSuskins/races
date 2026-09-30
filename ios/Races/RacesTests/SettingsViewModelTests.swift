@@ -8,15 +8,13 @@ final class SettingsViewModelTests: XCTestCase {
     @MainActor
     private func makeModel(
         _ credentials: InMemoryCredentialsStore,
-        server: FakeRacesServer = FakeRacesServer(),
-        history: LegacyHistory? = nil
+        server: FakeRacesServer = FakeRacesServer()
     ) throws -> (SettingsViewModel, AppEnvironment) {
         let environment = AppEnvironment(
             credentials: credentials,
             store: RacesStore(documents: InMemoryDocumentStore()),
-            history: try history ?? temporaryHistory(),
             makeServer: { _ in server })
-        return (SettingsViewModel(environment: environment, deviceName: "Test iPhone"), environment)
+        return (SettingsViewModel(environment: environment), environment)
     }
 
     @MainActor
@@ -88,40 +86,6 @@ final class SettingsViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_uploadingHistorySendsTheDocumentsAndRemembersIt() async throws {
-        let history = try temporaryHistory(documents: [LegacyHistory.tips: #"{"schemaVersion":1,"payload":{"storage":{}}}"#])
-        let server = FakeRacesServer(importSummary: .success(.fixture(tipsAdded: 3)))
-        let moment = Date(timeIntervalSince1970: 1_800_000_000)
-        let environment = AppEnvironment(
-            credentials: InMemoryCredentialsStore([.serverToken: "t"]),
-            store: RacesStore(documents: InMemoryDocumentStore()),
-            history: history,
-            makeServer: { _ in server })
-        let model = SettingsViewModel(environment: environment, deviceName: "Test iPhone", now: { moment })
-        XCTAssertTrue(model.hasHistoryToUpload)
-
-        await model.uploadHistory()
-
-        XCTAssertEqual(server.uploads.count, 1)
-        XCTAssertEqual(server.uploads.first?.device, "Test iPhone")
-        XCTAssertNotNil(server.uploads.first?.tips)
-        XCTAssertEqual(model.uploadResult, .succeeded(.fixture(tipsAdded: 3)))
-        XCTAssertEqual(model.historyUploadedAt, moment)
-    }
-
-    @MainActor
-    func test_aFailedUploadIsNotMarkedAsDone() async throws {
-        let history = try temporaryHistory(documents: [LegacyHistory.archive: "{}"])
-        let server = FakeRacesServer(importSummary: .failure(.unauthorized))
-        let (model, _) = try makeModel(InMemoryCredentialsStore([.serverToken: "t"]), server: server, history: history)
-
-        await model.uploadHistory()
-
-        XCTAssertEqual(model.uploadResult, .failed(.unauthorized))
-        XCTAssertNil(model.historyUploadedAt)
-        XCTAssertNil(history.uploadedAt)
-    }
-
     @MainActor
     func test_clearRemovesEverything() async throws {
         let credentials = InMemoryCredentialsStore([.serverToken: "t", .serverURL: "https://x.example"])

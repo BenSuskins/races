@@ -21,7 +21,7 @@ struct RecordView: View {
                     ContentUnavailableView(
                         "No tips yet",
                         systemImage: "chart.line.uptrend.xyaxis",
-                        description: Text("The server records a tip for every race five minutes before the off and settles it after racing. History from before the server can be uploaded in Settings."))
+                        description: Text("The server records a tip for every race five minutes before the off and settles it after racing."))
                 } else {
                     List {
                         weightsSelector
