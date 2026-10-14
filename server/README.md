@@ -146,7 +146,14 @@ the model and favourite subset with matching benchmark coverage.
 Training keeps the factor weight scale used by the live model. Validation scores
 exactly the weights that the server can activate. A candidate must improve on
 the current model and have log loss at most 0.005 above the market baseline.
-The minimum remains 500 settled samples. The form influence range includes zero.
+Training uses the newest consecutive settled snapshots that contain the newest
+factor set, within the 2,000-race window. It requires 500 compatible samples and
+reserves the newest 100 for validation. Older incompatible snapshots cannot
+exclude newer factors. The training report counts the compatible samples.
+
+The trainer adjusts only factors whose scores differ between runners in the
+fitting races. Candidate weights for factors without variation are zero.
+Validation races cannot enable a factor. The form influence range includes zero.
 
 Replay reports retain all eligible races in `highestProbability` and `rerated`.
 `benchmarkedModelLogLoss` and `marketLogLoss` use the same `marketComparisons`
