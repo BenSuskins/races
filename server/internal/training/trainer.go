@@ -86,6 +86,7 @@ func Train(samples []Race, current rating.Weights, cfg Configuration) Report {
 	if len(eligible) > cfg.TrainingWindow {
 		eligible = eligible[len(eligible)-cfg.TrainingWindow:]
 	}
+	eligible = recentCompatibleSamples(eligible)
 	notTrained := Report{SettledRaceCount: len(eligible), Weights: current}
 	if len(eligible) < cfg.MinimumRaces {
 		return notTrained
@@ -100,9 +101,19 @@ func Train(samples []Race, current rating.Weights, cfg Configuration) Report {
 	split := len(eligible) - validationCount
 	train, validation := eligible[:split], eligible[split:]
 
-	base := newParameters(current, commonFactorIDs(train))
-	fitted := fit(train, base, cfg)
+	factorIDs := eligible[len(eligible)-1].Snapshot.FactorIDs
+	base := newParameters(current, varyingFactorIDs(train, factorIDs))
+	totalWeight := 0.0
+	for _, factor := range factorIDs {
+		totalWeight += math.Max(0, current.Weight(factor))
+	}
+	fitted := fit(train, base, cfg, totalWeight)
 	candidate := fitted.makeWeights(current)
+	for _, factor := range factorIDs {
+		if !contains(base.factorIDs, factor) {
+			candidate.FactorWeights[string(factor)] = 0
+		}
+	}
 
 	baseline := LogLoss(validation, current)
 	candidateLoss := LogLoss(validation, candidate)
@@ -121,6 +132,23 @@ func Train(samples []Race, current rating.Weights, cfg Configuration) Report {
 		BaselineValidationLogLoss: &baseline, CandidateValidationLogLoss: &candidateLoss,
 		Promoted: promoted, Weights: weights,
 	}
+}
+
+func recentCompatibleSamples(samples []Race) []Race {
+	if len(samples) == 0 {
+		return nil
+	}
+	factorIDs := samples[len(samples)-1].Snapshot.FactorIDs
+	start := len(samples) - 1
+	for index := start; index >= 0; index-- {
+		for _, factor := range factorIDs {
+			if !contains(samples[index].Snapshot.FactorIDs, factor) {
+				return samples[start:]
+			}
+		}
+		start = index
+	}
+	return samples[start:]
 }
 
 type parameters struct {
@@ -148,24 +176,36 @@ func (p parameters) makeWeights(original rating.Weights) rating.Weights {
 	return result
 }
 
-func commonFactorIDs(samples []Race) []rating.FactorID {
+func varyingFactorIDs(samples []Race, factorIDs []rating.FactorID) []rating.FactorID {
 	if len(samples) == 0 {
 		return nil
 	}
-	var out []rating.FactorID
-	for _, f := range samples[0].Snapshot.FactorIDs {
-		all := true
-		for _, s := range samples {
-			if !contains(s.Snapshot.FactorIDs, f) {
-				all = false
+	var factors []rating.FactorID
+	for _, factor := range factorIDs {
+		varying := false
+		for _, sample := range samples {
+			for index, identifier := range sample.Snapshot.FactorIDs {
+				if identifier != factor {
+					continue
+				}
+				scores := sample.Snapshot.ZScores[index]
+				for _, score := range scores[1:] {
+					if score != scores[0] {
+						varying = true
+						break
+					}
+				}
+				break
+			}
+			if varying {
 				break
 			}
 		}
-		if all {
-			out = append(out, f)
+		if varying {
+			factors = append(factors, factor)
 		}
 	}
-	return out
+	return factors
 }
 
 func contains(ids []rating.FactorID, f rating.FactorID) bool {
@@ -177,15 +217,11 @@ func contains(ids []rating.FactorID, f rating.FactorID) bool {
 	return false
 }
 
-func fit(samples []Race, start parameters, cfg Configuration) parameters {
+func fit(samples []Race, start parameters, cfg Configuration, totalWeight float64) parameters {
 	p := start
 	p.weights = append([]float64(nil), start.weights...)
 	if len(p.factorIDs) == 0 {
 		return p
-	}
-	totalWeight := 0.0
-	for _, weight := range start.weights {
-		totalWeight += weight
 	}
 	n := float64(len(samples))
 	for range cfg.Epochs {

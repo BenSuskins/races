@@ -42,7 +42,7 @@ const (
 // ParseGoing maps a provider string; anything unrecognised is unknown rather
 // than an error, because a novel description must not cost us the card.
 func ParseGoing(raw string) Going {
-	key := strings.NewReplacer(" ", "", "-", "").Replace(strings.ToLower(raw))
+	key := strings.NewReplacer(" ", "", "-", "", "/", "to").Replace(strings.ToLower(raw))
 	switch key {
 	case "heavy":
 		return GoingHeavy

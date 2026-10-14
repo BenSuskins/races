@@ -89,3 +89,91 @@ func TestConfigurationMatchesSwiftCodable(t *testing.T) {
 		t.Fatal("ClosedRange<Double> encodes as a pair:", string(out))
 	}
 }
+
+func TestTrainsNewFactorsFromRecentCompatibleSnapshots(t *testing.T) {
+	races := samples(600)
+	for index := 100; index < len(races); index++ {
+		signal := races[index].Snapshot.ZScores[0]
+		races[index].Snapshot.FactorIDs = []rating.FactorID{rating.OfficialRating, rating.TrainerRecentStrikeRate}
+		races[index].Snapshot.ZScores = [][]float64{{0, 0, 0}, signal}
+	}
+	report := Train(races, rating.V3(), DefaultConfiguration())
+	if report.SettledRaceCount != 500 {
+		t.Fatalf("want 500 compatible races, got %d", report.SettledRaceCount)
+	}
+	if !report.Trained || !report.Promoted || report.Weights.Weight(rating.TrainerRecentStrikeRate) <= 0 {
+		t.Fatalf("the newer predictive factor must enter the promoted model: %+v", report)
+	}
+}
+
+func TestDoesNotGiveWeightsToFactorsWithoutVariation(t *testing.T) {
+	report := Train(calibratedSamples(), rating.V3(), DefaultConfiguration())
+	if !report.Promoted {
+		t.Fatalf("test requires a promoted candidate: %+v", report)
+	}
+	for _, factor := range []rating.FactorID{rating.Draw, rating.Headgear, rating.TrainerGoingStrikeRate, rating.HorseGoingPlaceRate} {
+		if weight := report.Weights.Weight(factor); weight != 0 {
+			t.Errorf("%s has no fitting variation but gets weight %g", factor, weight)
+		}
+	}
+}
+
+func TestWaitsForMinimumCompatibleHistory(t *testing.T) {
+	races := samples(599)
+	for index := 100; index < len(races); index++ {
+		races[index].Snapshot.FactorIDs = append(races[index].Snapshot.FactorIDs, rating.TrainerRecentStrikeRate)
+		races[index].Snapshot.ZScores = append(races[index].Snapshot.ZScores, []float64{2, -1, -1})
+	}
+	report := Train(races, rating.V3(), DefaultConfiguration())
+	if report.Trained || report.Promoted || report.SettledRaceCount != 499 || report.Weights.ID != "v3" {
+		t.Fatalf("older incompatible races must not satisfy the minimum: %+v", report)
+	}
+}
+
+func TestStopsCompatibleHistoryAtTheLatestGap(t *testing.T) {
+	races := samples(600)
+	for index := range races {
+		if index == 200 {
+			continue
+		}
+		races[index].Snapshot.FactorIDs = append(races[index].Snapshot.FactorIDs, rating.TrainerRecentStrikeRate)
+		races[index].Snapshot.ZScores = append(races[index].Snapshot.ZScores, []float64{2, -1, -1})
+	}
+	report := Train(races, rating.V3(), DefaultConfiguration())
+	if report.Trained || report.SettledRaceCount != 399 {
+		t.Fatalf("training must use consecutive compatible history: %+v", report)
+	}
+}
+
+func TestFactorOrderDoesNotChangeCompatibleHistory(t *testing.T) {
+	races := samples(500)
+	for index := range races {
+		if index%2 == 0 {
+			races[index].Snapshot.FactorIDs = []rating.FactorID{rating.RecentForm, rating.OfficialRating}
+			rows := races[index].Snapshot.ZScores
+			races[index].Snapshot.ZScores = [][]float64{rows[1], rows[0]}
+		}
+	}
+	report := Train(races, rating.V3(), DefaultConfiguration())
+	if !report.Trained || !report.Promoted || report.SettledRaceCount != 500 {
+		t.Fatalf("factor order must not split compatible history: %+v", report)
+	}
+}
+
+func TestValidationOnlyVariationDoesNotEnableFactor(t *testing.T) {
+	races := calibratedSamples()
+	for index := 400; index < len(races); index++ {
+		for position, factor := range races[index].Snapshot.FactorIDs {
+			if factor == rating.TrainerGoingStrikeRate {
+				races[index].Snapshot.ZScores[position] = []float64{2, -1, -1}
+			}
+		}
+	}
+	report := Train(races, rating.V3(), DefaultConfiguration())
+	if !report.Trained || !report.Promoted {
+		t.Fatalf("test requires a promoted candidate: %+v", report)
+	}
+	if report.Weights.Weight(rating.TrainerGoingStrikeRate) != 0 {
+		t.Fatal("validation races must not enable a factor without fitting variation")
+	}
+}

@@ -81,7 +81,7 @@ func TestGoingParsesProviderStrings(t *testing.T) {
 	cases := map[string]Going{
 		"Good": GoingGood, "GD": GoingGood, "Good To Soft": GoingGoodToSoft, "Gd-Sft": GoingGoodToSoft,
 		"Good To Firm": GoingGoodToFirm, "Heavy": GoingHeavy, "Standard To Slow": GoingStandardToSlow,
-		"Fast": GoingFast, "": GoingUnknown, "Yielding to Soft": GoingUnknown,
+		"Fast": GoingFast, "Standard / Slow": GoingStandardToSlow, "": GoingUnknown, "Yielding to Soft": GoingUnknown,
 	}
 	for raw, want := range cases {
 		if got := ParseGoing(raw); got != want {
