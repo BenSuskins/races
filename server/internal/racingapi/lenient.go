@@ -63,12 +63,17 @@ func (n *Number) Float() *float64 {
 // and "F" over jumps and also arrives as a bare 1; one unquoted value must not
 // throw away the race.
 type Text struct {
-	Value *string
+	Value   *string
+	Present bool
 }
 
 func (t *Text) UnmarshalJSON(data []byte) error {
 	t.Value = nil
+	t.Present = false
 	trimmed := bytes.TrimSpace(data)
+	if bytes.Equal(trimmed, []byte("null")) {
+		return nil
+	}
 	var s string
 	if err := json.Unmarshal(trimmed, &s); err == nil {
 		t.set(s)
@@ -86,6 +91,7 @@ func (t *Text) UnmarshalJSON(data []byte) error {
 }
 
 func (t *Text) set(s string) {
+	t.Present = true
 	s = strings.TrimSpace(s)
 	if s != "" {
 		t.Value = &s
@@ -107,4 +113,15 @@ func (t *Text) Or(fallback string) string {
 		return *v
 	}
 	return fallback
+}
+
+func (text *Text) Known() bool {
+	return text != nil && text.Present && (text.Value == nil || !placeholders[strings.ToLower(*text.Value)])
+}
+
+func (text *Text) KnownValue() *string {
+	if !text.Known() {
+		return nil
+	}
+	return text.NonEmpty()
 }

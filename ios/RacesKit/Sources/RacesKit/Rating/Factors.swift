@@ -538,3 +538,10 @@ public struct JockeyTrainerStrikeRateFactor: RatingFactor {
         return .value(smoothed, "\(Int((smoothed * 100).rounded()))% from \(pair.runs) runs together")
     }
 }
+
+struct ServerPreparedFactor: RatingFactor {
+    let id: FactorID
+    func value(for runner: Runner, in context: FactorContext) -> FactorValue {
+        .missing("This factor is calculated by the server.")
+    }
+}

@@ -382,11 +382,12 @@ func MatchRaces(races []domain.Race, markets []ExchangeMarket, tol Tolerances) R
 
 // ExchangePrices is one market's prices keyed by the exchange's selection id.
 type ExchangePrices struct {
-	MarketID   string
-	Status     string
-	CapturedAt time.Time
-	IsDelayed  bool
-	Prices     map[int64]domain.RunnerPrice
+	TotalMatched *float64
+	MarketID     string
+	Status       string
+	CapturedAt   time.Time
+	IsDelayed    bool
+	Prices       map[int64]domain.RunnerPrice
 }
 
 // Snapshot is the one crossing from the exchange's ids to ours. It DROPS
@@ -400,5 +401,5 @@ func Snapshot(prices ExchangePrices, horseIDsBySelectionID map[int64]string, sou
 		}
 	}
 	id := prices.MarketID
-	return domain.MarketSnapshot{MarketID: &id, Source: source, CapturedAt: domain.At(prices.CapturedAt), IsDelayed: prices.IsDelayed, Prices: byHorse}
+	return domain.MarketSnapshot{TotalMatched: prices.TotalMatched, MarketID: &id, Source: source, CapturedAt: domain.At(prices.CapturedAt), IsDelayed: prices.IsDelayed, Prices: byHorse}
 }

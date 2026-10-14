@@ -29,6 +29,7 @@ type Runner struct {
 	OfficialRating   *int    `json:"officialRating,omitempty"`
 	WeightPounds     *int    `json:"weightPounds,omitempty"`
 	Headgear         *string `json:"headgear,omitempty"`
+	HeadgearKnown    bool    `json:"headgearKnown,omitempty"`
 	Form             *string `json:"form,omitempty"`
 	DaysSinceLastRun *int    `json:"daysSinceLastRun,omitempty"`
 	JockeyID         *string `json:"jockeyID,omitempty"`
@@ -37,6 +38,9 @@ type Runner struct {
 	TrainerName      *string `json:"trainerName,omitempty"`
 	OwnerName        *string `json:"ownerName,omitempty"`
 	SireName         *string `json:"sireName,omitempty"`
+	SireID           *string `json:"sireID,omitempty"`
+	DamID            *string `json:"damID,omitempty"`
+	DamsireID        *string `json:"damsireID,omitempty"`
 	DamName          *string `json:"damName,omitempty"`
 	RacingPostRating *int    `json:"racingPostRating,omitempty"`
 	TopspeedRating   *int    `json:"topspeedRating,omitempty"`
@@ -114,6 +118,10 @@ func (r Race) Off() (time.Time, bool) {
 
 // Finisher is one horse's outcome in a settled race.
 type Finisher struct {
+	SireID               *string        `json:"sireID,omitempty"`
+	DamsireID            *string        `json:"damsireID,omitempty"`
+	Headgear             *string        `json:"headgear,omitempty"`
+	HeadgearKnown        bool           `json:"headgearKnown,omitempty"`
 	HorseID              string         `json:"horseID"`
 	HorseName            string         `json:"horseName"`
 	Position             FinishPosition `json:"position"`
@@ -174,6 +182,8 @@ func (r RaceResult) DidRun(horseID string) (ran bool, ok bool) {
 // RunnerPrice is one runner's exchange prices.
 type RunnerPrice struct {
 	BackPrice     *float64 `json:"backPrice,omitempty"`
+	BackSize      *float64 `json:"backSize,omitempty"`
+	LaySize       *float64 `json:"laySize,omitempty"`
 	LayPrice      *float64 `json:"layPrice,omitempty"`
 	LastTraded    *float64 `json:"lastTraded,omitempty"`
 	ForecastPrice *float64 `json:"forecastPrice,omitempty"`
@@ -197,6 +207,7 @@ const (
 // providers exist.
 type MarketSnapshot struct {
 	MarketID            *string                `json:"marketID,omitempty"`
+	TotalMatched        *float64               `json:"totalMatched,omitempty"`
 	Source              MarketSource           `json:"source"`
 	CapturedAt          Instant                `json:"capturedAt"`
 	IsDelayed           bool                   `json:"isDelayed"`

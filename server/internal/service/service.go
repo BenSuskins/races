@@ -127,6 +127,11 @@ func (s *Service) archive(ctx context.Context) (*tracking.Archive, error) {
 	if _, err := s.Store.LoadDocument(ctx, archiveDocument, a); err != nil {
 		return nil, err
 	}
+	facts, err := s.Store.ResultFactsKnownBefore(ctx, s.Now())
+	if err != nil {
+		return nil, err
+	}
+	a.RebuildHorseHistory(facts)
 	return a, nil
 }
 
@@ -430,6 +435,21 @@ func (s *Service) CollectResults(ctx context.Context) (Ingestion, error) {
 		results, err := s.Racing.TodaysResults(ctx)
 		if err != nil {
 			return "", err
+		}
+		for index, result := range results {
+			card, cardErr := s.Store.SealCard(ctx, result.ID)
+			if cardErr != nil {
+				return "", cardErr
+			}
+			if card == nil {
+				card, cardErr = s.Store.Race(ctx, result.ID)
+				if cardErr != nil {
+					return "", cardErr
+				}
+			}
+			if card != nil {
+				results[index] = resultWithCardMetadata(result, *card)
+			}
 		}
 		if ing.ResultsStored, err = s.Store.SaveResults(ctx, results, now); err != nil {
 			return "", err

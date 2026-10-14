@@ -597,5 +597,12 @@ func DefaultFactors(w Weights) []Factor {
 		jockeyTrainerStrikeRate{minimumSample: w.MinimumStrikeRateSample},
 		classAdjustedForm{minimumSample: 3},
 		marketMovement{},
+		exchangeDepth{},
+		horseSuitability{factor: HorseCoursePlaceRate},
+		horseSuitability{factor: HorseDistancePlaceRate},
+		horseSuitability{factor: HorseSurfacePlaceRate},
+		headgearChange{},
+		pedigreeSuitability{damsire: false},
+		pedigreeSuitability{damsire: true},
 	}
 }

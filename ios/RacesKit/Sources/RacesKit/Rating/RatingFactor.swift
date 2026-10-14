@@ -27,9 +27,24 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
     case jockeyTrainerStrikeRate
     case classAdjustedForm
     case marketMovement
+    case exchangeDepth
+    case horseCoursePlaceRate
+    case horseDistancePlaceRate
+    case horseSurfacePlaceRate
+    case headgearChange
+    case sireSuitability
+    case damsireSuitability
 
     public var label: String {
         switch self {
+        case .exchangeDepth: return "Exchange depth"
+        case .horseCoursePlaceRate: return "Horse record by course"
+        case .horseDistancePlaceRate: return "Horse record by distance"
+        case .horseSurfacePlaceRate: return "Horse record by surface"
+        case .headgearChange: return "Headgear change"
+        case .sireSuitability: return "Sire suitability"
+        case .damsireSuitability: return "Damsire suitability"
+
         case .officialRating: return "Official rating"
         case .handicapBandPosition: return "Position in the handicap"
         case .recentForm: return "Recent form"
@@ -64,6 +79,14 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
     /// the pairing.
     public var summary: String {
         switch self {
+        case .exchangeDepth: return "The amount available on both sides of the best exchange price."
+        case .horseCoursePlaceRate: return "The horse place rate under comparable race conditions."
+        case .horseDistancePlaceRate: return "The horse place rate under comparable race conditions."
+        case .horseSurfacePlaceRate: return "The horse place rate under comparable race conditions."
+        case .headgearChange: return "A change from the equipment on the last confirmed observed run."
+        case .sireSuitability: return "The place rate of related horses under comparable race conditions."
+        case .damsireSuitability: return "The place rate of related horses under comparable race conditions."
+
         case .officialRating:
             return "The handicapper's number. The strongest thing the free tier gives us."
         case .handicapBandPosition:
@@ -125,6 +148,8 @@ public enum FactorID: String, Codable, Hashable, Sendable, CaseIterable {
     /// like a bug.
     public var rationale: String? {
         switch self {
+        case .exchangeDepth, .horseCoursePlaceRate, .horseDistancePlaceRate, .horseSurfacePlaceRate, .headgearChange, .sireSuitability, .damsireSuitability:
+            return "The server calculates this factor. Its default weight is zero until later-race validation supports it."
         case .draw:
             return "The archive needs at least 100 comparable starters. The default weight is zero until replay supports it."
         case .headgear:

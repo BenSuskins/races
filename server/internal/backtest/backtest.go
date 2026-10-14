@@ -206,10 +206,11 @@ type Arm struct {
 
 // Report compares the weights against the market over the same races.
 type Report struct {
-	WeightsID string `json:"weightsID"`
-	CorpusID  string `json:"corpusID"`
-	From      string `json:"from,omitempty"`
-	To        string `json:"to,omitempty"`
+	FactorCoverage map[rating.FactorID]FactorCoverage `json:"factorCoverage,omitempty"`
+	WeightsID      string                             `json:"weightsID"`
+	CorpusID       string                             `json:"corpusID"`
+	From           string                             `json:"from,omitempty"`
+	To             string                             `json:"to,omitempty"`
 	// Rerated: races re-rated from the stored card and seal-time prices.
 	Rerated            Arm `json:"rerated"`
 	HighestProbability Arm `json:"highestProbability"`
@@ -291,6 +292,10 @@ func Run(ctx context.Context, st *store.Store, w rating.Weights, req Request) (R
 	var drawBiasCoverage factorCoverageAccumulator
 	var classFormCoverage factorCoverageAccumulator
 	var marketMovementCoverage factorCoverageAccumulator
+	coverage := map[rating.FactorID]*factorCoverageAccumulator{}
+	for _, factor := range rating.AllFactors {
+		coverage[factor] = &factorCoverageAccumulator{}
+	}
 	var corpus []string
 	var raceDates []string
 	missingSealCards := 0
@@ -332,6 +337,9 @@ func Run(ctx context.Context, st *store.Store, w rating.Weights, req Request) (R
 		drawBiasCoverage.add(a, rating.Draw)
 		classFormCoverage.add(a, rating.ClassAdjustedForm)
 		marketMovementCoverage.add(a, rating.MarketMovement)
+		for factor, accumulator := range coverage {
+			accumulator.add(a, factor)
+		}
 		corpus = append(corpus, t.RaceID)
 		raceDates = append(raceDates, t.RaceDate)
 		winner := result.Winner().HorseID
@@ -364,6 +372,10 @@ func Run(ctx context.Context, st *store.Store, w rating.Weights, req Request) (R
 	rep.DrawBiasCoverage = drawBiasCoverage.report()
 	rep.ClassFormCoverage = classFormCoverage.report()
 	rep.MarketMovementCoverage = marketMovementCoverage.report()
+	rep.FactorCoverage = map[rating.FactorID]FactorCoverage{}
+	for factor, accumulator := range coverage {
+		rep.FactorCoverage[factor] = accumulator.report()
+	}
 	rep.Rerated, rep.Favourite = rep.HighestProbability, fav.arm()
 	rep.MarketLogLoss = market.logLoss()
 	rep.BenchmarkedModelLogLoss = benchmarkedModel.logLoss()

@@ -772,7 +772,7 @@ func TestFactorDescriptions(t *testing.T) {
 			}
 		}
 	}
-	want := map[FactorID]bool{Draw: true, Headgear: true, JockeyStrikeRate: true, TrainerStrikeRate: true, JockeySurfaceStrikeRate: true, TrainerSurfaceStrikeRate: true, JockeyRaceTypeStrikeRate: true, TrainerRaceTypeStrikeRate: true, JockeyGoingStrikeRate: true, TrainerGoingStrikeRate: true, HorseGoingPlaceRate: true, JockeyRecentStrikeRate: true, TrainerRecentStrikeRate: true, JockeyTrainerStrikeRate: true, ClassAdjustedForm: true, MarketMovement: true}
+	want := map[FactorID]bool{DamsireSuitability: true, SireSuitability: true, HeadgearChange: true, HorseSurfacePlaceRate: true, HorseDistancePlaceRate: true, HorseCoursePlaceRate: true, ExchangeDepth: true, Draw: true, Headgear: true, JockeyStrikeRate: true, TrainerStrikeRate: true, JockeySurfaceStrikeRate: true, TrainerSurfaceStrikeRate: true, JockeyRaceTypeStrikeRate: true, TrainerRaceTypeStrikeRate: true, JockeyGoingStrikeRate: true, TrainerGoingStrikeRate: true, HorseGoingPlaceRate: true, JockeyRecentStrikeRate: true, TrainerRecentStrikeRate: true, JockeyTrainerStrikeRate: true, ClassAdjustedForm: true, MarketMovement: true}
 	if len(zeros) != len(want) {
 		t.Fatal("the set of deliberate zeros changed", zeros)
 	}

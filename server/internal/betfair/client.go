@@ -310,9 +310,10 @@ type catalogueDTO struct {
 }
 
 type bookDTO struct {
-	MarketID            string `json:"marketId"`
-	Status              string `json:"status"`
-	IsMarketDataDelayed *bool  `json:"isMarketDataDelayed"`
+	TotalMatched        *float64 `json:"totalMatched"`
+	MarketID            string   `json:"marketId"`
+	Status              string   `json:"status"`
+	IsMarketDataDelayed *bool    `json:"isMarketDataDelayed"`
 	Runners             []struct {
 		SelectionID     int64    `json:"selectionId"`
 		Status          *string  `json:"status"`
@@ -320,9 +321,11 @@ type bookDTO struct {
 		Ex              *struct {
 			AvailableToBack []struct {
 				Price *float64 `json:"price"`
+				Size  *float64 `json:"size"`
 			} `json:"availableToBack"`
 			AvailableToLay []struct {
 				Price *float64 `json:"price"`
+				Size  *float64 `json:"size"`
 			} `json:"availableToLay"`
 		} `json:"ex"`
 		SP *struct {
@@ -383,9 +386,11 @@ func mapPrices(b bookDTO, captured time.Time) (matching.ExchangePrices, bool) {
 		if r.Ex != nil {
 			if len(r.Ex.AvailableToBack) > 0 {
 				p.BackPrice = r.Ex.AvailableToBack[0].Price
+				p.BackSize = r.Ex.AvailableToBack[0].Size
 			}
 			if len(r.Ex.AvailableToLay) > 0 {
 				p.LayPrice = r.Ex.AvailableToLay[0].Price
+				p.LaySize = r.Ex.AvailableToLay[0].Size
 			}
 		}
 		if r.SP != nil {
@@ -400,5 +405,5 @@ func mapPrices(b bookDTO, captured time.Time) (matching.ExchangePrices, bool) {
 	if b.IsMarketDataDelayed != nil {
 		delayed = *b.IsMarketDataDelayed
 	}
-	return matching.ExchangePrices{MarketID: b.MarketID, Status: b.Status, CapturedAt: captured, IsDelayed: delayed, Prices: prices}, true
+	return matching.ExchangePrices{TotalMatched: b.TotalMatched, MarketID: b.MarketID, Status: b.Status, CapturedAt: captured, IsDelayed: delayed, Prices: prices}, true
 }

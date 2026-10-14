@@ -176,3 +176,38 @@ func TestClientEndpointsAndTierLatch(t *testing.T) {
 		t.Fatal("half-configured is not configured")
 	}
 }
+
+func TestRacecardsPreservePedigreeAndKnownHeadgear(t *testing.T) {
+	cards, err := ParseRacecards([]byte(`{"racecards":[{"race_id":"race","runners":[{"horse_id":"horse","horse":"Horse","sire_id":"sire","dam_id":"dam","damsire_id":"damsire","headgear":""},{"horse_id":"unknown","horse":"Unknown"}]}]}`), now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	horse := cards[0].Runners[0]
+	if horse.SireID == nil || *horse.SireID != "sire" || horse.DamsireID == nil || *horse.DamsireID != "damsire" || horse.DamID == nil || *horse.DamID != "dam" {
+		t.Fatalf("pedigree IDs are lost: %+v", horse)
+	}
+	if !horse.HeadgearKnown || cards[0].Runners[1].HeadgearKnown {
+		t.Fatal("empty headgear must remain distinct from unknown headgear")
+	}
+}
+
+func TestResultsPreserveEquipmentAndPedigree(t *testing.T) {
+	results, err := ParseResults([]byte(`{"results":[{"race_id":"race","runners":[{"horse_id":"horse","position":"1","headgear":"","sire_id":"sire","damsire_id":"damsire"}]}]}`), now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finisher := results[0].Finishers[0]
+	if !finisher.HeadgearKnown || finisher.SireID == nil || *finisher.SireID != "sire" || finisher.DamsireID == nil || *finisher.DamsireID != "damsire" {
+		t.Fatalf("confirmed run metadata is lost: %+v", finisher)
+	}
+}
+
+func TestHeadgearPlaceholdersRemainUnknown(t *testing.T) {
+	cards, err := ParseRacecards([]byte(`{"racecards":[{"race_id":"race","runners":[{"horse_id":"horse","horse":"Horse","headgear":"-"}]}]}`), now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cards[0].Runners[0].HeadgearKnown {
+		t.Fatal("a placeholder is not confirmed absence of equipment")
+	}
+}
