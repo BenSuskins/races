@@ -420,10 +420,53 @@ func TestReplayMarketGateUsesTheSameRaces(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	coverage, found := report.FactorCoverage[rating.ExchangeDepth]
+	if !found || coverage.EligibleRunners != 7 || coverage.AvailableRunners != 0 {
+		t.Fatalf("backtests must report missing depth across all replayed runners: %+v", coverage)
+	}
 	if report.HighestProbability.Races != 2 || report.Favourite.Races != 1 {
 		t.Fatalf("unexpected cohort: %+v", report)
 	}
 	if report.BeatsMarket == nil || !*report.BeatsMarket {
 		t.Fatalf("market control must pass its own benchmark: %+v", report)
+	}
+}
+
+func TestResultsUseSealCardMetadataAndKeepThePredictionCutoff(t *testing.T) {
+	service, provider, _, clock, race, _ := setup(t)
+	context := context.Background()
+	race.Runners[0].SireID = sp("original-sire")
+	race.Runners[0].DamsireID = sp("original-damsire")
+	race.Runners[0].Headgear = sp("b")
+	race.Runners[0].HeadgearKnown = true
+	if err := service.Store.SaveSealedTip(context, tracking.Tip{RaceID: race.ID}, race, "server", clock.t); err != nil {
+		t.Fatal(err)
+	}
+	changed := race
+	changed.Runners = append([]domain.Runner(nil), race.Runners...)
+	changed.Runners[0].SireID = sp("changed-sire")
+	if err := service.Store.SaveRaces(context, []domain.Race{changed}, clock.t); err != nil {
+		t.Fatal(err)
+	}
+	provider.results = []domain.RaceResult{result(race, race.Runners[0].ID)}
+	clock.t = race.OffDateTime.Add(time.Hour)
+	if _, err := service.CollectResults(context); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := service.Store.Result(context, race.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finisher := stored.Finisher(race.Runners[0].ID)
+	if finisher.SireID == nil || *finisher.SireID != "original-sire" || finisher.DamsireID == nil || !finisher.HeadgearKnown || finisher.Headgear == nil || *finisher.Headgear != "b" {
+		t.Fatalf("result metadata must come from the seal card: %+v", finisher)
+	}
+	earlier, err := service.Store.ResultFactsKnownBefore(context, clock.t)
+	if err != nil || len(earlier) != 0 {
+		t.Fatalf("results at the cutoff must remain excluded: %d, %v", len(earlier), err)
+	}
+	later, err := service.Store.ResultFactsKnownBefore(context, clock.t.Add(time.Second))
+	if err != nil || len(later) != 1 || later[0].Finishers[0].SireID == nil {
+		t.Fatalf("new metadata must persist in the immutable result facts: %+v, %v", later, err)
 	}
 }

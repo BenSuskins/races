@@ -112,6 +112,14 @@ public struct RatingWeights: Codable, Hashable, Sendable {
     }
 
     private static let baseFactorWeights: [String: Double] = [
+        FactorID.exchangeDepth.rawValue: 0.00,
+        FactorID.horseCoursePlaceRate.rawValue: 0.00,
+        FactorID.horseDistancePlaceRate.rawValue: 0.00,
+        FactorID.horseSurfacePlaceRate.rawValue: 0.00,
+        FactorID.headgearChange.rawValue: 0.00,
+        FactorID.sireSuitability.rawValue: 0.00,
+        FactorID.damsireSuitability.rawValue: 0.00,
+
         FactorID.officialRating.rawValue: 0.30,
         FactorID.handicapBandPosition.rawValue: 0.20,
         FactorID.recentForm.rawValue: 0.25,

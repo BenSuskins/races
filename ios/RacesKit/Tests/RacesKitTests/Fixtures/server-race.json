@@ -34,6 +34,7 @@
         "officialRating": 95,
         "weightPounds": 133,
         "headgear": "b",
+        "headgearKnown": true,
         "form": "1-3241",
         "daysSinceLastRun": 21,
         "jockeyID": "jky_1",
@@ -73,6 +74,7 @@
         "sex": "filly",
         "regionCode": "GB",
         "weightPounds": 126,
+        "headgearKnown": true,
         "jockeyID": "jky_3",
         "jockeyName": "T Marquand",
         "trainerID": "trn_3",
@@ -92,6 +94,7 @@
         "officialRating": 88,
         "weightPounds": 128,
         "headgear": "p",
+        "headgearKnown": true,
         "form": "0-P42",
         "daysSinceLastRun": 35,
         "jockeyID": "jky_4",
@@ -398,6 +401,90 @@
                 "_0": "no market prices for this race"
               }
             }
+          },
+          {
+            "factor": "exchangeDepth",
+            "label": "Exchange depth",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no exchange depth"
+              }
+            }
+          },
+          {
+            "factor": "horseCoursePlaceRate",
+            "label": "Horse record by course",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "only 0 completed comparable runs"
+              }
+            }
+          },
+          {
+            "factor": "horseDistancePlaceRate",
+            "label": "Horse record by distance",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "only 0 completed comparable runs"
+              }
+            }
+          },
+          {
+            "factor": "horseSurfacePlaceRate",
+            "label": "Horse record by surface",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "only 0 completed comparable runs"
+              }
+            }
+          },
+          {
+            "factor": "headgearChange",
+            "label": "Headgear change",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no unique confirmed previous headgear"
+              }
+            }
+          },
+          {
+            "factor": "sireSuitability",
+            "label": "Sire suitability",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "pedigree ID is unknown"
+              }
+            }
+          },
+          {
+            "factor": "damsireSuitability",
+            "label": "Damsire suitability",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "pedigree ID is unknown"
+              }
+            }
           }
         ]
       },
@@ -685,6 +772,90 @@
             "availability": {
               "missingData": {
                 "_0": "no market prices for this race"
+              }
+            }
+          },
+          {
+            "factor": "exchangeDepth",
+            "label": "Exchange depth",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no exchange depth"
+              }
+            }
+          },
+          {
+            "factor": "horseCoursePlaceRate",
+            "label": "Horse record by course",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "only 0 completed comparable runs"
+              }
+            }
+          },
+          {
+            "factor": "horseDistancePlaceRate",
+            "label": "Horse record by distance",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "only 0 completed comparable runs"
+              }
+            }
+          },
+          {
+            "factor": "horseSurfacePlaceRate",
+            "label": "Horse record by surface",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "only 0 completed comparable runs"
+              }
+            }
+          },
+          {
+            "factor": "headgearChange",
+            "label": "Headgear change",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "current headgear is unknown"
+              }
+            }
+          },
+          {
+            "factor": "sireSuitability",
+            "label": "Sire suitability",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "pedigree ID is unknown"
+              }
+            }
+          },
+          {
+            "factor": "damsireSuitability",
+            "label": "Damsire suitability",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "pedigree ID is unknown"
               }
             }
           }
@@ -981,6 +1152,90 @@
                 "_0": "no market prices for this race"
               }
             }
+          },
+          {
+            "factor": "exchangeDepth",
+            "label": "Exchange depth",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no exchange depth"
+              }
+            }
+          },
+          {
+            "factor": "horseCoursePlaceRate",
+            "label": "Horse record by course",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "only 0 completed comparable runs"
+              }
+            }
+          },
+          {
+            "factor": "horseDistancePlaceRate",
+            "label": "Horse record by distance",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "only 0 completed comparable runs"
+              }
+            }
+          },
+          {
+            "factor": "horseSurfacePlaceRate",
+            "label": "Horse record by surface",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "only 0 completed comparable runs"
+              }
+            }
+          },
+          {
+            "factor": "headgearChange",
+            "label": "Headgear change",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no unique confirmed previous headgear"
+              }
+            }
+          },
+          {
+            "factor": "sireSuitability",
+            "label": "Sire suitability",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "pedigree ID is unknown"
+              }
+            }
+          },
+          {
+            "factor": "damsireSuitability",
+            "label": "Damsire suitability",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "pedigree ID is unknown"
+              }
+            }
           }
         ]
       },
@@ -1268,6 +1523,90 @@
             "availability": {
               "missingData": {
                 "_0": "no market prices for this race"
+              }
+            }
+          },
+          {
+            "factor": "exchangeDepth",
+            "label": "Exchange depth",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no exchange depth"
+              }
+            }
+          },
+          {
+            "factor": "horseCoursePlaceRate",
+            "label": "Horse record by course",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "only 0 completed comparable runs"
+              }
+            }
+          },
+          {
+            "factor": "horseDistancePlaceRate",
+            "label": "Horse record by distance",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "only 0 completed comparable runs"
+              }
+            }
+          },
+          {
+            "factor": "horseSurfacePlaceRate",
+            "label": "Horse record by surface",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "only 0 completed comparable runs"
+              }
+            }
+          },
+          {
+            "factor": "headgearChange",
+            "label": "Headgear change",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "no unique confirmed previous headgear"
+              }
+            }
+          },
+          {
+            "factor": "sireSuitability",
+            "label": "Sire suitability",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "pedigree ID is unknown"
+              }
+            }
+          },
+          {
+            "factor": "damsireSuitability",
+            "label": "Damsire suitability",
+            "detail": "—",
+            "weight": 0,
+            "probabilityDelta": 0,
+            "availability": {
+              "missingData": {
+                "_0": "pedigree ID is unknown"
               }
             }
           }
@@ -1573,6 +1912,90 @@
             "_0": "no market prices for this race"
           }
         }
+      },
+      {
+        "factor": "exchangeDepth",
+        "label": "Exchange depth",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "no exchange depth"
+          }
+        }
+      },
+      {
+        "factor": "horseCoursePlaceRate",
+        "label": "Horse record by course",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "only 0 completed comparable runs"
+          }
+        }
+      },
+      {
+        "factor": "horseDistancePlaceRate",
+        "label": "Horse record by distance",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "only 0 completed comparable runs"
+          }
+        }
+      },
+      {
+        "factor": "horseSurfacePlaceRate",
+        "label": "Horse record by surface",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "only 0 completed comparable runs"
+          }
+        }
+      },
+      {
+        "factor": "headgearChange",
+        "label": "Headgear change",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "no unique confirmed previous headgear"
+          }
+        }
+      },
+      {
+        "factor": "sireSuitability",
+        "label": "Sire suitability",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "pedigree ID is unknown"
+          }
+        }
+      },
+      {
+        "factor": "damsireSuitability",
+        "label": "Damsire suitability",
+        "detail": "—",
+        "weight": 0,
+        "probabilityDelta": 0,
+        "availability": {
+          "missingData": {
+            "_0": "pedigree ID is unknown"
+          }
+        }
       }
     ],
     "createdAt": "2026-09-20T09:00:00Z"
@@ -1607,6 +2030,8 @@
         "trainerID": "trn_2"
       },
       {
+        "headgear": "b",
+        "headgearKnown": true,
         "horseID": "hrs_1",
         "horseName": "Kyprios",
         "position": {
@@ -1622,6 +2047,8 @@
         "trainerID": "trn_1"
       },
       {
+        "headgear": "p",
+        "headgearKnown": true,
         "horseID": "hrs_4",
         "horseName": "Numeric Types",
         "position": {

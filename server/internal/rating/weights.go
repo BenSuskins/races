@@ -57,7 +57,14 @@ func (w Weights) Clone() Weights {
 
 func baseFactorWeights() map[string]float64 {
 	return map[string]float64{
-		string(OfficialRating): 0.30, string(HandicapBandPosition): 0.20, string(RecentForm): 0.25,
+		string(ExchangeDepth):          0,
+		string(HorseCoursePlaceRate):   0,
+		string(HorseDistancePlaceRate): 0,
+		string(HorseSurfacePlaceRate):  0,
+		string(HeadgearChange):         0,
+		string(SireSuitability):        0,
+		string(DamsireSuitability):     0,
+		string(OfficialRating):         0.30, string(HandicapBandPosition): 0.20, string(RecentForm): 0.25,
 		string(WonLastTime): 0.10, string(CompletionRate): 0.08, string(DaysSinceLastRun): 0.06,
 		string(Age): 0.04, string(WeightCarried): 0.02, string(Draw): 0.00, string(Headgear): 0.00,
 		string(JockeyStrikeRate): 0.00, string(TrainerStrikeRate): 0.00,

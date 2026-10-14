@@ -43,6 +43,14 @@ public struct RaceRater: Sendable {
             JockeyTrainerStrikeRateFactor(minimumSample: weights.minimumStrikeRateSample),
             ClassAdjustedFormFactor(),
             MarketMovementFactor(),
+            ServerPreparedFactor(id: .exchangeDepth),
+            ServerPreparedFactor(id: .horseCoursePlaceRate),
+            ServerPreparedFactor(id: .horseDistancePlaceRate),
+            ServerPreparedFactor(id: .horseSurfacePlaceRate),
+            ServerPreparedFactor(id: .headgearChange),
+            ServerPreparedFactor(id: .sireSuitability),
+            ServerPreparedFactor(id: .damsireSuitability),
+
         ]
     }
 

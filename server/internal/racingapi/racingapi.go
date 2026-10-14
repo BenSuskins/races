@@ -228,6 +228,9 @@ type runnerDTO struct {
 	TrainerID Text   `json:"trainer_id"`
 	Owner     Text   `json:"owner"`
 	Sire      Text   `json:"sire"`
+	SireID    Text   `json:"sire_id"`
+	DamID     Text   `json:"dam_id"`
+	DamsireID Text   `json:"damsire_id"`
 	Dam       Text   `json:"dam"`
 	RPR       Number `json:"rpr"`
 	TS        Number `json:"ts"`
@@ -250,6 +253,9 @@ type resultDTO struct {
 }
 
 type resultRunnerDTO struct {
+	SireID    Text   `json:"sire_id"`
+	DamsireID Text   `json:"damsire_id"`
+	Headgear  Text   `json:"headgear"`
 	HorseID   Text   `json:"horse_id"`
 	Horse     Text   `json:"horse"`
 	Position  Text   `json:"position"`
@@ -309,10 +315,10 @@ func mapRunner(dto runnerDTO) (domain.Runner, bool) {
 	return domain.Runner{
 		ID: *id, Name: *name, ClothNumber: dto.Number.Int(), Draw: dto.Draw.Int(), Age: dto.Age.Int(),
 		Sex: dto.Sex.NonEmpty(), RegionCode: dto.Region.NonEmpty(), OfficialRating: dto.Ofr.Int(),
-		WeightPounds: dto.Lbs.Int(), Headgear: dto.Headgear.NonEmpty(), Form: dto.Form.NonEmpty(),
+		WeightPounds: dto.Lbs.Int(), Headgear: dto.Headgear.KnownValue(), HeadgearKnown: dto.Headgear.Known(), Form: dto.Form.NonEmpty(),
 		DaysSinceLastRun: dto.LastRun.Int(), JockeyID: dto.JockeyID.NonEmpty(), JockeyName: dto.Jockey.NonEmpty(),
 		TrainerID: dto.TrainerID.NonEmpty(), TrainerName: dto.Trainer.NonEmpty(), OwnerName: dto.Owner.NonEmpty(),
-		SireName: dto.Sire.NonEmpty(), DamName: dto.Dam.NonEmpty(), RacingPostRating: dto.RPR.Int(),
+		SireName: dto.Sire.NonEmpty(), SireID: dto.SireID.NonEmpty(), DamID: dto.DamID.NonEmpty(), DamsireID: dto.DamsireID.NonEmpty(), DamName: dto.Dam.NonEmpty(), RacingPostRating: dto.RPR.Int(),
 		TopspeedRating: dto.TS.Int(), Spotlight: dto.Spotlight.NonEmpty(), SilkURL: dto.SilkURL.NonEmpty(),
 	}, true
 }
@@ -338,6 +344,7 @@ func mapResult(dto resultDTO, now time.Time) (domain.RaceResult, bool) {
 			continue
 		}
 		r.Finishers = append(r.Finishers, domain.Finisher{
+			SireID: f.SireID.NonEmpty(), DamsireID: f.DamsireID.NonEmpty(), Headgear: f.Headgear.KnownValue(), HeadgearKnown: f.Headgear.Known(),
 			HorseID: *id, HorseName: f.Horse.Or("Unknown"), Position: domain.ParseFinishPosition(f.Position.Value),
 			ClothNumber: f.Number.Int(), Draw: f.Draw.Int(), WeightPounds: f.WeightLbs.Int(), OfficialRating: f.OR.Int(),
 			JockeyID: f.JockeyID.NonEmpty(), TrainerID: f.TrainerID.NonEmpty(), StartingPriceDecimal: f.SpDec.Float(),

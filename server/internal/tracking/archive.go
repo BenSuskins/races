@@ -15,6 +15,7 @@ import (
 //
 // The JSON is ResultsArchive's, so a device's archive seeds this one.
 type Archive struct {
+	HorseRuns        map[string][]ObservedHorseRun  `json:"horseRuns,omitempty"`
 	Jockeys          map[string]rating.StrikeRate   `json:"jockeys"`
 	Trainers         map[string]rating.StrikeRate   `json:"trainers"`
 	JockeySurfaces   map[string]rating.StrikeRate   `json:"jockeySurfaces,omitempty"`
@@ -59,6 +60,9 @@ func NewArchive() *Archive {
 }
 
 func (a *Archive) index() {
+	if a.HorseRuns == nil {
+		a.HorseRuns = map[string][]ObservedHorseRun{}
+	}
 	// Rebuilt whenever it falls out of step with the id list, which is what
 	// decoding a stored archive into an existing value does.
 	if a.ingested == nil || len(a.ingested) != len(a.IngestedRaceIDs) {
@@ -129,6 +133,7 @@ func (a *Archive) Ingest(r domain.RaceResult) bool {
 		validRecentDate = true
 	}
 	for _, f := range r.Finishers {
+		a.observeHorse(r, f)
 		if validRecentDate && r.RaceClass != nil && *r.RaceClass >= 1 && *r.RaceClass <= 7 && len(r.Finishers) >= 2 {
 			score := 0.0
 			if position := f.Position.NumericPosition(); position != nil && *position >= 1 && *position <= len(r.Finishers) {
@@ -346,6 +351,9 @@ func (a *Archive) Merge(other Archive) int {
 		for _, run := range record {
 			a.HorseClass[key] = appendClassRun(a.HorseClass[key], run)
 		}
+	}
+	for horse, runs := range other.HorseRuns {
+		a.HorseRuns[horse] = append(a.HorseRuns[horse], runs...)
 	}
 	a.TotalRuns += other.TotalRuns
 	a.TotalWins += other.TotalWins

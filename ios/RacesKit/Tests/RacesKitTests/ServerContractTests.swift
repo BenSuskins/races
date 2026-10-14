@@ -81,6 +81,19 @@ final class ServerContractTests: XCTestCase {
         XCTAssertTrue(model.weights.contains { $0.origin == "device" })
     }
 
+    func test_theNewServerFactorsDecodeWithZeroDefaults() throws {
+        let model = try decode(ServerModel.self, "server-model.json")
+        let factors: Set<FactorID> = [.sireSuitability, .damsireSuitability, .headgearChange, .exchangeDepth, .horseCoursePlaceRate, .horseDistancePlaceRate, .horseSurfacePlaceRate]
+        XCTAssertTrue(factors.isSubset(of: Set(model.active.factorWeights.keys.compactMap { FactorID(rawValue: $0) })))
+        for factor in factors {
+            XCTAssertEqual(model.active.weight(for: factor), 0)
+        }
+        let card = try decode(ServerRacecard.self, "server-racecard.json")
+        let assessment = try XCTUnwrap(card.assessments["rac_1001"])
+        let runner = try XCTUnwrap(assessment.runners.first)
+        XCTAssertTrue(factors.isSubset(of: Set(runner.contributions.map(\.factor))))
+    }
+
     func test_theStatusDecodes() throws {
         let status = try decode(ServerStatus.self, "server-status.json")
         XCTAssertTrue(status.racingAPI.configured)

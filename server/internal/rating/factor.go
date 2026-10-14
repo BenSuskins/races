@@ -2,10 +2,8 @@
 // rater that combines them. Everything here is pure — no network, no clock, no
 // disk — which is what lets the back-test replay history in seconds.
 //
-// It is a line-for-line port of RacesKit/Rating. The numbers and the strings
-// are the same on purpose: a tip's contributions are stored and shown, and a
-// model that behaved differently here from on the device would split the
-// accuracy history without saying so.
+// The server computes additional factors. RacesKit decodes their stable IDs
+// and stored contributions so the app can render them without rating logic.
 package rating
 
 import (
@@ -44,6 +42,13 @@ const (
 	JockeyTrainerStrikeRate   FactorID = "jockeyTrainerStrikeRate"
 	ClassAdjustedForm         FactorID = "classAdjustedForm"
 	MarketMovement            FactorID = "marketMovement"
+	ExchangeDepth             FactorID = "exchangeDepth"
+	HorseCoursePlaceRate      FactorID = "horseCoursePlaceRate"
+	HorseDistancePlaceRate    FactorID = "horseDistancePlaceRate"
+	HorseSurfacePlaceRate     FactorID = "horseSurfacePlaceRate"
+	HeadgearChange            FactorID = "headgearChange"
+	SireSuitability           FactorID = "sireSuitability"
+	DamsireSuitability        FactorID = "damsireSuitability"
 )
 
 // AllFactors in declaration order, which is also the rater's order.
@@ -51,11 +56,32 @@ var AllFactors = []FactorID{
 	OfficialRating, HandicapBandPosition, RecentForm, WonLastTime, CompletionRate,
 	DaysSinceLastRun, Age, WeightCarried, Draw, Headgear, JockeyStrikeRate, TrainerStrikeRate,
 	JockeySurfaceStrikeRate, TrainerSurfaceStrikeRate, JockeyRaceTypeStrikeRate, TrainerRaceTypeStrikeRate, JockeyGoingStrikeRate, TrainerGoingStrikeRate, HorseGoingPlaceRate, JockeyRecentStrikeRate, TrainerRecentStrikeRate, JockeyTrainerStrikeRate, ClassAdjustedForm, MarketMovement,
+	ExchangeDepth,
+	HorseCoursePlaceRate,
+	HorseDistancePlaceRate,
+	HorseSurfacePlaceRate,
+	HeadgearChange,
+	SireSuitability,
+	DamsireSuitability,
 }
 
 // Label is the short name shown on screen.
 func (f FactorID) Label() string {
 	switch f {
+	case DamsireSuitability:
+		return "Damsire suitability"
+	case SireSuitability:
+		return "Sire suitability"
+	case HeadgearChange:
+		return "Headgear change"
+	case HorseSurfacePlaceRate:
+		return "Horse record by surface"
+	case HorseDistancePlaceRate:
+		return "Horse record by distance"
+	case HorseCoursePlaceRate:
+		return "Horse record by course"
+	case ExchangeDepth:
+		return "Exchange depth"
 	case OfficialRating:
 		return "Official rating"
 	case HandicapBandPosition:
@@ -111,6 +137,20 @@ func (f FactorID) Label() string {
 // Summary is one sentence on what the factor reads.
 func (f FactorID) Summary() string {
 	switch f {
+	case DamsireSuitability:
+		return "The place rate of related horses under comparable race conditions."
+	case SireSuitability:
+		return "The place rate of related horses under comparable race conditions."
+	case HeadgearChange:
+		return "A change from the equipment on the last confirmed observed run."
+	case HorseSurfacePlaceRate:
+		return "The horse place rate under comparable race conditions."
+	case HorseDistancePlaceRate:
+		return "The horse place rate under comparable race conditions."
+	case HorseCoursePlaceRate:
+		return "The horse place rate under comparable race conditions."
+	case ExchangeDepth:
+		return "The amount available on both sides of the best exchange price."
 	case OfficialRating:
 		return "The handicapper's number. The strongest thing the free tier gives us."
 	case HandicapBandPosition:
@@ -167,6 +207,20 @@ func (f FactorID) Summary() string {
 // present and switched off.
 func (f FactorID) Rationale() string {
 	switch f {
+	case DamsireSuitability:
+		return "The archive needs 30 comparable offspring runs. The default weight is zero until later-race validation supports the factor."
+	case SireSuitability:
+		return "The archive needs 30 comparable offspring runs. The default weight is zero until later-race validation supports the factor."
+	case HeadgearChange:
+		return "A previous confirmed run and known equipment are required. This factor does not establish first-time career use. Its default weight is zero until validation supports it."
+	case HorseSurfacePlaceRate:
+		return "The archive needs three completed comparable runs. The default weight is zero until later-race validation supports the factor."
+	case HorseDistancePlaceRate:
+		return "The archive needs three completed comparable runs. The default weight is zero until later-race validation supports the factor."
+	case HorseCoursePlaceRate:
+		return "The archive needs three completed comparable runs. The default weight is zero until later-race validation supports the factor."
+	case ExchangeDepth:
+		return "The default weight is zero until later-race validation supports the factor."
 	case Draw:
 		return "Draw bias uses course, distance, going, field-size, and draw bands. Cells need 100 comparable starters; the default weight is zero until walk-forward evidence supports it."
 	case Headgear:
@@ -358,4 +412,16 @@ type Context struct {
 type Factor interface {
 	ID() FactorID
 	Value(runner domain.Runner, ctx Context) FactorValue
+}
+
+type HorseConditionRates interface {
+	HorseConditionRate(horseID string, race domain.Race, factor FactorID, before time.Time) (PlaceRate, bool)
+}
+
+type HeadgearHistory interface {
+	PreviousHeadgear(horseID string, raceID string, before time.Time) (string, bool)
+}
+
+type PedigreeRates interface {
+	PedigreePlaceRate(parentID string, damsire bool, race domain.Race, before time.Time) (PlaceRate, bool)
 }

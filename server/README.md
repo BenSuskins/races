@@ -164,6 +164,37 @@ Each results pass retries missing prices for settled tips. It preserves the
 selection, probabilities, seal, and settled outcome. This includes older tips
 whose markets Betfair still serves. The results job summary shows price failures.
 
+## Additional payload factors
+
+The server records seven additional factors with zero default weights:
+
+| Factor | Input | History minimum |
+|---|---|---|
+| Sire and damsire suitability | Prior offspring places in the same surface, race type, distance band, and going bucket | 30 completed runs |
+| Headgear change | Equipment on the current card and the latest confirmed observed run | One unambiguous prior run |
+| Exchange depth | The smaller positive amount at the best back and lay prices, on a log scale | Two valid offers before the rating time |
+| Horse course, distance, and surface records | Prior completed places under comparable conditions | Three completed runs |
+
+The server preserves pedigree IDs, known equipment state, and exchange amounts.
+New result facts use the immutable seal card for missing equipment and pedigree
+metadata. The stored race card is the fallback. Existing result facts and
+training snapshots remain unchanged. Draft history and replay history use only
+facts known before the prediction cutoff.
+
+A headgear change means a change since the last confirmed observed run. It does
+not establish first-time career use. Missing equipment remains distinct from
+confirmed absence. Sparse histories produce missing data rather than invented
+scores. Place rates use the existing prior and smoothing approach.
+
+New factors enter future training snapshots. Training waits for the minimum
+compatible history after the factor set changes. Existing weights read absent
+new keys as zero. Replay reports expose availability for every factor in
+`factorCoverage`, while retaining the existing coverage fields.
+
+The iOS package adds decode cases and descriptions. The server computes the new
+scores. Release the updated client before a server release that returns the new
+factor IDs. Older clients use a closed factor enum.
+
 ## The contract with the app
 
 The app decodes responses with RacesKit's own models, so the JSON here is

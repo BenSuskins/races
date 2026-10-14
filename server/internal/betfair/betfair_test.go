@@ -312,3 +312,16 @@ func TestStartingPricesRetriesMarketsOmittedFromMixedBatch(t *testing.T) {
 	}
 	assertStartingPriceProjection(t, f.bodies["/listMarketBook/"])
 }
+
+func TestPricesPreserveOfferSizesAndMarketActivity(t *testing.T) {
+	exchange := newFake()
+	exchange.replies["/listMarketBook/"] = []string{`[{"marketId":"1.1","status":"OPEN","totalMatched":456,"runners":[{"selectionId":1,"status":"ACTIVE","ex":{"availableToBack":[{"price":2,"size":123.5}],"availableToLay":[{"price":2.02,"size":67.8}]}}]}]`}
+	books, err := client(t, exchange, creds).Prices(context.Background(), []string{"1.1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	price := books[0].Prices[1]
+	if price.BackSize == nil || *price.BackSize != 123.5 || price.LaySize == nil || *price.LaySize != 67.8 || books[0].TotalMatched == nil || *books[0].TotalMatched != 456 {
+		t.Fatalf("offer amounts are lost: %+v, %+v", price, books[0])
+	}
+}

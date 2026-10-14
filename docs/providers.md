@@ -63,6 +63,8 @@ curl -s -u "$RACING_USER:$RACING_PASS" \
   `sire`/`dam`/`damsire` (+ ids), `trainer`/`trainer_id`, `owner`/`owner_id`,
   `number`, `draw`, `headgear`, `lbs`, `ofr`, `jockey`/`jockey_id`, `last_run`,
   `form`
+- **Stored for the new factors:** pedigree IDs and headgear state. An empty
+  headgear string confirms no equipment. A missing field remains unknown.
 - **Schedule:** Today's card every 15 minutes 06:00–22:59, tomorrow's hourly.
   Cards barely change, but non-runners are declared through the day.
 
@@ -276,3 +278,15 @@ the limits are unrelated.
 
 The limiter is a safety net against a bug looping on a request, not a throughput
 constraint we have to design around.
+
+## Preserved factor inputs
+
+The server keeps `sire_id`, `dam_id`, and `damsire_id` from free racecards.
+It keeps confirmed result headgear and uses the immutable seal card to supply
+missing result metadata for matched finishers. It never treats a declared
+non-runner as a completed historical run.
+
+Betfair best offers provide price and size. The server keeps the best back and
+lay sizes and market `totalMatched` in its snapshots. Exchange depth uses only
+valid two-sided offers captured before the rating time. It does not use runner
+matched volume, in-play prices, or starting prices as pre-race inputs.
