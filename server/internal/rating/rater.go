@@ -168,6 +168,21 @@ type anchor struct {
 func (rt Rater) Rate(race domain.Race, market *domain.MarketSnapshot, strikeRates StrikeRates, now time.Time) Assessment {
 	w := rt.Weights
 	runners := race.DeclaredRunners()
+	if market != nil {
+		active := make([]domain.Runner, 0, len(runners))
+		for _, runner := range runners {
+			price, present := market.Price(runner.ID)
+			if !present || price.IsActive {
+				active = append(active, runner)
+			}
+		}
+		if len(active) != len(runners) {
+			race.Runners = active
+			fieldSize := len(active)
+			race.FieldSize = &fieldSize
+		}
+		runners = active
+	}
 	if len(runners) == 0 {
 		return Assessment{
 			RaceID: race.ID, GeneratedAt: domain.At(now), ModelVersion: ModelVersion, WeightsID: w.ID,

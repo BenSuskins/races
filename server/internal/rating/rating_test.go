@@ -491,6 +491,74 @@ func TestThinMarketDiscardedWholesaleAndThresholdUsed(t *testing.T) {
 	}
 }
 
+func TestKnownInactiveRunnerCannotBeSelected(t *testing.T) {
+	race := race("Test Stakes", domain.RaceTypeFlat, nil, sp("3yo+"),
+		runner("withdrawn", runnerOpts{number: ip(1), or: ip(95), form: sp("111")}),
+		runner("active", runnerOpts{number: ip(2), or: ip(50), form: sp("999")}),
+	)
+	market := market(map[string]float64{"active": 2})
+	market.Prices["withdrawn"] = domain.RunnerPrice{IsActive: false}
+	assessment := NewRater(V3()).Rate(race, market, nil, epoch)
+	if selection := assessment.Selection(); selection == nil || selection.HorseID != "active" {
+		t.Fatal("a known inactive runner cannot receive the selection")
+	}
+	if len(assessment.Runners) != 1 || assessment.IsFormOnly() || assessment.MarketCoverage != 1 {
+		t.Fatal("only the active field contributes to market coverage")
+	}
+	if snapshot := assessment.TrainingSnapshot; snapshot == nil || len(snapshot.RunnerIDs) != 1 || snapshot.RunnerIDs[0] != "active" {
+		t.Fatal("the training snapshot excludes the inactive runner")
+	}
+}
+
+func TestKnownInactiveRunnerDoesNotContributeToFieldFactors(t *testing.T) {
+	race := race("Test Stakes", domain.RaceTypeFlat, nil, sp("3yo+"),
+		runner("withdrawn", runnerOpts{number: ip(1)}),
+		runner("a", runnerOpts{number: ip(2)}),
+		runner("b", runnerOpts{number: ip(3)}),
+		runner("c", runnerOpts{number: ip(4)}),
+	)
+	market := market(map[string]float64{"a": 2, "b": 4, "c": 8})
+	market.Prices["withdrawn"] = domain.RunnerPrice{IsActive: false}
+	assessment := NewRater(V3()).Rate(race, market, fakeStrikeRates{}, epoch)
+	if detail := contribution(t, runnerNamed(t, assessment, "a"), HorseGoingPlaceRate).Detail; detail != "Field place prior (100%)" {
+		t.Fatalf("the field prior uses the three active runners: %s", detail)
+	}
+	if len(race.Runners) != 4 || race.Runners[0].ID != "withdrawn" || *race.FieldSize != 4 {
+		t.Fatal("rating preserves the original race card")
+	}
+}
+
+func TestUnpricedRunnerRemainsEligible(t *testing.T) {
+	for _, activeEntry := range []bool{false, true} {
+		race := race("Test Stakes", domain.RaceTypeFlat, nil, sp("3yo+"),
+			runner("unpriced", runnerOpts{number: ip(1), or: ip(95), form: sp("111")}),
+			runner("priced", runnerOpts{number: ip(2), or: ip(50), form: sp("999")}),
+		)
+		market := market(map[string]float64{"priced": 2})
+		if activeEntry {
+			market.Prices["unpriced"] = domain.RunnerPrice{IsActive: true}
+		}
+		assessment := NewRater(V3()).Rate(race, market, nil, epoch)
+		if len(assessment.Runners) != 2 || assessment.Selection().HorseID != "unpriced" {
+			t.Fatal("an absent price does not establish that a runner is inactive")
+		}
+	}
+}
+
+func TestAllKnownInactiveRunnersLeaveNoSelection(t *testing.T) {
+	race := race("Test Stakes", domain.RaceTypeFlat, nil, sp("3yo+"),
+		runner("a", runnerOpts{number: ip(1), or: ip(95), form: sp("111")}),
+		runner("b", runnerOpts{number: ip(2), or: ip(50), form: sp("999")}),
+	)
+	market := &domain.MarketSnapshot{Prices: map[string]domain.RunnerPrice{
+		"a": {IsActive: false}, "b": {IsActive: false},
+	}}
+	assessment := NewRater(V3()).Rate(race, market, nil, epoch)
+	if len(assessment.Runners) != 0 || assessment.Selection() != nil || assessment.TrainingSnapshot != nil {
+		t.Fatal("an entirely inactive field produces no selection or training snapshot")
+	}
+}
+
 func TestExplanations(t *testing.T) {
 	a := NewRater(V2()).Rate(fourRunnerHandicap(), fullMarket(), nil, epoch)
 	first := a.Runners[0]
