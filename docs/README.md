@@ -2,6 +2,8 @@
 
 > An iOS horse-racing app that explains race recommendations and tracks their results.
 
+## Overview
+
 UK horse racing for iOS. Browse **course → race → runner**, get an explainable
 recommendation for each race, and see honestly how well those recommendations do.
 
