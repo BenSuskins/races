@@ -1,10 +1,14 @@
 # Races
 
+> An iOS horse-racing app that explains race recommendations and tracks their results.
+
+## Overview
+
 UK horse racing for iOS. Browse **course → race → runner**, get an explainable
 recommendation for each race, and see honestly how well those recommendations do.
 
 Native SwiftUI app, backed by a small Go server on the homelab
-([`server/`](server/README.md)) that talks to the two providers, rates and seals
+([`server/`](../server/README.md)) that talks to the two providers, rates and seals
 every race on a clock, and keeps the whole history in SQLite — including every
 raw provider response, so future models can be trained and back-tested against
 it. The app reads from the server over the LAN or Tailscale.
@@ -12,7 +16,7 @@ it. The app reads from the server over the LAN or Tailscale.
 ## Status
 
 Everything in the original plan is built and on TestFlight. What is left, and what
-each item is actually blocked on, is in [`docs/roadmap.md`](docs/roadmap.md).
+each item is actually blocked on, is in [`docs/roadmap.md`](roadmap.md).
 
 | Milestone | State |
 |---|---|
@@ -30,9 +34,9 @@ Two things are outstanding and neither is a feature: the **Betfair login spike**
 **real race days** — the archive starts empty, so the strike-rate factors, ROI and
 the favourite baseline all need a sample before they mean anything.
 
-See [`docs/providers.md`](docs/providers.md) for the data sources in use,
-[`docs/data-sources.md`](docs/data-sources.md) for the ones evaluated and turned
-down, and [`CLAUDE.md`](CLAUDE.md) for developer context.
+See [`docs/providers.md`](providers.md) for the data sources in use,
+[`docs/data-sources.md`](data-sources.md) for the ones evaluated and turned
+down, and [`CLAUDE.md`](../CLAUDE.md) for developer context.
 
 ## How the recommendation works
 
@@ -48,7 +52,7 @@ and the accuracy tracker reports that comparison alongside every other figure.
 
 Factors the free data tier can't support honestly (draw bias, first-time headgear)
 ship at zero weight with the code present, rather than being faked with invented
-numbers. See [`docs/algorithm.md`](docs/algorithm.md).
+numbers. See [`docs/algorithm.md`](algorithm.md).
 
 ## Setup
 
@@ -71,7 +75,7 @@ so on screen.
 ## Development
 
 ```bash
-swift test --package-path ios/RacesKit      # the fast loop; runs on Linux
+cd .. && swift test --package-path ios/RacesKit      # the fast loop; runs on Linux
 ```
 
 The whole kit — networking, matching, rating, storage — is testable with no
@@ -86,4 +90,4 @@ or the National Gambling Helpline on 0808 8020 133.
 
 ## Licence
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](../LICENSE).
