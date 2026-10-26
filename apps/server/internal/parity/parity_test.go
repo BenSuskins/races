@@ -1,7 +1,7 @@
 // Package parity pins the Go rater to the Swift one it replaced.
 //
 // It rates the committed racecard fixture under every preset and writes the
-// result to ios/RacesKit/Tests/RacesKitTests/Fixtures/server-golden-rating.json.
+// result to packages/RacesKit/Tests/RacesKitTests/Fixtures/server-golden-rating.json.
 // RacesKit's ServerParityTests rates the same fixture with the Swift rater and
 // asserts the same numbers, so the two cannot drift while both exist.
 //
@@ -23,7 +23,7 @@ import (
 
 var update = flag.Bool("update", false, "rewrite the golden file")
 
-const golden = "../../../ios/RacesKit/Tests/RacesKitTests/Fixtures/server-golden-rating.json"
+const golden = "../../../../packages/RacesKit/Tests/RacesKitTests/Fixtures/server-golden-rating.json"
 
 // Market is the fixture market, by our horse id. Mixed shapes on purpose:
 // back and lay, back alone, forecast alone.

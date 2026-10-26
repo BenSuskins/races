@@ -2,7 +2,7 @@
 # Xcode Cloud post-clone hook.
 #
 # Location matters: Xcode Cloud looks for ci_scripts/ in the directory containing
-# the Xcode project, NOT at the repository root. Hence ios/Races/ci_scripts/.
+# the Xcode project, NOT at the repository root. Hence apps/ios/Races/ci_scripts/.
 #
 # There are no secrets to inject. Both the Racing API and Betfair credentials are
 # entered by the user at runtime and held in the Keychain, never in the binary,
@@ -26,7 +26,7 @@ git fetch --unshallow --quiet 2>/dev/null \
 
 if [ -n "${CI_BUILD_NUMBER:-}" ]; then
     echo "Stamping CURRENT_PROJECT_VERSION = ${CI_BUILD_NUMBER}"
-    cd "$REPO/ios/Races"
+    cd "$REPO/apps/ios/Races"
     # Requires VERSIONING_SYSTEM = "apple-generic" in the project build settings.
     # Without it agvtool silently does nothing, so keep that setting in place.
     xcrun agvtool new-version -all "$CI_BUILD_NUMBER"

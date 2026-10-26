@@ -1,7 +1,7 @@
 # On-device model learning
 
 > **Now server-side.** Since 2026-09-24 this trainer runs on the Races server
-> (`server/internal/training`, a line-for-line port) every night at 03:00 over
+> (`apps/server/internal/training`, a line-for-line port) every night at 03:00 over
 > every settled race the server has sealed, plus any samples a phone uploaded.
 > The rules below — the 500-race minimum, held-out validation, promotion only on
 > improvement, a new `weightsID` on promotion — are unchanged. A promoted set is

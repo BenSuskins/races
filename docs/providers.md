@@ -1,14 +1,14 @@
 # Provider Reference
 
 Every third-party endpoint the Races server calls, what tier it needs, and what we
-take from it. **Keep this in step with `server/internal/racingapi/` and
-`server/internal/betfair/` — if you add, remove or re-tier a call, update this
+take from it. **Keep this in step with `apps/server/internal/racingapi/` and
+`apps/server/internal/betfair/` — if you add, remove or re-tier a call, update this
 file in the same change.**
 
 The app calls none of these any more. The server on the homelab does, on a
-schedule (`server/internal/service/scheduler.go`), with credentials from Ansible
+schedule (`apps/server/internal/service/scheduler.go`), with credentials from Ansible
 Vault, and keeps every response body gzipped in `raw_payloads`. The Swift
-clients under `ios/RacesKit/Sources/RacesKit/Providers/` remain only until the
+clients under `packages/RacesKit/Sources/RacesKit/Providers/` remain only until the
 Swift rater is deleted; they are no longer on any request path.
 
 This matters more than a normal API doc would, because we don't own these APIs and
@@ -268,7 +268,7 @@ All calls are `POST` with a JSON body.
 
 ## Rate limiting
 
-Each provider gets its own `httpx.RateLimiter` (`server/internal/httpx`), since
+Each provider gets its own `httpx.RateLimiter` (`apps/server/internal/httpx`), since
 the limits are unrelated.
 
 | Provider | Limit applied | Why it is not a bottleneck |

@@ -307,7 +307,7 @@ func TestContractFixtures(t *testing.T) {
 		}
 		responses[name] = body
 	}
-	dir := "../../../ios/RacesKit/Tests/RacesKitTests/Fixtures/"
+	dir := "../../../../packages/RacesKit/Tests/RacesKitTests/Fixtures/"
 	for name, body := range responses {
 		var pretty bytes.Buffer
 		if err := json.Indent(&pretty, body, "", "  "); err != nil {

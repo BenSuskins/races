@@ -5,19 +5,19 @@ recommendation for each race, and track how well those recommendations actually 
 
 Three parts:
 
-- **`server/`** — a Go backend with one SQLite file, deployed as a container on
+- **`apps/server/`** — a Go backend with one SQLite file, deployed as a container on
   the homelab `docker` host and reached at `https://races-api.suskins.co.uk` over
   the LAN and Tailscale. It owns the two providers, the rater, the sealing rule,
   settlement, the accuracy record, retraining and back-tests. **It is where the
   history lives**, and it keeps every raw provider payload.
-- **`ios/RacesKit/`** — a Foundation-only Swift package: the domain models the
+- **`packages/RacesKit/`** — a Foundation-only Swift package: the domain models the
   app decodes the server's JSON into, the server client, and — until it is
   deleted — the Swift rater the Go one was ported from.
-- **`ios/Races/`** — a SwiftUI client that *reads*. It holds the server's
+- **`apps/ios/Races/`** — a SwiftUI client that *reads*. It holds the server's
   address and an API token, and nothing it does can change the record.
 
 Single user, several phones: every app talks to the same server with the same
-token. `server/README.md` has the API, the timetable and the configuration.
+token. `apps/server/README.md` has the API, the timetable and the configuration.
 
 ## What is left
 
@@ -33,7 +33,7 @@ covered only by the Linux job.
 `docs/providers.md` is the canonical list of every third-party endpoint we call
 (provider, tier required, rate limit, schedule, fields consumed, runnable `curl`).
 **Whenever you add, remove, or change a provider call in
-`server/internal/racingapi/` or `server/internal/betfair/`, update
+`apps/server/internal/racingapi/` or `apps/server/internal/betfair/`, update
 `docs/providers.md` in the same change.** Do not let it drift.
 
 It matters more than a typical API doc: we don't own these APIs, and the free/paid
@@ -43,12 +43,12 @@ boundary is invisible until a 403 arrives at runtime.
 
 | Component | Directory | Description |
 |-----------|-----------|-------------|
-| Server | `server/` | Go 1.25, `modernc.org/sqlite` (no cgo). Providers, matching, **the rating algorithm**, tracking, training, back-test, HTTP API |
-| Shared kit | `ios/RacesKit/` | Models, the server client, and the Swift rater kept for parity. Foundation-only so Linux CI tests it in seconds |
-| iOS app | `ios/Races/` | SwiftUI client — views, view models, Keychain |
+| Server | `apps/server/` | Go 1.25, `modernc.org/sqlite` (no cgo). Providers, matching, **the rating algorithm**, tracking, training, back-test, HTTP API |
+| Shared kit | `packages/RacesKit/` | Models, the server client, and the Swift rater kept for parity. Foundation-only so Linux CI tests it in seconds |
+| iOS app | `apps/ios/Races/` | SwiftUI client — views, view models, Keychain |
 
 ```
-server/
+apps/server/
 ├── cmd/races-server/   # Env config, wiring, HTTP server, scheduler
 └── internal/
     ├── domain/         # Race, Runner, RaceResult… in RacesKit's Codable JSON shape
@@ -71,11 +71,11 @@ server/
 
 | Target | Directory | Notes |
 |--------|-----------|-------|
-| `Races` | `ios/Races/Races/` | The app. Folder-synced group, so new files need no project edit |
-| `RacesTests` | `ios/Races/RacesTests/` | Unit tests hosted by the app, for what cannot live in the kit |
+| `Races` | `apps/ios/Races/Races/` | The app. Folder-synced group, so new files need no project edit |
+| `RacesTests` | `apps/ios/Races/RacesTests/` | Unit tests hosted by the app, for what cannot live in the kit |
 
 ```
-ios/Races/Races/
+apps/ios/Races/Races/
 ├── App/           # AppEnvironment + ServerLink, RacesStore (cache) + LegacyHistory, RacecardLoader
 ├── Components/    # StateContentView, ErrorStateView, RaceRow
 ├── Today/         # Today's and tomorrow's meetings
@@ -139,7 +139,7 @@ never records anything.
 Xcode — see the gotcha below. The macOS CI job is what validates it.
 
 ```
-ios/RacesKit/Sources/RacesKit/
+packages/RacesKit/Sources/RacesKit/
 ├── Core/          # ViewState, APIError, RetryPolicy, RateLimiter, HTTPClient, credentials
 ├── Server/        # RacesServing, RacesServerClient, the server's response types
 ├── Models/        # Course, Race, Runner, RaceResult — what the server's JSON decodes into
@@ -313,7 +313,7 @@ live in Ansible Vault, and only the server sees them.
 - **`Races.xcodeproj` was hand-written, so treat the macOS CI job as the thing
   that proves it works.** It uses `objectVersion = 77` with
   `PBXFileSystemSynchronizedRootGroup`, so adding a source file needs no project
-  edit at all — drop it in `ios/Races/Races/` and it is in the target. Opening the
+  edit at all — drop it in `apps/ios/Races/Races/` and it is in the target. Opening the
   project in Xcode and changing a setting will rewrite the file with Xcode's own
   UUIDs; that is fine and expected.
 - **Never name a simulator model in a `-destination`.** `name=iPhone 16,OS=latest`
@@ -331,7 +331,7 @@ live in Ansible Vault, and only the server sees them.
   `CURRENT_PROJECT_VERSION` by hand.)
 - **Two TestFlight prerequisites live in the project and are easy to delete by
   accident.** `ITSAppUsesNonExemptEncryption = false` in
-  `ios/Races/Races/Info.plist` is the export-compliance declaration — without it
+  `apps/ios/Races/Races/Info.plist` is the export-compliance declaration — without it
   every upload sits at "Missing Compliance" until the questionnaire is answered
   by hand. And `AppIcon.appiconset` must contain a real 1024×1024 PNG **with no
   alpha channel**; App Store Connect rejects the marketing icon otherwise.
@@ -504,9 +504,9 @@ Three workflows, split by cost rather than by tidiness.
 
 | Workflow | Job | Runs when |
 |---|---|---|
-| `server.yml` | `Server (Go)`, then `Image (GHCR)` on `main` | `server/**` or the `server-*.json` contract fixtures change |
-| `kit.yml` | `RacesKit (Linux)` | `ios/RacesKit/**` changes |
-| `app.yml` | `Races (Xcode)` | `ios/Races/**`, `ios/RacesKit/Sources/**` or `Package.swift` changes |
+| `server.yml` | `Server (Go)`, then `Image (GHCR)` on `main` | `apps/server/**` or the `server-*.json` contract fixtures change |
+| `kit.yml` | `RacesKit (Linux)` | `packages/RacesKit/**` changes |
+| `app.yml` | `Races (Xcode)` | `apps/ios/Races/**`, `packages/RacesKit/Sources/**` or `packages/RacesKit/Package.swift` changes |
 
 `server.yml` pushes `ghcr.io/bensuskins/races-server:latest` (and a `sha-` tag
 to roll back to) from `main`; the homelab's `update.yml` pulls it on its next
@@ -526,9 +526,9 @@ Two rules follow, and neither is cosmetic:
   monthly allowance from a single hang. Hangs are not hypothetical here: eleven
   synchronous `@MainActor` tests deadlocked on 2026-09-21 and the test phase ran
   12.8 minutes.
-- **The Xcode job's paths include `ios/RacesKit/Sources/**`, and that is not an
+- **The Xcode job's paths include `packages/RacesKit/Sources/**`, and that is not an
   oversight.** The app compiles against the kit, so a public API change there can
-  break the app target with no app file touched. Narrowing to `ios/Races/**`
+  break the app target with no app file touched. Narrowing to `apps/ios/Races/**`
   would save more and would lose real coverage. What *is* excluded is only what
   provably cannot affect the app build: the kit's own tests and fixtures.
 
@@ -565,24 +565,24 @@ uploaded from a phone keep their `device:` source and are labelled on screen.
   back-test — in milliseconds, and `api_test.go` drives the HTTP surface.
 - Prefer fakes over mocks; fakes live in the test target alongside what they fake.
 - Provider payloads are committed as fixtures under
-  `ios/RacesKit/Tests/RacesKitTests/Fixtures/` and loaded via `Fixture.load(_:)`.
+  `packages/RacesKit/Tests/RacesKitTests/Fixtures/` and loaded via `Fixture.load(_:)`.
   **Strip credentials before committing a fixture.**
 - The whole kit is testable with no network and no subscription. If a change can
   only be tested with live credentials, the seam is in the wrong place.
 
 ```bash
-(cd server && go test ./...)                    # the server, in seconds
-(cd server && go test ./internal/api ./internal/parity -update)  # regenerate the contract fixtures
-swift test --package-path ios/RacesKit          # the kit, including ServerContractTests and ServerParityTests
+(cd apps/server && go test ./...)                    # the server, in seconds
+(cd apps/server && go test ./internal/api ./internal/parity -update)  # regenerate the contract fixtures
+swift test --package-path packages/RacesKit          # the kit, including ServerContractTests and ServerParityTests
 
 # The app half. Needs macOS. CI runs this, resolving the simulator the same way.
-xcodebuild test -project ios/Races/Races.xcodeproj -scheme Races \
+xcodebuild test -project apps/ios/Races/Races.xcodeproj -scheme Races \
   -destination "platform=iOS Simulator,id=$(xcrun simctl list devices available -j \
     | jq -r '[.devices[][] | select(.name | startswith("iPhone"))] | .[0].udid')" \
   CODE_SIGNING_ALLOWED=NO
 ```
 
-App-side fakes live in `ios/Races/RacesTests/Fakes.swift`: `FakeRacesServer`
+App-side fakes live in `apps/ios/Races/RacesTests/Fakes.swift`: `FakeRacesServer`
 (scripted `Result`s per endpoint, defaulting to a loud "not scripted" failure,
 plus call counts and the jobs and uploads it received) and
 `InMemoryCredentialsStore` (which can also be told to throw, for the

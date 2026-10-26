@@ -6,13 +6,13 @@ name: Races app
 # allowance in a single day, and Actions stopped scheduling jobs entirely.
 #
 # So the paths below are deliberately narrower than `ios/**`, and deliberately
-# wider than `ios/Races/**`:
+# wider than `apps/ios/Races/**`:
 #
-#   ios/Races/**              the app and the hand-written pbxproj
-#   ios/RacesKit/Sources/**   the app compiles against the kit, so a public API
+#   apps/ios/Races/**              the app and the hand-written pbxproj
+#   packages/RacesKit/Sources/**   the app compiles against the kit, so a public API
 #                             change here can break the app target even though
 #                             no app file changed
-#   ios/RacesKit/Package.swift  target settings, isolation, platform version
+#   packages/RacesKit/Package.swift  target settings, isolation, platform version
 #
 # What that excludes is exactly what cannot affect the app build: the kit's own
 # tests and fixtures, and everything under docs/. Excluding kit *sources* would
@@ -21,15 +21,15 @@ on:
   push:
     branches: [main]
     paths:
-      - 'ios/Races/**'
-      - 'ios/RacesKit/Sources/**'
-      - 'ios/RacesKit/Package.swift'
+      - 'apps/ios/Races/**'
+      - 'packages/RacesKit/Sources/**'
+      - 'packages/RacesKit/Package.swift'
       - '.github/workflows/app.yml'
   pull_request:
     paths:
-      - 'ios/Races/**'
-      - 'ios/RacesKit/Sources/**'
-      - 'ios/RacesKit/Package.swift'
+      - 'apps/ios/Races/**'
+      - 'packages/RacesKit/Sources/**'
+      - 'packages/RacesKit/Package.swift'
       - '.github/workflows/app.yml'
 
 permissions:
@@ -43,7 +43,7 @@ concurrency:
 
 env:
   XCODE_VERSION: '26.1'
-  PROJECT_PATH: ios/Races/Races.xcodeproj
+  PROJECT_PATH: apps/ios/Races/Races.xcodeproj
   SCHEME: Races
 
 jobs:
@@ -76,7 +76,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/Library/Caches/org.swift.swiftpm
-          key: spm-${{ runner.os }}-${{ env.XCODE_VERSION }}-${{ hashFiles('ios/RacesKit/Package.swift', 'ios/Races/Races.xcodeproj/project.pbxproj') }}
+          key: spm-${{ runner.os }}-${{ env.XCODE_VERSION }}-${{ hashFiles('packages/RacesKit/Package.swift', 'apps/ios/Races/Races.xcodeproj/project.pbxproj') }}
           restore-keys: |
             spm-${{ runner.os }}-${{ env.XCODE_VERSION }}-
 

@@ -3,7 +3,7 @@ import XCTest
 
 /// Pins the Swift rater to the Go one that replaced it on the server.
 ///
-/// `server/internal/parity` rates `racingapi-racecards-free.json` under every
+/// `apps/server/internal/parity` rates `racingapi-racecards-free.json` under every
 /// preset, with and without a market, and commits the numbers as
 /// `server-golden-rating.json`. This rates the same fixture here and asserts
 /// the same numbers. While both raters exist, neither can drift: a changed

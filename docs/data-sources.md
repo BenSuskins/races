@@ -2,7 +2,7 @@
 
 **This file is not `docs/providers.md`.** That one lists the endpoints the app
 actually calls and must stay in step with
-`ios/RacesKit/Sources/RacesKit/Providers/`. This one lists sources we *looked at*
+`packages/RacesKit/Sources/RacesKit/Providers/`. This one lists sources we *looked at*
 and what we decided about each. **Nothing in this file is wired up.** A source
 moves from here to `providers.md` only when a call site exists.
 
@@ -67,7 +67,7 @@ the **wrong** market anchors every runner to another race's prices and looks
 entirely normal. A third feed does not divide that risk, it adds to it.
 
 Concretely, `RaceMatcher.match(races:markets:tolerances:)`
-(`ios/RacesKit/Sources/RacesKit/Matching/RaceMatcher.swift:134`) takes one flat
+(`packages/RacesKit/Sources/RacesKit/Matching/RaceMatcher.swift:134`) takes one flat
 `[ExchangeMarket]` and maintains a single `claimedMarketIDs` set
 (`RaceMatcher.swift:146`). Feed it two
 providers' catalogues concatenated and they **compete** for each race rather than
@@ -78,7 +78,7 @@ depends on resolving unambiguously hours later at settlement.
 
 The favourable half is real too: `ExchangeMarket`, `MarketSnapshotJoin` and
 `RaceMatcher` are already provider-agnostic and Foundation-only.
-`ios/RacesKit/Sources/RacesKit/Matching/ExchangeMarket.swift:3-8` says so
+`packages/RacesKit/Sources/RacesKit/Matching/ExchangeMarket.swift:3-8` says so
 outright — a Betfair catalogue entry maps into it, "so could anything else."
 
 The conclusion to draw is a preference, not a prohibition:
@@ -319,5 +319,5 @@ recording *why not* is most of the value here, because otherwise the same
 evaluation gets redone in six months from the same starting ignorance.
 
 A source leaves this file for `docs/providers.md` only when a call site exists in
-`ios/RacesKit/Sources/RacesKit/Providers/`, and `CLAUDE.md`'s doc-drift rule takes
+`packages/RacesKit/Sources/RacesKit/Providers/`, and `CLAUDE.md`'s doc-drift rule takes
 over from there.
