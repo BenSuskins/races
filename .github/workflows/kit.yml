@@ -14,9 +14,9 @@ name: RacesKit
 on:
   push:
     branches: [main]
-    paths: ['ios/RacesKit/**', '.github/workflows/kit.yml']
+    paths: ['packages/RacesKit/**', '.github/workflows/kit.yml']
   pull_request:
-    paths: ['ios/RacesKit/**', '.github/workflows/kit.yml']
+    paths: ['packages/RacesKit/**', '.github/workflows/kit.yml']
 
 permissions:
   contents: read
@@ -38,7 +38,7 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
-  PACKAGE_PATH: ios/RacesKit
+  PACKAGE_PATH: packages/RacesKit
 
 jobs:
   # RacesKit is deliberately Foundation-only, so it builds and tests on Linux in
@@ -93,7 +93,7 @@ jobs:
           path: |
             ~/.cache/org.swift.swiftpm
             ${{ env.PACKAGE_PATH }}/.build
-          key: spm-swift${{ matrix.swift }}-${{ hashFiles('ios/RacesKit/Package.swift', 'ios/RacesKit/Sources/**/*.swift', 'ios/RacesKit/Tests/**/*.swift') }}
+          key: spm-swift${{ matrix.swift }}-${{ hashFiles('packages/RacesKit/Package.swift', 'packages/RacesKit/Sources/**/*.swift', 'packages/RacesKit/Tests/**/*.swift') }}
           restore-keys: |
             spm-swift${{ matrix.swift }}-
 

@@ -25,7 +25,7 @@ SIZE = 1024
 SUPERSAMPLE = 2  # rendered at 2048 and averaged down: 4 samples per pixel
 
 OUT = Path(__file__).resolve().parent.parent / (
-    "ios/Races/Races/Assets.xcassets/AppIcon.appiconset")
+    "apps/ios/Races/Races/Assets.xcassets/AppIcon.appiconset")
 
 
 class Palette:

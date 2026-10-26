@@ -8,10 +8,22 @@ UK horse racing for iOS. Browse **course → race → runner**, get an explainab
 recommendation for each race, and see honestly how well those recommendations do.
 
 Native SwiftUI app, backed by a small Go server on the homelab
-([`server/`](../server/README.md)) that talks to the two providers, rates and seals
-every race on a clock, and keeps the whole history in SQLite — including every
+([`apps/server/`](../apps/server/README.md)) that talks to the two providers,
+rates and seals every race on a clock, and keeps the whole history in SQLite — including every
 raw provider response, so future models can be trained and back-tested against
 it. The app reads from the server over the LAN or Tailscale.
+
+## Project Structure
+
+```text
+apps/
+├── ios/
+│   └── Races/       # SwiftUI app and XCTest target
+└── server/          # Go API and container image
+packages/
+└── RacesKit/        # Shared Swift models, client, and Foundation-only tests
+docs/               # Project documentation
+```
 
 ## Status
 
@@ -75,7 +87,7 @@ so on screen.
 ## Development
 
 ```bash
-cd .. && swift test --package-path ios/RacesKit      # the fast loop; runs on Linux
+swift test --package-path packages/RacesKit      # the fast loop; runs on Linux
 ```
 
 The whole kit — networking, matching, rating, storage — is testable with no

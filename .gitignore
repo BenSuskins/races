@@ -2,11 +2,11 @@
 .DS_Store
 
 # Xcode
-ios/build/
-ios/DerivedData/
-ios/**/*.xcodeproj/xcuserdata/
-ios/**/*.xcodeproj/project.xcworkspace/xcuserdata/
-ios/**/*.xcworkspace/xcuserdata/
+apps/ios/build/
+apps/ios/DerivedData/
+apps/ios/**/*.xcodeproj/xcuserdata/
+apps/ios/**/*.xcodeproj/project.xcworkspace/xcuserdata/
+apps/ios/**/*.xcworkspace/xcuserdata/
 
 # Swift Package Manager
 .build/

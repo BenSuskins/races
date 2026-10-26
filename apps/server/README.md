@@ -212,15 +212,15 @@ for byte by the Go tests:
   asserted by RacesKit's `ServerParityTests`. Regenerate with
   `go test ./internal/parity -update`.
 
-Regenerating either means running `swift test --package-path ios/RacesKit`
+Regenerating either means running `swift test --package-path packages/RacesKit`
 before merging.
 
 ## Running it
 
 ```bash
-go test ./...                 # everything, in seconds
-go run ./cmd/races-server     # with the environment above
-docker build -t races-server server/
+(cd apps/server && go test ./...)                 # everything, in seconds
+(cd apps/server && go run ./cmd/races-server)     # with the environment above
+docker build -t races-server apps/server/
 ```
 
 ## Backups

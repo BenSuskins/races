@@ -8,19 +8,19 @@ name: Races server
 # namespaced so it cannot cancel the other two.
 #
 # The contract fixtures the app decodes are written by this module's tests into
-# ios/RacesKit/Tests/RacesKitTests/Fixtures/, and those tests compare them byte
+# packages/RacesKit/Tests/RacesKitTests/Fixtures/, and those tests compare them byte
 # for byte — so a change to a fixture there must run this job too.
 on:
   push:
     branches: [main]
     paths:
-      - 'server/**'
-      - 'ios/RacesKit/Tests/RacesKitTests/Fixtures/server-*.json'
+      - 'apps/server/**'
+      - 'packages/RacesKit/Tests/RacesKitTests/Fixtures/server-*.json'
       - '.github/workflows/server.yml'
   pull_request:
     paths:
-      - 'server/**'
-      - 'ios/RacesKit/Tests/RacesKitTests/Fixtures/server-*.json'
+      - 'apps/server/**'
+      - 'packages/RacesKit/Tests/RacesKitTests/Fixtures/server-*.json'
       - '.github/workflows/server.yml'
   workflow_dispatch:
 
@@ -41,14 +41,14 @@ jobs:
     timeout-minutes: 10
     defaults:
       run:
-        working-directory: server
+        working-directory: apps/server
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: server/go.mod
-          cache-dependency-path: server/go.sum
+          go-version-file: apps/server/go.mod
+          cache-dependency-path: apps/server/go.sum
 
       - name: Format
         run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
@@ -83,7 +83,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: server
+          context: apps/server
           push: true
           build-args: VERSION=${{ github.sha }}
           tags: |

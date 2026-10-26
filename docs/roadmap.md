@@ -13,7 +13,7 @@ Updated 2026-09-24, when the Go server replaced the on-device pipeline.
 
 ## The server — deploy and follow-ups
 
-The Go server (`server/`) now owns the providers, rating, sealing, settlement,
+The Go server (`apps/server/`) now owns the providers, rating, sealing, settlement,
 retraining and back-tests; the app reads from it. What is left to make that real:
 
 ### Deploy it
@@ -108,7 +108,7 @@ account.
 
 A script that pulls a real card and its results with your Racing API credentials,
 plus the corresponding Betfair catalogue, strips credentials, and writes committed
-fixtures under `ios/RacesKit/Tests/RacesKitTests/Fixtures/`.
+fixtures under `packages/RacesKit/Tests/RacesKitTests/Fixtures/`.
 
 This is the **prerequisite nothing else admits to needing**. `docs/matching.md`
 already says it plainly under Known limitations:

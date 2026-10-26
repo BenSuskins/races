@@ -169,7 +169,7 @@
 			mainGroup = 0A00000000000000000000A2;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				0A00000000000000000000D1 /* XCLocalSwiftPackageReference "../RacesKit" */,
+				0A00000000000000000000D1 /* XCLocalSwiftPackageReference "../../../packages/RacesKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0A00000000000000000000A3 /* Products */;
@@ -497,9 +497,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		0A00000000000000000000D1 /* XCLocalSwiftPackageReference "../RacesKit" */ = {
+		0A00000000000000000000D1 /* XCLocalSwiftPackageReference "../../../packages/RacesKit" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = ../RacesKit;
+			relativePath = ../../../packages/RacesKit;
 		};
 /* End XCLocalSwiftPackageReference section */
 
