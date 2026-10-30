@@ -1,0 +1,58 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps-actions)"
+    labels:
+      - "dependencies"
+    groups:
+      actions-minor:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "swift"
+    directory: "/packages/RacesKit"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps-races-kit)"
+    labels:
+      - "dependencies"
+    groups:
+      races-kit-minor:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "gomod"
+    directory: "/apps/server"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps-races-server)"
+    labels:
+      - "dependencies"
+    groups:
+      races-server-minor:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "docker"
+    directory: "/apps/server"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps-races-server-container)"
+    labels:
+      - "dependencies"
+    groups:
+      races-server-container-minor:
+        update-types:
+          - "minor"
+          - "patch"
