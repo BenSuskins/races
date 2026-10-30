@@ -74,7 +74,7 @@ jobs:
         swift: ['6.2']
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Cheap, and it puts the exact toolchain in the log — useful when a build
       # succeeds locally and fails here, or the reverse.
