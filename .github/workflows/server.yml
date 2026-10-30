@@ -81,7 +81,7 @@ jobs:
       # `latest` is what the homelab task pulls, as its other self-built
       # images do; the sha tag is there to roll back to.
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: apps/server
           push: true
