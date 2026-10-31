@@ -25,6 +25,10 @@ packages/
 docs/               # Project documentation
 ```
 
+## Architecture
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for system design, components, and data flow.
+
 ## Status
 
 Everything in the original plan is built and on TestFlight. What is left, and what
