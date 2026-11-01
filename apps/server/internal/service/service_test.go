@@ -12,6 +12,7 @@ import (
 
 	"github.com/bensuskins/races/server/internal/backtest"
 	"github.com/bensuskins/races/server/internal/domain"
+	"github.com/bensuskins/races/server/internal/importer"
 	"github.com/bensuskins/races/server/internal/matching"
 	"github.com/bensuskins/races/server/internal/rating"
 	"github.com/bensuskins/races/server/internal/store"
@@ -97,6 +98,20 @@ type clock struct{ t time.Time }
 
 func (c *clock) now() time.Time { return c.t }
 
+type testImportStore struct{ *store.Store }
+
+func (r testImportStore) ImportTransaction(ctx context.Context, run func(importer.Transaction) error) error {
+	return r.Store.Tx(ctx, func(transaction *store.Tx) error { return run(transaction) })
+}
+
+func testPersistence(st *store.Store) Persistence {
+	return Persistence{Imports: testImportStore{st}, Weights: st, Jobs: st, Cards: st, Markets: st, Tips: st, Results: st, Training: st, Documents: st, History: st, Assessments: st}
+}
+
+func testStore(service *Service) *store.Store {
+	return service.ports.Tips.(*store.Store)
+}
+
 func setup(t *testing.T) (*Service, *fakeRacing, *fakeMarkets, *clock, domain.Race, domain.Race) {
 	t.Helper()
 	st, err := store.Open(context.Background(), ":memory:")
@@ -114,7 +129,7 @@ func setup(t *testing.T) (*Service, *fakeRacing, *fakeMarkets, *clock, domain.Ra
 		"1.22": {},
 	}}
 	c := &clock{t: day.Add(9 * time.Hour)}
-	s := New(st, racing, markets, c.now, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	s := New(testPersistence(st), racing, markets, c.now, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err := s.Bootstrap(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -127,11 +142,11 @@ func TestADayEndToEnd(t *testing.T) {
 	s.Execute(ctx, Everything)
 
 	// Morning: both races drafted, neither sealed.
-	row, _ := s.Store.Tip(ctx, "rac_1")
+	row, _ := testStore(s).Tip(ctx, "rac_1")
 	if row == nil || row.Tip.IsSealed() || row.Tip.WasFormOnly {
 		t.Fatalf("race 1 should be a priced draft: %+v", row)
 	}
-	row2, _ := s.Store.Tip(ctx, "rac_2")
+	row2, _ := testStore(s).Tip(ctx, "rac_2")
 	if row2 == nil || !row2.Tip.WasFormOnly || row2.Tip.MarketReference == nil {
 		t.Fatal("a matched market with no prices is form-only but keeps its reference for SP")
 	}
@@ -140,20 +155,20 @@ func TestADayEndToEnd(t *testing.T) {
 	// training snapshot.
 	c.t = first.OffDateTime.Add(-3 * time.Minute)
 	s.Execute(ctx, PlanFor(c.t))
-	row, _ = s.Store.Tip(ctx, "rac_1")
+	row, _ = testStore(s).Tip(ctx, "rac_1")
 	if !row.Tip.IsSealed() || row.Source != "server" {
 		t.Fatal("inside the window the tip is sealed")
 	}
 	sealedAt := row.Tip.SealedAt.Time
-	if snap, _ := s.Store.LatestSnapshot(ctx, "rac_1", "seal"); snap == nil {
+	if snap, _ := testStore(s).LatestSnapshot(ctx, "rac_1", "seal"); snap == nil {
 		t.Fatal("the prices it was sealed on are kept")
 	}
-	if _, pending := s.Store.TrainingCounts(ctx); pending != 1 {
+	if _, pending := testStore(s).TrainingCounts(ctx); pending != 1 {
 		t.Fatal("a training snapshot is frozen at the seal")
 	}
 	c.t = c.t.Add(time.Minute)
 	s.Execute(ctx, PlanFor(c.t))
-	if row, _ = s.Store.Tip(ctx, "rac_1"); !row.Tip.SealedAt.Time.Equal(sealedAt) {
+	if row, _ = testStore(s).Tip(ctx, "rac_1"); !row.Tip.SealedAt.Time.Equal(sealedAt) {
 		t.Fatal("a sealed tip is never rewritten")
 	}
 
@@ -167,7 +182,7 @@ func TestADayEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	row, _ = s.Store.Tip(ctx, "rac_1")
+	row, _ = testStore(s).Tip(ctx, "rac_1")
 	if row.Tip.Outcome == nil || row.Tip.Outcome.Kind != tracking.Won || *row.Tip.Outcome.BetfairSP != 3.1 {
 		t.Fatalf("settled won at BSP: %+v", row.Tip.Outcome)
 	}
@@ -176,7 +191,7 @@ func TestADayEndToEnd(t *testing.T) {
 	}
 	// Race 2 was never inside the seal window while the server looked, so its
 	// draft is settled as it stands — exactly what the device ledger did.
-	if row2, _ = s.Store.Tip(ctx, "rac_2"); row2.Tip.Outcome == nil {
+	if row2, _ = testStore(s).Tip(ctx, "rac_2"); row2.Tip.Outcome == nil {
 		t.Fatal("race 2 settled")
 	}
 
@@ -186,18 +201,18 @@ func TestADayEndToEnd(t *testing.T) {
 	}
 
 	// The sealed race replays through any weights, against the market.
-	beforeChange, err := backtest.Run(ctx, s.Store, rating.V2(), backtest.Request{From: "2026-09-20", To: "2026-09-20"})
+	beforeChange, err := backtest.Run(ctx, testStore(s), rating.V2(), backtest.Request{From: "2026-09-20", To: "2026-09-20"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	changed := first
 	changed.Name = "Updated after sealing"
 	changed.Runners = changed.Runners[:1]
-	if err := s.Store.SaveRaces(ctx, []domain.Race{changed}, c.t.Add(time.Hour)); err != nil {
+	if err := testStore(s).SaveRaces(ctx, []domain.Race{changed}, c.t.Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	for _, w := range []rating.Weights{rating.V2(), rating.MarketOnly()} {
-		rep, err := backtest.Run(ctx, s.Store, w, backtest.Request{From: "2026-09-20", To: "2026-09-20"})
+		rep, err := backtest.Run(ctx, testStore(s), w, backtest.Request{From: "2026-09-20", To: "2026-09-20"})
 		if err != nil || rep.Rerated.Races != 1 || rep.HighestProbability.Races != rep.ValueSelection.Races || rep.CorpusID == "" || rep.Snapshots != 1 || rep.Rerated.LogLoss == nil || rep.MarketLogLoss == nil || rep.BeatsMarket == nil {
 			t.Fatalf("%s: %+v %v", w.ID, rep, err)
 		}
@@ -209,7 +224,7 @@ func TestADayEndToEnd(t *testing.T) {
 			t.Fatal("a later card refresh changed the sealed replay")
 		}
 	}
-	if rep, _ := backtest.Run(ctx, s.Store, rating.V2(), backtest.Request{From: "2026-09-21"}); rep.Rerated.Races != 0 {
+	if rep, _ := backtest.Run(ctx, testStore(s), rating.V2(), backtest.Request{From: "2026-09-21"}); rep.Rerated.Races != 0 {
 		t.Fatal("the date range is applied")
 	}
 }
@@ -217,7 +232,7 @@ func TestADayEndToEnd(t *testing.T) {
 func TestMarketMovementFreezesFirstObservedPricesAtSeal(t *testing.T) {
 	ctx := context.Background()
 	s, _, markets, _, race, _ := setup(t)
-	if err := s.Store.SaveRaces(ctx, []domain.Race{race}, race.OffDateTime.Add(-time.Hour)); err != nil {
+	if err := testStore(s).SaveRaces(ctx, []domain.Race{race}, race.OffDateTime.Add(-time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.RefreshMarkets(ctx, domain.Today); err != nil {
@@ -235,7 +250,7 @@ func TestMarketMovementFreezesFirstObservedPricesAtSeal(t *testing.T) {
 	if _, err := s.rateAndRecord(ctx, []domain.Race{race}, "display", latestAt); err != nil {
 		t.Fatal(err)
 	}
-	assessment, err := s.Store.Assessment(ctx, race.ID)
+	assessment, err := testStore(s).Assessment(ctx, race.ID)
 	if err != nil || assessment == nil {
 		t.Fatalf("latest assessment missing: %v", err)
 	}
@@ -259,7 +274,7 @@ func TestMarketMovementFreezesFirstObservedPricesAtSeal(t *testing.T) {
 	if _, err := s.rateAndRecord(ctx, []domain.Race{race}, "seal", sealAt); err != nil {
 		t.Fatal(err)
 	}
-	sealed, err := s.Store.LatestSnapshot(ctx, race.ID, "seal")
+	sealed, err := testStore(s).LatestSnapshot(ctx, race.ID, "seal")
 	if err != nil || sealed == nil || sealed.FirstObservedAt == nil || !sealed.FirstObservedAt.Equal(openingAt) || *sealed.FirstObservedPrices[race.Runners[0].ID].BackPrice != 2.5 {
 		t.Fatalf("seal snapshot did not freeze the first observed prices: %+v, %v", sealed, err)
 	}
@@ -285,7 +300,7 @@ func TestRaceFirstSeenAfterTheOffIsNeverRecorded(t *testing.T) {
 	s, _, _, c, first, _ := setup(t)
 	c.t = first.OffDateTime.Add(time.Minute)
 	s.Execute(ctx, Everything)
-	if row, _ := s.Store.Tip(ctx, "rac_1"); row != nil {
+	if row, _ := testStore(s).Tip(ctx, "rac_1"); row != nil {
 		t.Fatal("a race opened after it has run never enters the tracker")
 	}
 }
@@ -295,7 +310,7 @@ func TestStartingPriceFailureCostsOnlyROI(t *testing.T) {
 	s, racing, markets, c, first, _ := setup(t)
 	c.t = first.OffDateTime.Add(-2 * time.Minute)
 	s.Execute(ctx, Everything)
-	row, _ := s.Store.Tip(ctx, "rac_1")
+	row, _ := testStore(s).Tip(ctx, "rac_1")
 	racing.results = []domain.RaceResult{result(first, row.Tip.SelectionHorseID)}
 	markets.spErr = errors.New("betfair down")
 	c.t = first.OffDateTime.Add(time.Hour)
@@ -303,7 +318,7 @@ func TestStartingPriceFailureCostsOnlyROI(t *testing.T) {
 	if err != nil || !ing.PricesFailed {
 		t.Fatal(err)
 	}
-	row, _ = s.Store.Tip(ctx, "rac_1")
+	row, _ = testStore(s).Tip(ctx, "rac_1")
 	if row.Tip.Outcome.Kind != tracking.Won || row.Tip.Outcome.BetfairSP != nil {
 		t.Fatal("settled on the result alone")
 	}
@@ -314,7 +329,7 @@ func TestWithoutBetfairEverythingIsFormOnly(t *testing.T) {
 	s, _, _, _, _, _ := setup(t)
 	s.Markets = nil
 	s.Execute(ctx, Everything)
-	row, _ := s.Store.Tip(ctx, "rac_1")
+	row, _ := testStore(s).Tip(ctx, "rac_1")
 	if row == nil || !row.Tip.WasFormOnly || row.Tip.MarketReference != nil {
 		t.Fatal("no Betfair is an ordinary state")
 	}
@@ -351,7 +366,7 @@ func TestBaselineBacktestStoresReportAndStatus(t *testing.T) {
 	if err != nil || reportID == 0 || report.WeightsID != "v3" {
 		t.Fatalf("baseline report was not stored: %d %+v %v", reportID, report, err)
 	}
-	runs, err := s.Store.JobRuns(ctx)
+	runs, err := testStore(s).JobRuns(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -372,7 +387,7 @@ func TestBootstrapMovesV2OntoV3AndLeavesTrainedSetsAlone(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.Close() })
-	s := New(st, &fakeRacing{}, nil, time.Now, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	s := New(testPersistence(st), &fakeRacing{}, nil, time.Now, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 	if err := s.Bootstrap(ctx); err != nil {
 		t.Fatal(err)
@@ -416,7 +431,7 @@ func TestReplayMarketGateUsesTheSameRaces(t *testing.T) {
 	if _, err := service.CollectResults(ctx); err != nil {
 		t.Fatal(err)
 	}
-	report, err := backtest.Run(ctx, service.Store, rating.MarketOnly(), backtest.Request{})
+	report, err := backtest.Run(ctx, testStore(service), rating.MarketOnly(), backtest.Request{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -439,13 +454,13 @@ func TestResultsUseSealCardMetadataAndKeepThePredictionCutoff(t *testing.T) {
 	race.Runners[0].DamsireID = sp("original-damsire")
 	race.Runners[0].Headgear = sp("b")
 	race.Runners[0].HeadgearKnown = true
-	if err := service.Store.SaveSealedTip(context, tracking.Tip{RaceID: race.ID}, race, "server", clock.t); err != nil {
+	if err := testStore(service).SaveSealedTip(context, tracking.Tip{RaceID: race.ID}, race, "server", clock.t); err != nil {
 		t.Fatal(err)
 	}
 	changed := race
 	changed.Runners = append([]domain.Runner(nil), race.Runners...)
 	changed.Runners[0].SireID = sp("changed-sire")
-	if err := service.Store.SaveRaces(context, []domain.Race{changed}, clock.t); err != nil {
+	if err := testStore(service).SaveRaces(context, []domain.Race{changed}, clock.t); err != nil {
 		t.Fatal(err)
 	}
 	provider.results = []domain.RaceResult{result(race, race.Runners[0].ID)}
@@ -453,7 +468,7 @@ func TestResultsUseSealCardMetadataAndKeepThePredictionCutoff(t *testing.T) {
 	if _, err := service.CollectResults(context); err != nil {
 		t.Fatal(err)
 	}
-	stored, err := service.Store.Result(context, race.ID)
+	stored, err := testStore(service).Result(context, race.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -461,11 +476,11 @@ func TestResultsUseSealCardMetadataAndKeepThePredictionCutoff(t *testing.T) {
 	if finisher.SireID == nil || *finisher.SireID != "original-sire" || finisher.DamsireID == nil || !finisher.HeadgearKnown || finisher.Headgear == nil || *finisher.Headgear != "b" {
 		t.Fatalf("result metadata must come from the seal card: %+v", finisher)
 	}
-	earlier, err := service.Store.ResultFactsKnownBefore(context, clock.t)
+	earlier, err := testStore(service).ResultFactsKnownBefore(context, clock.t)
 	if err != nil || len(earlier) != 0 {
 		t.Fatalf("results at the cutoff must remain excluded: %d, %v", len(earlier), err)
 	}
-	later, err := service.Store.ResultFactsKnownBefore(context, clock.t.Add(time.Second))
+	later, err := testStore(service).ResultFactsKnownBefore(context, clock.t.Add(time.Second))
 	if err != nil || len(later) != 1 || later[0].Finishers[0].SireID == nil {
 		t.Fatalf("new metadata must persist in the immutable result facts: %+v, %v", later, err)
 	}

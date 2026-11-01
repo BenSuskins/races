@@ -18,6 +18,7 @@ import (
 	_ "modernc.org/sqlite" // pure Go, so the image needs no cgo
 
 	"github.com/bensuskins/races/server/internal/domain"
+	"github.com/bensuskins/races/server/internal/matching"
 	"github.com/bensuskins/races/server/internal/rating"
 	"github.com/bensuskins/races/server/internal/tracking"
 	"github.com/bensuskins/races/server/internal/training"
@@ -295,13 +296,7 @@ func (s *Store) ResultsOn(ctx context.Context, date string) ([]domain.RaceResult
 // MARK: - Market matches and snapshots
 
 // MatchRow is a race's current market, or why it has none.
-type MatchRow struct {
-	RaceID    string                  `json:"raceID"`
-	MarketID  string                  `json:"marketID,omitempty"`
-	MatchedAt time.Time               `json:"-"`
-	Reference *domain.MarketReference `json:"reference,omitempty"`
-	Refusal   json.RawMessage         `json:"refusal,omitempty"`
-}
+type MatchRow = matching.Record
 
 func (s *Store) SaveMatch(ctx context.Context, m MatchRow) error {
 	var ref, refusal, market any
@@ -443,10 +438,7 @@ func (s *Store) AssessmentsOn(ctx context.Context, date string) (map[string]rati
 // MARK: - Tips
 
 // TipRow is a tip plus where it came from.
-type TipRow struct {
-	Tip    tracking.Tip
-	Source string
-}
+type TipRow = tracking.RecordedTip
 
 func (s *Store) SaveTip(ctx context.Context, t tracking.Tip, source string, at time.Time) error {
 	return saveTip(ctx, s.db, t, source, at)
@@ -625,12 +617,7 @@ func (s *Store) WeightsIDsInUse(ctx context.Context) (map[string]int, error) {
 // MARK: - Weights
 
 // WeightsRow is a stored weight set.
-type WeightsRow struct {
-	Weights   rating.Weights `json:"weights"`
-	Origin    string         `json:"origin"`
-	CreatedAt domain.Instant `json:"createdAt"`
-	Active    bool           `json:"active"`
-}
+type WeightsRow = rating.StoredWeights
 
 // EnsureWeights inserts a set if its id is new. Existing ids are never
 // overwritten: an id names one set of numbers forever.
@@ -815,13 +802,7 @@ func (s *Store) SaveBacktest(ctx context.Context, weightsID string, request, rep
 }
 
 // BacktestRow is a stored back-test.
-type BacktestRow struct {
-	ID        int64           `json:"id"`
-	CreatedAt domain.Instant  `json:"createdAt"`
-	WeightsID string          `json:"weightsID"`
-	Request   json.RawMessage `json:"request"`
-	Report    json.RawMessage `json:"report"`
-}
+type BacktestRow = domain.StoredBacktest
 
 func (s *Store) Backtests(ctx context.Context, id int64) ([]BacktestRow, error) {
 	q := `SELECT id, created_at, weights_id, request, report FROM backtests`
@@ -853,14 +834,7 @@ func (s *Store) SaveImport(ctx context.Context, device string, summary any, raw 
 }
 
 // JobRun is the last run of a scheduled job.
-type JobRun struct {
-	Name        string          `json:"name"`
-	StartedAt   *domain.Instant `json:"startedAt,omitempty"`
-	FinishedAt  *domain.Instant `json:"finishedAt,omitempty"`
-	SucceededAt *domain.Instant `json:"succeededAt,omitempty"`
-	Error       string          `json:"error,omitempty"`
-	Summary     string          `json:"summary,omitempty"`
-}
+type JobRun = domain.JobRun
 
 func (s *Store) JobStarted(ctx context.Context, name string, at time.Time) {
 	s.db.ExecContext(ctx, `INSERT INTO job_runs (name, started_at) VALUES (?,?) ON CONFLICT(name) DO UPDATE SET started_at = excluded.started_at`, name, ts(at))
@@ -901,9 +875,7 @@ func (s *Store) JobRuns(ctx context.Context) ([]JobRun, error) {
 }
 
 // Counts for /metrics and /v1/status.
-type Counts struct {
-	Races, Results, Tips, SealedTips, SettledTips, Payloads, TrainingSettled, TrainingPending int
-}
+type Counts = domain.Counts
 
 func (s *Store) Counts(ctx context.Context) Counts {
 	var c Counts

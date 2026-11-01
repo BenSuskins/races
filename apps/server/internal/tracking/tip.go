@@ -72,7 +72,18 @@ func (o *Outcome) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &wrapper); err != nil {
 		return err
 	}
+	if len(wrapper) != 1 {
+		return fmt.Errorf("outcome: expected exactly one kind, got %d", len(wrapper))
+	}
 	for kind, body := range wrapper {
+		switch kind {
+		case Won, Lost, NonRunner, Abandoned, Unresolved, Expired:
+		default:
+			return fmt.Errorf("outcome: unknown kind %q", kind)
+		}
+		if string(body) == "null" {
+			return fmt.Errorf("outcome: missing %q payload", kind)
+		}
 		var v struct {
 			BetfairSP     *float64        `json:"betfairSP"`
 			Position      *int            `json:"position"`
@@ -90,11 +101,7 @@ func (o *Outcome) UnmarshalJSON(data []byte) error {
 		if v.At != nil {
 			o.At = *v.At
 		}
-		switch kind {
-		case Won, Lost, NonRunner, Abandoned, Unresolved, Expired:
-			return nil
-		}
-		return fmt.Errorf("outcome: unknown kind %q", kind)
+		return nil
 	}
 	return fmt.Errorf("outcome: empty object")
 }
@@ -162,5 +169,50 @@ func NewTip(a rating.Assessment, race domain.Race, ref *domain.MarketReference, 
 	if t.Contributions == nil {
 		t.Contributions = []rating.Contribution{}
 	}
-	return t, true
+	return copyTip(t), true
+}
+
+func copyPointer[T any](value *T) *T {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	return &copy
+}
+
+func copyTip(tip Tip) Tip {
+	tip.OffAt = copyPointer(tip.OffAt)
+	tip.MarketProbabilityAtTip = copyPointer(tip.MarketProbabilityAtTip)
+	tip.MarketBackPriceAtTip = copyPointer(tip.MarketBackPriceAtTip)
+	tip.MarketFavouriteHorseID = copyPointer(tip.MarketFavouriteHorseID)
+	tip.AgreedWithFavourite = copyPointer(tip.AgreedWithFavourite)
+	tip.SealedAt = copyPointer(tip.SealedAt)
+	if tip.Contributions != nil {
+		tip.Contributions = append([]rating.Contribution{}, tip.Contributions...)
+		for i := range tip.Contributions {
+			tip.Contributions[i].ZScore = copyPointer(tip.Contributions[i].ZScore)
+		}
+	}
+	if tip.MarketReference != nil {
+		reference := *tip.MarketReference
+		if reference.SelectionIDsByHorseID != nil {
+			reference.SelectionIDsByHorseID = make(map[string]int64, len(tip.MarketReference.SelectionIDsByHorseID))
+			for horseID, selectionID := range tip.MarketReference.SelectionIDsByHorseID {
+				reference.SelectionIDsByHorseID[horseID] = selectionID
+			}
+		}
+		tip.MarketReference = &reference
+	}
+	if tip.Outcome != nil {
+		outcome := *tip.Outcome
+		outcome.BetfairSP = copyPointer(outcome.BetfairSP)
+		outcome.Position = copyPointer(outcome.Position)
+		tip.Outcome = &outcome
+	}
+	if tip.FavouriteOutcome != nil {
+		favourite := *tip.FavouriteOutcome
+		favourite.BetfairSP = copyPointer(favourite.BetfairSP)
+		tip.FavouriteOutcome = &favourite
+	}
+	return tip
 }

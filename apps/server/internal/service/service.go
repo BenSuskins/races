@@ -21,7 +21,6 @@ import (
 	"github.com/bensuskins/races/server/internal/httpx"
 	"github.com/bensuskins/races/server/internal/matching"
 	"github.com/bensuskins/races/server/internal/rating"
-	"github.com/bensuskins/races/server/internal/store"
 	"github.com/bensuskins/races/server/internal/tracking"
 	"github.com/bensuskins/races/server/internal/training"
 )
@@ -44,7 +43,6 @@ type MarketData interface {
 // Service owns the jobs. Jobs are serialised by one mutex: a seal and a
 // results ingest must never interleave.
 type Service struct {
-	Store   *store.Store
 	Racing  RacingData
 	Markets MarketData
 	Now     func() time.Time
@@ -53,6 +51,8 @@ type Service struct {
 	Regions []string
 	// Training is the retraining configuration.
 	Training training.Configuration
+
+	ports Persistence
 
 	mu sync.Mutex
 }
@@ -63,14 +63,14 @@ const (
 	sourceServer           = "server"
 )
 
-func New(st *store.Store, racing RacingData, markets MarketData, now func() time.Time, log *slog.Logger) *Service {
+func New(ports Persistence, racing RacingData, markets MarketData, now func() time.Time, log *slog.Logger) *Service {
 	if now == nil {
 		now = time.Now
 	}
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Service{Store: st, Racing: racing, Markets: markets, Now: now, Log: log, Regions: []string{"gb", "ire"}, Training: training.DefaultConfiguration()}
+	return &Service{ports: ports, Racing: racing, Markets: markets, Now: now, Log: log, Regions: []string{"gb", "ire"}, Training: training.DefaultConfiguration()}
 }
 
 // Bootstrap seeds the preset weights and makes v3 active on a fresh database,
@@ -83,14 +83,14 @@ func New(st *store.Store, racing RacingData, markets MarketData, now func() time
 func (s *Service) Bootstrap(ctx context.Context) error {
 	now := s.Now()
 	for _, w := range rating.Presets() {
-		if _, err := s.Store.EnsureWeights(ctx, w, "preset", now); err != nil {
+		if _, err := s.ports.Weights.EnsureWeights(ctx, w, "preset", now); err != nil {
 			return err
 		}
 	}
-	if active, err := s.Store.ActiveWeights(ctx); err != nil {
+	if active, err := s.ports.Weights.ActiveWeights(ctx); err != nil {
 		return err
 	} else if active == nil || active.ID == rating.V2().ID {
-		return s.Store.SetActiveWeights(ctx, rating.V3().ID)
+		return s.ports.Weights.SetActiveWeights(ctx, rating.V3().ID)
 	}
 	return nil
 }
@@ -99,9 +99,9 @@ func (s *Service) Bootstrap(ctx context.Context) error {
 func (s *Service) run(ctx context.Context, name string, fn func() (string, error)) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.Store.JobStarted(ctx, name, s.Now())
+	s.ports.Jobs.JobStarted(ctx, name, s.Now())
 	summary, err := fn()
-	s.Store.JobFinished(ctx, name, s.Now(), summary, err)
+	s.ports.Jobs.JobFinished(ctx, name, s.Now(), summary, err)
 	if err != nil {
 		s.Log.Warn("job failed", "job", name, "error", err)
 	} else {
@@ -111,7 +111,7 @@ func (s *Service) run(ctx context.Context, name string, fn func() (string, error
 }
 
 func (s *Service) activeRater(ctx context.Context) (rating.Rater, error) {
-	w, err := s.Store.ActiveWeights(ctx)
+	w, err := s.ports.Weights.ActiveWeights(ctx)
 	if err != nil {
 		return rating.Rater{}, err
 	}
@@ -124,10 +124,10 @@ func (s *Service) activeRater(ctx context.Context) (rating.Rater, error) {
 
 func (s *Service) archive(ctx context.Context) (*tracking.Archive, error) {
 	a := tracking.NewArchive()
-	if _, err := s.Store.LoadDocument(ctx, archiveDocument, a); err != nil {
+	if _, err := s.ports.Documents.LoadDocument(ctx, archiveDocument, a); err != nil {
 		return nil, err
 	}
-	facts, err := s.Store.ResultFactsKnownBefore(ctx, s.Now())
+	facts, err := s.ports.Results.ResultFactsKnownBefore(ctx, s.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +153,7 @@ func (s *Service) RefreshCourses(ctx context.Context) error {
 		if err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("%d courses", len(courses)), s.Store.SaveCourses(ctx, courses, s.Now())
+		return fmt.Sprintf("%d courses", len(courses)), s.ports.Cards.SaveCourses(ctx, courses, s.Now())
 	})
 }
 
@@ -164,7 +164,7 @@ func (s *Service) RefreshCards(ctx context.Context, day domain.RaceDay) error {
 		if err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("%d races", len(races)), s.Store.SaveRaces(ctx, races, s.Now())
+		return fmt.Sprintf("%d races", len(races)), s.ports.Cards.SaveRaces(ctx, races, s.Now())
 	})
 }
 
@@ -178,7 +178,7 @@ func (s *Service) RefreshMarkets(ctx context.Context, day domain.RaceDay) error 
 	}
 	return s.run(ctx, "markets-"+string(day), func() (string, error) {
 		date := domain.DayStringFor(day, s.Now())
-		races, err := s.Store.RacesOn(ctx, date)
+		races, err := s.ports.Cards.RacesOn(ctx, date)
 		if err != nil || len(races) == 0 {
 			return "no races", err
 		}
@@ -190,13 +190,13 @@ func (s *Service) RefreshMarkets(ctx context.Context, day domain.RaceDay) error 
 		now := s.Now()
 		for _, m := range report.Matches {
 			ref := m.Reference()
-			if err := s.Store.SaveMatch(ctx, store.MatchRow{RaceID: m.RaceID, MatchedAt: now, Reference: &ref}); err != nil {
+			if err := s.ports.Markets.SaveMatch(ctx, matching.Record{RaceID: m.RaceID, MatchedAt: now, Reference: &ref}); err != nil {
 				return "", err
 			}
 		}
 		for raceID, refusal := range report.Refusals {
 			raw, _ := json.Marshal(refusalView(refusal))
-			if err := s.Store.SaveMatch(ctx, store.MatchRow{RaceID: raceID, MatchedAt: now, Refusal: raw}); err != nil {
+			if err := s.ports.Markets.SaveMatch(ctx, matching.Record{RaceID: raceID, MatchedAt: now, Refusal: raw}); err != nil {
 				return "", err
 			}
 		}
@@ -227,7 +227,7 @@ func (s *Service) priced(ctx context.Context, races []domain.Race) (map[string]d
 	for i, r := range races {
 		ids[i] = r.ID
 	}
-	matches, err := s.Store.Matches(ctx, ids)
+	matches, err := s.ports.Markets.Matches(ctx, ids)
 	if err != nil {
 		s.Log.Warn("loading matches", "error", err)
 		return snapshots, references
@@ -286,7 +286,7 @@ func hasAnyPrice(s domain.MarketSnapshot) bool {
 func (s *Service) DraftTips(ctx context.Context, day domain.RaceDay) error {
 	return s.run(ctx, "draft-"+string(day), func() (string, error) {
 		now := s.Now()
-		races, err := s.Store.RacesOn(ctx, domain.DayStringFor(day, now))
+		races, err := s.ports.Cards.RacesOn(ctx, domain.DayStringFor(day, now))
 		if err != nil {
 			return "", err
 		}
@@ -308,13 +308,13 @@ func (s *Service) DraftTips(ctx context.Context, day domain.RaceDay) error {
 func (s *Service) SealTips(ctx context.Context) error {
 	return s.run(ctx, "seal", func() (string, error) {
 		now := s.Now()
-		races, err := s.Store.RacesOffBetween(ctx, now, now.Add(tracking.SealWindow+time.Second))
+		races, err := s.ports.Cards.RacesOffBetween(ctx, now, now.Add(tracking.SealWindow+time.Second))
 		if err != nil {
 			return "", err
 		}
 		var due []domain.Race
 		for _, r := range races {
-			row, err := s.Store.Tip(ctx, r.ID)
+			row, err := s.ports.Tips.Tip(ctx, r.ID)
 			if err != nil {
 				return "", err
 			}
@@ -342,7 +342,7 @@ func (s *Service) rateAndRecord(ctx context.Context, races []domain.Race, kind s
 		for _, race := range races {
 			sealing[race.ID] = true
 		}
-		facts, factsErr := s.Store.ResultFactsKnownBefore(ctx, now)
+		facts, factsErr := s.ports.Results.ResultFactsKnownBefore(ctx, now)
 		if factsErr != nil {
 			return 0, factsErr
 		}
@@ -363,7 +363,7 @@ func (s *Service) rateAndRecord(ctx context.Context, races []domain.Race, kind s
 	for _, race := range races {
 		var market *domain.MarketSnapshot
 		if snap, ok := snapshots[race.ID]; ok {
-			opening, openingErr := s.Store.LatestSnapshot(ctx, race.ID, "display-opening")
+			opening, openingErr := s.ports.Markets.LatestSnapshot(ctx, race.ID, "display-opening")
 			if openingErr != nil {
 				return stored, openingErr
 			}
@@ -372,32 +372,40 @@ func (s *Service) rateAndRecord(ctx context.Context, races []domain.Race, kind s
 				snap.FirstObservedPrices = opening.Prices
 			}
 			market = &snap
-			if err := s.Store.SaveSnapshot(ctx, race.ID, kind, snap); err != nil {
+			if err := s.ports.Markets.SaveSnapshot(ctx, race.ID, kind, snap); err != nil {
 				return stored, err
 			}
 		}
 		a := rater.Rate(race, market, archive, now)
-		if err := s.Store.SaveAssessment(ctx, a); err != nil {
+		if err := s.ports.Assessments.SaveAssessment(ctx, a); err != nil {
 			return stored, err
 		}
 		candidate, ok := tracking.NewTip(a, race, references[race.ID], now)
 		if !ok {
 			continue
 		}
-		var existing *tracking.Tip
-		if row, err := s.Store.Tip(ctx, race.ID); err != nil {
+		var existing *tracking.TipRecord
+		if row, err := s.ports.Tips.Tip(ctx, race.ID); err != nil {
 			return stored, err
 		} else if row != nil {
-			existing = &row.Tip
+			record, err := tracking.RestoreTipRecord(row.Tip)
+			if err != nil {
+				return stored, err
+			}
+			existing = &record
 		}
-		outcome, tip := tracking.Decide(existing, candidate, now)
-		if tip == nil {
+		outcome, record, err := tracking.EvaluateTip(existing, candidate, now)
+		if err != nil {
+			return stored, err
+		}
+		if record == nil {
 			continue
 		}
+		tip := record.Snapshot()
 		if outcome == tracking.Sealed {
-			err = s.Store.SaveSealedTip(ctx, *tip, race, sourceServer, now)
+			err = s.ports.Tips.SaveSealedTip(ctx, tip, race, sourceServer, now)
 		} else {
-			err = s.Store.SaveTip(ctx, *tip, sourceServer, now)
+			err = s.ports.Tips.SaveTip(ctx, tip, sourceServer, now)
 		}
 		if err != nil {
 			return stored, err
@@ -405,7 +413,7 @@ func (s *Service) rateAndRecord(ctx context.Context, races []domain.Race, kind s
 		stored++
 		// The inputs the tip was sealed on are what training learns from.
 		if outcome == tracking.Sealed && a.TrainingSnapshot != nil {
-			if err := s.Store.SaveTrainingSnapshot(ctx, *a.TrainingSnapshot, sourceServer); err != nil {
+			if err := s.ports.Training.SaveTrainingSnapshot(ctx, *a.TrainingSnapshot, sourceServer); err != nil {
 				return stored, err
 			}
 		}
@@ -437,12 +445,12 @@ func (s *Service) CollectResults(ctx context.Context) (Ingestion, error) {
 			return "", err
 		}
 		for index, result := range results {
-			card, cardErr := s.Store.SealCard(ctx, result.ID)
+			card, cardErr := s.ports.Results.SealCard(ctx, result.ID)
 			if cardErr != nil {
 				return "", cardErr
 			}
 			if card == nil {
-				card, cardErr = s.Store.Race(ctx, result.ID)
+				card, cardErr = s.ports.Cards.Race(ctx, result.ID)
 				if cardErr != nil {
 					return "", cardErr
 				}
@@ -451,7 +459,7 @@ func (s *Service) CollectResults(ctx context.Context) (Ingestion, error) {
 				results[index] = resultWithCardMetadata(result, *card)
 			}
 		}
-		if ing.ResultsStored, err = s.Store.SaveResults(ctx, results, now); err != nil {
+		if ing.ResultsStored, err = s.ports.Results.SaveResults(ctx, results, now); err != nil {
 			return "", err
 		}
 		// Results can also be re-read for races settled on earlier days.
@@ -470,39 +478,36 @@ func (s *Service) CollectResults(ctx context.Context) (Ingestion, error) {
 			}
 		}
 		if ing.RacesArchived > 0 {
-			if err := s.Store.SaveDocument(ctx, archiveDocument, archive, now); err != nil {
+			if err := s.ports.Documents.SaveDocument(ctx, archiveDocument, archive, now); err != nil {
 				return "", err
 			}
 		}
 
-		waiting, err := s.Store.AwaitingReconciliation(ctx, now)
+		waiting, err := s.ports.Tips.AwaitingReconciliation(ctx, now)
 		if err != nil {
 			return "", err
 		}
-		missingPrices, err := s.Store.AwaitingStartingPrices(ctx)
+		missingPrices, err := s.ports.Tips.AwaitingStartingPrices(ctx)
 		if err != nil {
 			return "", err
 		}
-		priceRequests := append(append([]store.TipRow(nil), waiting...), missingPrices...)
+		priceRequests := append(append([]tracking.RecordedTip(nil), waiting...), missingPrices...)
 		sps := s.startingPrices(ctx, priceRequests, now, &ing)
 		for _, row := range missingPrices {
 			tip := row.Tip
 			prices := tip.MarketReference.StartingPrices(sps)
-			changed := false
-			if price, ok := prices[tip.SelectionHorseID]; ok && tip.Outcome.BetfairSP == nil {
-				tip.Outcome.BetfairSP = &price
-				changed = true
+			record, err := tracking.RestoreTipRecord(tip)
+			if err != nil {
+				return "", err
 			}
-			if favourite := tip.FavouriteOutcome; favourite != nil && favourite.BetfairSP == nil {
-				if price, ok := prices[favourite.HorseID]; ok {
-					favourite.BetfairSP = &price
-					changed = true
-				}
+			updated, changed, err := record.WithStartingPrices(prices)
+			if err != nil {
+				return "", err
 			}
 			if !changed {
 				continue
 			}
-			if err := s.Store.SaveTip(ctx, tip, row.Source, now); err != nil {
+			if err := s.ports.Tips.SaveTip(ctx, updated.Snapshot(), row.Source, now); err != nil {
 				return "", err
 			}
 		}
@@ -511,15 +516,23 @@ func (s *Service) CollectResults(ctx context.Context) (Ingestion, error) {
 			var result *domain.RaceResult
 			if r, ok := byRace[tip.RaceID]; ok {
 				result = &r
-			} else if stored, err := s.Store.Result(ctx, tip.RaceID); err == nil && stored != nil {
+			} else if stored, err := s.ports.Results.Result(ctx, tip.RaceID); err == nil && stored != nil {
 				result = stored
 			}
 			var betfair map[string]float64
 			if tip.MarketReference != nil {
 				betfair = tip.MarketReference.StartingPrices(sps)
 			}
-			settled := tracking.Settle(tip, result, betfair, false, now)
-			if err := s.Store.SaveTip(ctx, settled, row.Source, now); err != nil {
+			record, err := tracking.RestoreTipRecord(tip)
+			if err != nil {
+				return "", err
+			}
+			updated, err := record.Reconcile(result, betfair, false, now)
+			if err != nil {
+				return "", err
+			}
+			settled := updated.Snapshot()
+			if err := s.ports.Tips.SaveTip(ctx, settled, row.Source, now); err != nil {
 				return "", err
 			}
 			if settled.Outcome != nil && (settled.Outcome.IsSettled() || settled.Outcome.IsVoid()) {
@@ -527,7 +540,7 @@ func (s *Service) CollectResults(ctx context.Context) (Ingestion, error) {
 			}
 			if settled.Outcome != nil && settled.Outcome.IsSettled() && result != nil {
 				if w := result.Winner(); w != nil {
-					if ok, err := s.Store.SetTrainingWinner(ctx, tip.RaceID, w.HorseID); err != nil {
+					if ok, err := s.ports.Training.SetTrainingWinner(ctx, tip.RaceID, w.HorseID); err != nil {
 						return "", err
 					} else if ok {
 						ing.SamplesSettled++
@@ -544,14 +557,14 @@ func (s *Service) CollectResults(ctx context.Context) (Ingestion, error) {
 	return ing, err
 }
 
-func (s *Service) startingPrices(ctx context.Context, waiting []store.TipRow, now time.Time, ing *Ingestion) map[string]map[int64]float64 {
+func (s *Service) startingPrices(ctx context.Context, waiting []tracking.RecordedTip, now time.Time, ing *Ingestion) map[string]map[int64]float64 {
 	tips := make([]tracking.Tip, len(waiting))
 	for i, w := range waiting {
 		tips[i] = w.Tip
 	}
 	ids := tracking.MarketIDsAwaitingStartingPrice(tips, now)
 	if len(ids) == 0 || s.Markets == nil {
-		stored, _ := s.Store.StartingPrices(ctx, ids)
+		stored, _ := s.ports.Markets.StartingPrices(ctx, ids)
 		return stored
 	}
 	fresh, err := s.Markets.StartingPrices(ctx, ids)
@@ -563,9 +576,9 @@ func (s *Service) startingPrices(ctx context.Context, waiting []store.TipRow, no
 		for _, m := range fresh {
 			ing.StartingPrices += len(m)
 		}
-		s.Store.SaveStartingPrices(ctx, fresh, now)
+		s.ports.Markets.SaveStartingPrices(ctx, fresh, now)
 	}
-	stored, _ := s.Store.StartingPrices(ctx, ids)
+	stored, _ := s.ports.Markets.StartingPrices(ctx, ids)
 	return stored
 }
 
@@ -577,16 +590,16 @@ func (s *Service) BaselineBacktest(ctx context.Context) (int64, backtest.Report,
 	var report backtest.Report
 	var reportID int64
 	err := s.run(ctx, "baseline-backtest", func() (string, error) {
-		weights, err := s.Store.ActiveWeights(ctx)
+		weights, err := s.ports.Weights.ActiveWeights(ctx)
 		if err != nil || weights == nil {
 			return "", errors.Join(err, errors.New("no active weights"))
 		}
 		request := backtest.Request{WeightsID: weights.ID}
-		report, err = backtest.Run(ctx, s.Store, *weights, request)
+		report, err = backtest.Run(ctx, s.ports.History, *weights, request)
 		if err != nil {
 			return "", err
 		}
-		reportID, err = s.Store.SaveBacktest(ctx, weights.ID, request, report, s.Now())
+		reportID, err = s.ports.Documents.SaveBacktest(ctx, weights.ID, request, report, s.Now())
 		if err != nil {
 			return "", err
 		}
@@ -601,25 +614,17 @@ func (s *Service) Train(ctx context.Context) (training.Report, error) {
 	var report training.Report
 	err := s.run(ctx, "train", func() (string, error) {
 		now := s.Now()
-		current, err := s.Store.ActiveWeights(ctx)
+		current, err := s.ports.Weights.ActiveWeights(ctx)
 		if err != nil || current == nil {
 			return "", errors.Join(err, errors.New("no active weights"))
 		}
-		samples, err := s.Store.SettledTrainingSamples(ctx, time.Time{}, time.Time{})
+		samples, err := s.ports.Training.SettledTrainingSamples(ctx, time.Time{}, time.Time{})
 		if err != nil {
 			return "", err
 		}
 		report = training.Train(samples, *current, s.Training)
-		if err := s.Store.SaveDocument(ctx, trainingReportDocument, report, now); err != nil {
+		if err := s.publishTrainingReport(ctx, report, now); err != nil {
 			return "", err
-		}
-		if report.Promoted {
-			if _, err := s.Store.EnsureWeights(ctx, report.Weights, "trained", now); err != nil {
-				return "", err
-			}
-			if err := s.Store.SetActiveWeights(ctx, report.Weights.ID); err != nil {
-				return "", err
-			}
 		}
 		return fmt.Sprintf("%d samples, trained=%t, promoted=%t", report.SettledRaceCount, report.Trained, report.Promoted), nil
 	})
@@ -629,7 +634,7 @@ func (s *Service) Train(ctx context.Context) (training.Report, error) {
 // LastTrainingReport, if any.
 func (s *Service) LastTrainingReport(ctx context.Context) *training.Report {
 	var r training.Report
-	if ok, _ := s.Store.LoadDocument(ctx, trainingReportDocument, &r); ok {
+	if ok, _ := s.ports.Documents.LoadDocument(ctx, trainingReportDocument, &r); ok {
 		return &r
 	}
 	return nil

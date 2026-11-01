@@ -101,19 +101,19 @@ func TestSealingRule(t *testing.T) {
 	if got := record(l, r, off.Add(-2*time.Hour)); got != Created {
 		t.Fatal(got)
 	}
-	if got := record(l, r, off.Add(-time.Hour)); got != Updated || len(l.Storage) != 1 {
+	if got := record(l, r, off.Add(-time.Hour)); got != Updated || len(l.TipsByRaceID()) != 1 {
 		t.Fatal(got)
 	}
 	justInside := off.Add(-SealWindow + time.Second)
-	if got := record(l, r, justInside); got != Sealed || !l.Storage["rac_1"].SealedAt.Equal(justInside) {
+	if got := record(l, r, justInside); got != Sealed || !l.TipsByRaceID()["rac_1"].SealedAt.Equal(justInside) {
 		t.Fatal(got)
 	}
-	if got := record(l, r, off.Add(-30*time.Second)); got != RejectedAlreadySealed || !l.Storage["rac_1"].SealedAt.Equal(justInside) {
+	if got := record(l, r, off.Add(-30*time.Second)); got != RejectedAlreadySealed || !l.TipsByRaceID()["rac_1"].SealedAt.Equal(justInside) {
 		t.Fatal("the seal time must not move")
 	}
 
 	l = NewLedger()
-	if got := record(l, r, off.Add(-SealWindow-time.Second)); got != Created || l.Storage["rac_1"].IsSealed() {
+	if got := record(l, r, off.Add(-SealWindow-time.Second)); got != Created || l.TipsByRaceID()["rac_1"].IsSealed() {
 		t.Fatal("just outside the window is a draft")
 	}
 	if got := record(l, r, off.Add(time.Minute)); got != RejectedRaceStarted {
@@ -121,7 +121,7 @@ func TestSealingRule(t *testing.T) {
 	}
 
 	l = NewLedger()
-	if got := record(l, r, off.Add(time.Second)); got != RejectedRaceStarted || len(l.Storage) != 0 || got.DidStore() {
+	if got := record(l, r, off.Add(time.Second)); got != RejectedRaceStarted || len(l.TipsByRaceID()) != 0 || got.DidStore() {
 		t.Fatal("a race that has run is never recorded")
 	}
 	if got := record(l, ledgerRace(nil), off); got != Sealed {
@@ -147,7 +147,7 @@ func TestSettleOnceOnly(t *testing.T) {
 		t.Fatal("nor does a void one")
 	}
 	l = NewLedger(makeTip(tipOpts{outcome: &Outcome{Kind: Unresolved, Attempts: 2}}))
-	if !l.Settle("rac_1", Outcome{Kind: Won}, &FavouriteOutcome{HorseID: "hrs_1", Won: true}) || !l.Storage["rac_1"].FavouriteOutcome.Won {
+	if !l.Settle("rac_1", Outcome{Kind: Won}, &FavouriteOutcome{HorseID: "hrs_1", Won: true}) || !l.TipsByRaceID()["rac_1"].FavouriteOutcome.Won {
 		t.Fatal("unresolved can still settle")
 	}
 }
@@ -357,7 +357,7 @@ func TestLedgerRoundTrip(t *testing.T) {
 	l := NewLedger(makeTip(tipOpts{}), makeTip(tipOpts{raceID: "rac_2", selection: "hrs_9"}))
 	data, _ := json.Marshal(l)
 	var back Ledger
-	if err := json.Unmarshal(data, &back); err != nil || back.Storage["rac_2"].SelectionHorseID != "hrs_9" {
+	if err := json.Unmarshal(data, &back); err != nil || back.TipsByRaceID()["rac_2"].SelectionHorseID != "hrs_9" {
 		t.Fatal(err)
 	}
 }
@@ -385,5 +385,96 @@ func TestArchiveIsIdempotent(t *testing.T) {
 	}
 	if a.Merge(*other) != 0 || a.TotalRuns != 4 {
 		t.Fatal("repeat merge is a no-op")
+	}
+}
+
+func TestNewTipKeepsItsOwnAssessmentAndMarketData(t *testing.T) {
+	zScore := 1.0
+	price := 3.0
+	assessment := rating.Assessment{RaceID: "race", Runners: []rating.RunnerAssessment{{
+		HorseID: "horse", MarketBackPrice: &price,
+		Contributions: []rating.Contribution{{Label: "form", ZScore: &zScore}},
+	}}}
+	race := domain.Race{ID: "race", OffDateTime: domain.Ptr(off)}
+	reference := &domain.MarketReference{MarketID: "market", SelectionIDsByHorseID: map[string]int64{"horse": 1}}
+	tip, ok := NewTip(assessment, race, reference, off.Add(-time.Hour))
+	if !ok {
+		t.Fatal("expected a tip")
+	}
+	assessment.Runners[0].Contributions[0].Label = "changed"
+	zScore = 2
+	price = 4
+	reference.SelectionIDsByHorseID["horse"] = 2
+	*race.OffDateTime = domain.At(off.Add(time.Hour))
+	if tip.Contributions[0].Label != "form" || *tip.Contributions[0].ZScore != 1 || *tip.MarketBackPriceAtTip != 3 || tip.MarketReference.SelectionIDsByHorseID["horse"] != 1 || !tip.OffAt.Time.Equal(off) {
+		t.Fatal("tip changed when its inputs changed")
+	}
+}
+
+func TestLedgerSnapshotsDoNotShareMutableTipData(t *testing.T) {
+	original := makeTip(tipOpts{ref: &domain.MarketReference{MarketID: "market", SelectionIDsByHorseID: map[string]int64{"horse": 1}}})
+	original.Contributions = []rating.Contribution{{Label: "form", ZScore: fp(1)}}
+	ledger := NewLedger(original)
+	original.MarketReference.SelectionIDsByHorseID["horse"] = 2
+	*original.Contributions[0].ZScore = 2
+	snapshot := ledger.Tips()
+	if snapshot[0].MarketReference.SelectionIDsByHorseID["horse"] != 1 || *snapshot[0].Contributions[0].ZScore != 1 {
+		t.Fatal("ledger retained mutable input")
+	}
+	snapshot[0].MarketReference.SelectionIDsByHorseID["horse"] = 3
+	*snapshot[0].Contributions[0].ZScore = 3
+	got := ledger.Tips()
+	if got[0].MarketReference.SelectionIDsByHorseID["horse"] != 1 || *got[0].Contributions[0].ZScore != 1 {
+		t.Fatal("snapshot changed the ledger")
+	}
+}
+
+func TestSettleDoesNotShareDataWithTheTipOrResult(t *testing.T) {
+	tip := makeTip(tipOpts{ref: &domain.MarketReference{MarketID: "market", SelectionIDsByHorseID: map[string]int64{"hrs_1": 1}}})
+	tip.Contributions = []rating.Contribution{{Label: "form", ZScore: fp(1)}}
+	raceResult := result([][2]string{{"hrs_1", "1"}, {"hrs_2", "2"}, {"hrs_3", "3"}}, map[string]float64{"hrs_1": 3})
+	settled := Settle(tip, raceResult, nil, false, off)
+	tip.MarketReference.SelectionIDsByHorseID["hrs_1"] = 2
+	*tip.Contributions[0].ZScore = 2
+	*raceResult.Finishers[0].StartingPriceDecimal = 4
+	if settled.MarketReference.SelectionIDsByHorseID["hrs_1"] != 1 || *settled.Contributions[0].ZScore != 1 || *settled.Outcome.BetfairSP != 3 {
+		t.Fatal("settled tip shares mutable inputs")
+	}
+}
+
+func TestDecideReturnsAnIndependentTip(t *testing.T) {
+	candidate := makeTip(tipOpts{ref: &domain.MarketReference{MarketID: "market", SelectionIDsByHorseID: map[string]int64{"horse": 1}}})
+	outcome, decision := Decide(nil, candidate, off.Add(-time.Hour))
+	if outcome != Created || decision == nil {
+		t.Fatal("expected a draft")
+	}
+	candidate.MarketReference.SelectionIDsByHorseID["horse"] = 2
+	if decision.MarketReference.SelectionIDsByHorseID["horse"] != 1 {
+		t.Fatal("decision shares candidate data")
+	}
+}
+
+func TestLedgerSettlementKeepsItsOwnOutcome(t *testing.T) {
+	ledger := NewLedger(makeTip(tipOpts{}))
+	price := 4.0
+	favouritePrice := 3.0
+	outcome := Outcome{Kind: Won, BetfairSP: &price}
+	favourite := FavouriteOutcome{HorseID: "hrs_1", Won: true, BetfairSP: &favouritePrice}
+	if !ledger.Settle("rac_1", outcome, &favourite) {
+		t.Fatal("expected settlement")
+	}
+	price = 9
+	favouritePrice = 8
+	favourite.HorseID = "changed"
+	got := ledger.TipsByRaceID()["rac_1"]
+	if *got.Outcome.BetfairSP != 4 || *got.FavouriteOutcome.BetfairSP != 3 || got.FavouriteOutcome.HorseID != "hrs_1" {
+		t.Fatal("settlement shares mutable input")
+	}
+}
+
+func TestOutcomeRejectsMultipleVariants(t *testing.T) {
+	var outcome Outcome
+	if err := json.Unmarshal([]byte(`{"won":{},"lost":{}}`), &outcome); err == nil {
+		t.Fatal("an outcome cannot have multiple variants")
 	}
 }

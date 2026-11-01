@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/bensuskins/races/server/internal/rating"
-	"github.com/bensuskins/races/server/internal/store"
 	"github.com/bensuskins/races/server/internal/tracking"
 	"github.com/bensuskins/races/server/internal/training"
 )
@@ -74,13 +73,29 @@ type deviceTraining struct {
 
 const archiveDocument = "archive"
 
+// Transaction is the atomic tip subset needed while merging an upload.
+type Transaction interface {
+	Tip(context.Context, string) (*tracking.RecordedTip, error)
+	SaveTip(context.Context, tracking.Tip, string, time.Time) error
+}
+
+// Repository supplies persistence for an import.
+type Repository interface {
+	ImportTransaction(context.Context, func(Transaction) error) error
+	LoadDocument(context.Context, string, any) (bool, error)
+	SaveDocument(context.Context, string, any, time.Time) error
+	InsertTrainingSample(context.Context, training.Race, string) (bool, error)
+	EnsureWeights(context.Context, rating.Weights, string, time.Time) (bool, error)
+	SaveImport(context.Context, string, any, []byte, time.Time) error
+}
+
 // Import folds one upload into the store.
 //
 // Tips: a server tip always wins, because the server sealed it itself. Between
 // two device copies of the same race — two phones — a sealed tip beats a
 // draft, and the earlier seal wins, because that is the one made first with
 // less information. Everything else is added with source device:<name>.
-func Import(ctx context.Context, st *store.Store, up Upload, now time.Time) (Summary, error) {
+func Import(ctx context.Context, st Repository, up Upload, now time.Time) (Summary, error) {
 	if up.Device == "" {
 		up.Device = "unknown"
 	}
@@ -101,15 +116,16 @@ func Import(ctx context.Context, st *store.Store, up Upload, now time.Time) (Sum
 	}
 
 	if ledger != nil {
-		ids := make([]string, 0, len(ledger.Storage))
-		for id := range ledger.Storage {
+		tips := ledger.TipsByRaceID()
+		ids := make([]string, 0, len(tips))
+		for id := range tips {
 			ids = append(ids, id)
 		}
 		sort.Strings(ids)
 		sum.TipsReceived = len(ids)
-		err := st.Tx(ctx, func(tx *store.Tx) error {
+		err := st.ImportTransaction(ctx, func(tx Transaction) error {
 			for _, id := range ids {
-				tip := ledger.Storage[id]
+				tip := tips[id]
 				if tip.RaceID == "" {
 					tip.RaceID = id
 				}
@@ -204,7 +220,7 @@ func Import(ctx context.Context, st *store.Store, up Upload, now time.Time) (Sum
 }
 
 // prefer says whether an incoming device tip should replace the stored one.
-func prefer(incoming tracking.Tip, existing store.TipRow) bool {
+func prefer(incoming tracking.Tip, existing tracking.RecordedTip) bool {
 	if existing.Source == "server" {
 		return false
 	}

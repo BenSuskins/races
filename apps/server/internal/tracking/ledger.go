@@ -1,6 +1,8 @@
 package tracking
 
 import (
+	"encoding/json"
+	"fmt"
 	"sort"
 	"time"
 
@@ -41,6 +43,7 @@ func Decide(existing *Tip, candidate Tip, now time.Time) (RecordOutcome, *Tip) {
 	if existing != nil && existing.IsSealed() {
 		return RejectedAlreadySealed, nil
 	}
+	candidate = copyTip(candidate)
 	if candidate.OffAt == nil {
 		candidate.SealedAt = domain.Ptr(now)
 		return Sealed, &candidate
@@ -63,22 +66,52 @@ func Decide(existing *Tip, candidate Tip, now time.Time) (RecordOutcome, *Tip) {
 // SQLite; this is what device uploads decode into and what the rules are
 // tested against. Its JSON is TipLedger's: {"storage": {raceID: tip}}.
 type Ledger struct {
-	Storage map[string]Tip `json:"storage"`
+	storage map[string]Tip
+}
+
+func (l Ledger) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Storage map[string]Tip `json:"storage"`
+	}{Storage: l.storage})
+}
+
+func (l *Ledger) UnmarshalJSON(data []byte) error {
+	var document struct {
+		Storage map[string]Tip `json:"storage"`
+	}
+	if err := json.Unmarshal(data, &document); err != nil {
+		return err
+	}
+	for raceID, tip := range document.Storage {
+		if tip.RaceID != "" && tip.RaceID != raceID {
+			return fmt.Errorf("ledger: race ID %q does not match key %q", tip.RaceID, raceID)
+		}
+	}
+	l.storage = document.Storage
+	return nil
+}
+
+func (l *Ledger) TipsByRaceID() map[string]Tip {
+	tips := make(map[string]Tip, len(l.storage))
+	for raceID, tip := range l.storage {
+		tips[raceID] = copyTip(tip)
+	}
+	return tips
 }
 
 func NewLedger(tips ...Tip) *Ledger {
-	l := &Ledger{Storage: map[string]Tip{}}
+	l := &Ledger{storage: map[string]Tip{}}
 	for _, t := range tips {
-		l.Storage[t.RaceID] = t
+		l.storage[t.RaceID] = copyTip(t)
 	}
 	return l
 }
 
 // Tips newest off first.
 func (l *Ledger) Tips() []Tip {
-	out := make([]Tip, 0, len(l.Storage))
-	for _, t := range l.Storage {
-		out = append(out, t)
+	out := make([]Tip, 0, len(l.storage))
+	for _, t := range l.storage {
+		out = append(out, copyTip(t))
 	}
 	SortTips(out)
 	return out
@@ -108,19 +141,22 @@ func (l *Ledger) Record(a rating.Assessment, race domain.Race, ref *domain.Marke
 		return RejectedNoSelection
 	}
 	var existing *Tip
-	if t, ok := l.Storage[candidate.RaceID]; ok {
+	if t, ok := l.storage[candidate.RaceID]; ok {
 		existing = &t
 	}
 	outcome, store := Decide(existing, candidate, now)
 	if store != nil {
-		l.Storage[store.RaceID] = *store
+		if l.storage == nil {
+			l.storage = make(map[string]Tip)
+		}
+		l.storage[store.RaceID] = *store
 	}
 	return outcome
 }
 
 // Settle applies an outcome unless the tip already has a final one.
 func (l *Ledger) Settle(raceID string, outcome Outcome, favourite *FavouriteOutcome) bool {
-	t, ok := l.Storage[raceID]
+	t, ok := l.storage[raceID]
 	if !ok {
 		return false
 	}
@@ -131,7 +167,7 @@ func (l *Ledger) Settle(raceID string, outcome Outcome, favourite *FavouriteOutc
 	if favourite != nil {
 		t.FavouriteOutcome = favourite
 	}
-	l.Storage[raceID] = t
+	l.storage[raceID] = copyTip(t)
 	return true
 }
 

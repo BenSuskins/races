@@ -23,6 +23,7 @@ import (
 	"github.com/bensuskins/races/server/internal/store"
 	"github.com/bensuskins/races/server/internal/testutil"
 	"github.com/bensuskins/races/server/internal/tracking"
+	"github.com/bensuskins/races/server/internal/wiring"
 )
 
 const token = "test-token-0123456789"
@@ -53,20 +54,25 @@ func (f fixtureRacing) TodaysResults(ctx context.Context) ([]domain.RaceResult, 
 
 var now = time.Date(2026, 9, 20, 9, 0, 0, 0, time.UTC)
 
-func setup(t *testing.T) (*httptest.Server, *service.Service) {
+type testService struct {
+	*service.Service
+	Store *store.Store
+}
+
+func setup(t *testing.T) (*httptest.Server, testService) {
 	t.Helper()
 	st, err := store.Open(context.Background(), ":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.Close() })
-	svc := service.New(st, fixtureRacing{t}, nil, func() time.Time { return now }, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	svc := service.New(wiring.Storage(st), fixtureRacing{t}, nil, func() time.Time { return now }, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err := svc.Bootstrap(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	s := httptest.NewServer((&Server{Service: svc, Token: token, RacingConfigured: true, Version: "test"}).Handler())
 	t.Cleanup(s.Close)
-	return s, svc
+	return s, testService{Service: svc, Store: st}
 }
 
 func call(t *testing.T, s *httptest.Server, method, path string, body any, auth bool) (int, []byte) {

@@ -17,7 +17,7 @@ const (
 
 // Settle turns a result into an outcome. Pure: every awkward case has a test.
 func Settle(tip Tip, result *domain.RaceResult, betfairSPs map[string]float64, meetingAbandoned bool, now time.Time) Tip {
-	settled := tip
+	settled := copyTip(tip)
 	if meetingAbandoned {
 		settled.Outcome = &Outcome{Kind: Abandoned}
 		return settled
@@ -58,7 +58,7 @@ func startingPrice(betfair map[string]float64, horseID string, f *domain.Finishe
 		return &p
 	}
 	if f != nil {
-		return f.StartingPriceDecimal
+		return copyPointer(f.StartingPriceDecimal)
 	}
 	return nil
 }

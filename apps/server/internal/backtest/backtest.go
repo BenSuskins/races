@@ -26,7 +26,6 @@ import (
 
 	"github.com/bensuskins/races/server/internal/domain"
 	"github.com/bensuskins/races/server/internal/rating"
-	"github.com/bensuskins/races/server/internal/store"
 	"github.com/bensuskins/races/server/internal/tracking"
 	"github.com/bensuskins/races/server/internal/training"
 )
@@ -267,8 +266,19 @@ func (c factorCoverageAccumulator) report() FactorCoverage {
 	return coverage
 }
 
+// History supplies the sealed evidence needed to replay previous races.
+type History interface {
+	Tips(context.Context, string, string) ([]tracking.RecordedTip, error)
+	SealCard(context.Context, string) (*domain.Race, error)
+	Result(context.Context, string) (*domain.RaceResult, error)
+	ResultFactsKnownBefore(context.Context, time.Time) ([]domain.RaceResult, error)
+	LatestSnapshot(context.Context, string, string) (*domain.MarketSnapshot, error)
+	StartingPrices(context.Context, []string) (map[string]map[int64]float64, error)
+	SettledTrainingSamples(context.Context, time.Time, time.Time) ([]training.Race, error)
+}
+
 // Run replays the stored history.
-func Run(ctx context.Context, st *store.Store, w rating.Weights, req Request) (Report, error) {
+func Run(ctx context.Context, st History, w rating.Weights, req Request) (Report, error) {
 	rep := Report{WeightsID: w.ID, From: req.From, To: req.To, Notes: []string{
 		"Archive factors use result facts recorded before each tip sealed.",
 		"Legacy server tips without an immutable seal card are excluded; run the recovery scan to identify provable cards.",
