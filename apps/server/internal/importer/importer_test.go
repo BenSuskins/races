@@ -26,6 +26,12 @@ func upload(t *testing.T, device string) Upload {
 	return Upload{Device: device, Tips: read("device-tips.json"), Archive: read("device-archive.json"), Training: read("device-training.json")}
 }
 
+type testRepository struct{ *store.Store }
+
+func (r testRepository) ImportTransaction(ctx context.Context, run func(Transaction) error) error {
+	return r.Store.Tx(ctx, func(transaction *store.Tx) error { return run(transaction) })
+}
+
 func open(t *testing.T) *store.Store {
 	t.Helper()
 	st, err := store.Open(context.Background(), ":memory:")
@@ -41,7 +47,7 @@ func open(t *testing.T) *store.Store {
 func TestImportsADevicesHistory(t *testing.T) {
 	ctx := context.Background()
 	st := open(t)
-	sum, err := Import(ctx, st, upload(t, "Ben's iPhone"), now)
+	sum, err := Import(ctx, testRepository{st}, upload(t, "Ben's iPhone"), now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,8 +93,8 @@ func TestImportsADevicesHistory(t *testing.T) {
 func TestAReUploadChangesNothing(t *testing.T) {
 	ctx := context.Background()
 	st := open(t)
-	Import(ctx, st, upload(t, "phone"), now)
-	sum, err := Import(ctx, st, upload(t, "phone"), now)
+	Import(ctx, testRepository{st}, upload(t, "phone"), now)
+	sum, err := Import(ctx, testRepository{st}, upload(t, "phone"), now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +109,7 @@ func TestServerTipsAlwaysWin(t *testing.T) {
 	server := tracking.Tip{RaceID: "rac_old_1", RaceDate: "2026-09-10", SelectionHorseID: "hrs_2", WeightsID: "v2",
 		SealedAt: domain.Ptr(time.Date(2026, 9, 10, 13, 29, 0, 0, time.UTC)), CreatedAt: domain.At(now), Contributions: []rating.Contribution{}}
 	st.SaveTip(ctx, server, "server", now)
-	sum, _ := Import(ctx, st, upload(t, "phone"), now)
+	sum, _ := Import(ctx, testRepository{st}, upload(t, "phone"), now)
 	if sum.TipsKept != 1 {
 		t.Fatalf("%+v", sum)
 	}
@@ -117,7 +123,7 @@ func TestUnreadableDocumentsAreReportedNotFatal(t *testing.T) {
 	st := open(t)
 	up := upload(t, "phone")
 	up.Archive = []byte(`{"schemaVersion":2,"payload":{}}`)
-	sum, err := Import(context.Background(), st, up, now)
+	sum, err := Import(context.Background(), testRepository{st}, up, now)
 	if err != nil || len(sum.UnreadableDocuments) != 1 || sum.TipsAdded != 3 {
 		t.Fatalf("%+v %v", sum, err)
 	}

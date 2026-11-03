@@ -36,6 +36,21 @@ flowchart LR
 | Storage | SQLite connection, migrations, race history, and saved provider payloads | `apps/server/internal/store/` |
 | Composition root | Opens storage, wires providers and services, starts scheduled jobs, and serves HTTP | `apps/server/cmd/races-server/` |
 
+### Backend Ports and Adapters
+
+The HTTP handlers and scheduler call operations in `internal/service`. The
+service accepts focused persistence and provider interfaces. `internal/wiring`
+connects the SQLite store and the import transaction adapter at startup. The
+import transaction uses only its transaction-scoped interface, so it does not
+wait on the connection it already holds.
+
+The tracking domain protects a tip's sealed state and settlement transitions
+in `TipRecord`. It copies mutable data when it restores a record or returns a
+snapshot. The `Tip` representation preserves the existing API and stored JSON.
+The store keeps a sealed card and tip together in one transaction. Tests cover
+these transitions, legacy import and adapter behavior. The OpenAPI contract
+describes the existing HTTP representation and is checked against the server.
+
 ## Request Flow
 
 The app loads a race card from the server. Independently, the server collects and

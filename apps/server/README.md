@@ -76,6 +76,9 @@ rewritten — the same rules `TipLedger` enforced on the phone.
 ## API
 
 Everything under `/v1` needs `Authorization: Bearer $RACES_API_TOKEN`.
+The server serves its OpenAPI contract at `/openapi.json` and Swagger UI at
+`/docs/`. The UI uses locally served Swagger UI 5.30.3 assets; its upstream
+license is in `internal/api/swagger/LICENSE`.
 
 | Route | |
 |---|---|

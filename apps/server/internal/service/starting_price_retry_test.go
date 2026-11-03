@@ -18,7 +18,7 @@ func TestStartingPriceArrivesAfterResult(t *testing.T) {
 	if err := s.SealTips(ctx); err != nil {
 		t.Fatal(err)
 	}
-	row, err := s.Store.Tip(ctx, race.ID)
+	row, err := testStore(s).Tip(ctx, race.ID)
 	if err != nil || row == nil {
 		t.Fatal("missing tip", err)
 	}
@@ -29,7 +29,7 @@ func TestStartingPriceArrivesAfterResult(t *testing.T) {
 	if _, err := s.CollectResults(ctx); err != nil {
 		t.Fatal(err)
 	}
-	row, _ = s.Store.Tip(ctx, race.ID)
+	row, _ = testStore(s).Tip(ctx, race.ID)
 	if row.Tip.Outcome == nil || !row.Tip.Outcome.IsSettled() || row.Tip.Outcome.BetfairSP != nil {
 		t.Fatal("test requires a result that settles before its starting price")
 	}
@@ -45,7 +45,7 @@ func TestStartingPriceArrivesAfterResult(t *testing.T) {
 	if _, err := s.CollectResults(ctx); err != nil {
 		t.Fatal(err)
 	}
-	row, _ = s.Store.Tip(ctx, race.ID)
+	row, _ = testStore(s).Tip(ctx, race.ID)
 	if row.Tip.Outcome.BetfairSP == nil || *row.Tip.Outcome.BetfairSP != 3.1 {
 		t.Fatal("starting price remains missing after the provider makes 3.1 available")
 	}

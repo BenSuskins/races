@@ -33,6 +33,7 @@ import (
 	"github.com/bensuskins/races/server/internal/recovery"
 	"github.com/bensuskins/races/server/internal/service"
 	"github.com/bensuskins/races/server/internal/store"
+	"github.com/bensuskins/races/server/internal/wiring"
 )
 
 // version is set at build time with -ldflags "-X main.version=…".
@@ -122,7 +123,7 @@ func run(log *slog.Logger) error {
 		markets = bf
 	}
 
-	svc := service.New(st, racing, markets, time.Now, log)
+	svc := service.New(wiring.Storage(st), racing, markets, time.Now, log)
 	if err := svc.Bootstrap(ctx); err != nil {
 		return err
 	}

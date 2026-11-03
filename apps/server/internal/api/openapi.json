@@ -1,0 +1,3125 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Races API",
+    "version": "1.0.0",
+    "description": "HTTP API for the Races server. Dates and enum variants follow the existing v1 wire contract.",
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/license/mit/"
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "operationId": "CheckHealth",
+        "summary": "Check health",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/metrics": {
+      "get": {
+        "operationId": "ReadMetrics",
+        "summary": "Read metrics",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/v1/status": {
+      "get": {
+        "operationId": "ReadStatus",
+        "summary": "Read status",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_Status"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/courses": {
+      "get": {
+        "operationId": "ListCourses",
+        "summary": "List courses",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "courses": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/domain_Course"
+                      }
+                    }
+                  },
+                  "required": [
+                    "courses"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/racecards": {
+      "get": {
+        "operationId": "ReadRacecard",
+        "summary": "Read racecard",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_Racecard"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "day",
+            "in": "query",
+            "required": false,
+            "description": "Defaults to today; unsupported values also use today.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/races/{id}": {
+      "get": {
+        "operationId": "ReadRace",
+        "summary": "Read race",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_RaceDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/tips": {
+      "get": {
+        "operationId": "ListTips",
+        "summary": "List tips",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/api_TipView"
+                      }
+                    }
+                  },
+                  "required": [
+                    "tips"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "weightsID",
+            "in": "query",
+            "required": false,
+            "description": "weightsID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "description": "date",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/record": {
+      "get": {
+        "operationId": "ReadRecord",
+        "summary": "Read record",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_Record"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "weightsID",
+            "in": "query",
+            "required": false,
+            "description": "weightsID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commission",
+            "in": "query",
+            "required": false,
+            "description": "Values outside 0\u20131 use the default.",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/model": {
+      "get": {
+        "operationId": "ReadModel",
+        "summary": "Read model",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_Model"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/import": {
+      "post": {
+        "operationId": "ImportHistory",
+        "summary": "Import history",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/importer_Summary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/importer_Upload"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/backtests": {
+      "get": {
+        "operationId": "ListBacktests",
+        "summary": "List backtests",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "backtests": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/store_BacktestRow"
+                      }
+                    }
+                  },
+                  "required": [
+                    "backtests"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "RunBacktest",
+        "summary": "Run backtest",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "sweep": {
+                          "$ref": "#/components/schemas/backtest_SweepReport"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "sweep"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "report": {
+                          "$ref": "#/components/schemas/backtest_Report"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "report"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/backtest_Request"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/backtests/{id}": {
+      "get": {
+        "operationId": "ReadBacktest",
+        "summary": "Read backtest",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/store_BacktestRow"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "id",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/v1/admin/weights": {
+      "post": {
+        "operationId": "InstallWeights",
+        "summary": "Install weights",
+        "responses": {
+          "201": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "weights": {
+                      "$ref": "#/components/schemas/rating_Weights"
+                    },
+                    "origin": {
+                      "type": "string"
+                    },
+                    "active": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "weights",
+                    "origin",
+                    "active"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/rating_Weights"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/jobs/{name}": {
+      "post": {
+        "operationId": "RunJob",
+        "summary": "Run job",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "type": "string"
+                    },
+                    "jobs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/store_JobRun"
+                      }
+                    }
+                  },
+                  "required": [
+                    "job",
+                    "jobs"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api_ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "description": "name",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "courses",
+                "cards",
+                "markets",
+                "tips",
+                "results",
+                "train",
+                "all"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "api_ErrorBody": {
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error",
+          "message"
+        ],
+        "type": "object"
+      },
+      "api_FactorView": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "summary"
+        ],
+        "type": "object"
+      },
+      "api_LoginFailureView": {
+        "properties": {
+          "class": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "class",
+          "message"
+        ],
+        "type": "object"
+      },
+      "api_Model": {
+        "properties": {
+          "active": {
+            "$ref": "#/components/schemas/rating_Weights"
+          },
+          "archivedRaces": {
+            "type": "integer"
+          },
+          "factors": {
+            "items": {
+              "$ref": "#/components/schemas/api_FactorView"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "modelVersion": {
+            "type": "string"
+          },
+          "samples": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "nullable": true,
+            "type": "object"
+          },
+          "training": {
+            "$ref": "#/components/schemas/TrainingReport"
+          },
+          "weights": {
+            "items": {
+              "$ref": "#/components/schemas/store_WeightsRow"
+            },
+            "nullable": true,
+            "type": "array"
+          }
+        },
+        "required": [
+          "modelVersion",
+          "active",
+          "weights",
+          "factors",
+          "samples",
+          "archivedRaces"
+        ],
+        "type": "object"
+      },
+      "api_ProviderStatus": {
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "healthy": {
+            "type": "boolean"
+          },
+          "loginFailure": {
+            "$ref": "#/components/schemas/api_LoginFailureView"
+          }
+        },
+        "required": [
+          "configured",
+          "healthy"
+        ],
+        "type": "object"
+      },
+      "api_RaceDetail": {
+        "properties": {
+          "assessment": {
+            "$ref": "#/components/schemas/rating_Assessment"
+          },
+          "race": {
+            "$ref": "#/components/schemas/domain_Race"
+          },
+          "refusal": {
+            "$ref": "#/components/schemas/MarketRefusal"
+          },
+          "result": {
+            "$ref": "#/components/schemas/domain_RaceResult"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/domain_MarketSnapshot"
+          },
+          "tip": {
+            "$ref": "#/components/schemas/tracking_Tip"
+          }
+        },
+        "required": [
+          "race"
+        ],
+        "type": "object"
+      },
+      "api_Racecard": {
+        "properties": {
+          "archivedRaces": {
+            "type": "integer"
+          },
+          "assessments": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/rating_Assessment"
+            },
+            "nullable": true,
+            "type": "object"
+          },
+          "date": {
+            "type": "string"
+          },
+          "day": {
+            "type": "string"
+          },
+          "fetchedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "races": {
+            "items": {
+              "$ref": "#/components/schemas/domain_Race"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "refusals": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/MarketRefusal"
+            },
+            "nullable": true,
+            "type": "object"
+          },
+          "results": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/domain_RaceResult"
+            },
+            "nullable": true,
+            "type": "object"
+          },
+          "tips": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/tracking_Tip"
+            },
+            "nullable": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "day",
+          "date",
+          "races",
+          "assessments",
+          "tips",
+          "results",
+          "refusals",
+          "archivedRaces"
+        ],
+        "type": "object"
+      },
+      "api_Status": {
+        "properties": {
+          "activeWeightsID": {
+            "type": "string"
+          },
+          "betfair": {
+            "$ref": "#/components/schemas/api_ProviderStatus"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "nullable": true,
+            "type": "object"
+          },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/store_JobRun"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "racingAPI": {
+            "$ref": "#/components/schemas/api_ProviderStatus"
+          },
+          "serverTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "serverTime",
+          "activeWeightsID",
+          "racingAPI",
+          "betfair",
+          "jobs",
+          "counts"
+        ],
+        "type": "object"
+      },
+      "api_TipView": {
+        "properties": {
+          "agreedWithFavourite": {
+            "type": "boolean"
+          },
+          "confidence": {
+            "type": "string"
+          },
+          "contributions": {
+            "items": {
+              "$ref": "#/components/schemas/rating_Contribution"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "courseName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "favouriteOutcome": {
+            "$ref": "#/components/schemas/tracking_FavouriteOutcome"
+          },
+          "fieldSizeAtTip": {
+            "type": "integer"
+          },
+          "marketBackPriceAtTip": {
+            "type": "number"
+          },
+          "marketFavouriteHorseID": {
+            "type": "string"
+          },
+          "marketProbabilityAtTip": {
+            "type": "number"
+          },
+          "marketReference": {
+            "$ref": "#/components/schemas/domain_MarketReference"
+          },
+          "modelVersion": {
+            "type": "string"
+          },
+          "offAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/Outcome"
+          },
+          "predictedProbability": {
+            "type": "number"
+          },
+          "raceDate": {
+            "type": "string"
+          },
+          "raceID": {
+            "type": "string"
+          },
+          "raceName": {
+            "type": "string"
+          },
+          "raceType": {
+            "type": "string"
+          },
+          "sealedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "selectionHorseID": {
+            "type": "string"
+          },
+          "selectionHorseName": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "wasFormOnly": {
+            "type": "boolean"
+          },
+          "weightsID": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "raceID",
+          "raceDate",
+          "courseName",
+          "raceName",
+          "raceType",
+          "fieldSizeAtTip",
+          "selectionHorseID",
+          "selectionHorseName",
+          "predictedProbability",
+          "wasFormOnly",
+          "confidence",
+          "modelVersion",
+          "weightsID",
+          "contributions",
+          "createdAt",
+          "source"
+        ],
+        "type": "object"
+      },
+      "backtest_Arm": {
+        "properties": {
+          "brier": {
+            "type": "number"
+          },
+          "favouriteAgreement": {
+            "type": "integer"
+          },
+          "favouriteAgreementRate": {
+            "type": "number"
+          },
+          "favouriteComparisons": {
+            "type": "integer"
+          },
+          "logLoss": {
+            "type": "number"
+          },
+          "races": {
+            "type": "integer"
+          },
+          "roi": {
+            "$ref": "#/components/schemas/tracking_ROI"
+          },
+          "strikeRate": {
+            "type": "number"
+          },
+          "wins": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "races",
+          "wins",
+          "favouriteAgreement",
+          "favouriteComparisons"
+        ],
+        "type": "object"
+      },
+      "backtest_FactorCoverage": {
+        "properties": {
+          "availableRunners": {
+            "type": "integer"
+          },
+          "eligibleRunners": {
+            "type": "integer"
+          },
+          "rate": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "eligibleRunners",
+          "availableRunners"
+        ],
+        "type": "object"
+      },
+      "backtest_Report": {
+        "properties": {
+          "beatsMarket": {
+            "type": "boolean"
+          },
+          "benchmarkedModelLogLoss": {
+            "type": "number"
+          },
+          "classAdjustedFormCoverage": {
+            "$ref": "#/components/schemas/backtest_FactorCoverage"
+          },
+          "corpusID": {
+            "type": "string"
+          },
+          "drawBiasCoverage": {
+            "$ref": "#/components/schemas/backtest_FactorCoverage"
+          },
+          "factorCoverage": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/backtest_FactorCoverage"
+            },
+            "nullable": true,
+            "type": "object"
+          },
+          "favourite": {
+            "$ref": "#/components/schemas/backtest_Arm"
+          },
+          "from": {
+            "type": "string"
+          },
+          "highestProbability": {
+            "$ref": "#/components/schemas/backtest_Arm"
+          },
+          "jockeyTrainerCoverage": {
+            "$ref": "#/components/schemas/backtest_FactorCoverage"
+          },
+          "marketComparisons": {
+            "type": "integer"
+          },
+          "marketLogLoss": {
+            "type": "number"
+          },
+          "marketMovementCoverage": {
+            "$ref": "#/components/schemas/backtest_FactorCoverage"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "rerated": {
+            "$ref": "#/components/schemas/backtest_Arm"
+          },
+          "snapshotLogLoss": {
+            "type": "number"
+          },
+          "snapshotMarketLogLoss": {
+            "type": "number"
+          },
+          "snapshots": {
+            "type": "integer"
+          },
+          "to": {
+            "type": "string"
+          },
+          "valueSelection": {
+            "$ref": "#/components/schemas/backtest_Arm"
+          },
+          "weightsID": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "weightsID",
+          "corpusID",
+          "rerated",
+          "highestProbability",
+          "valueSelection",
+          "favourite",
+          "marketComparisons",
+          "jockeyTrainerCoverage",
+          "drawBiasCoverage",
+          "classAdjustedFormCoverage",
+          "marketMovementCoverage",
+          "snapshots",
+          "notes"
+        ],
+        "type": "object"
+      },
+      "backtest_Request": {
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "variants": {
+            "items": {
+              "$ref": "#/components/schemas/backtest_SweepVariant"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "weights": {
+            "$ref": "#/components/schemas/rating_Weights"
+          },
+          "weightsID": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "backtest_SweepReport": {
+        "properties": {
+          "reports": {
+            "items": {
+              "$ref": "#/components/schemas/backtest_VariantReport"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "sharedCorpusID": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sharedCorpusID",
+          "reports"
+        ],
+        "type": "object"
+      },
+      "backtest_SweepVariant": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "overrides": {
+            "additionalProperties": {},
+            "nullable": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "name",
+          "overrides"
+        ],
+        "type": "object"
+      },
+      "backtest_VariantReport": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "report": {
+            "$ref": "#/components/schemas/backtest_Report"
+          }
+        },
+        "required": [
+          "name",
+          "report"
+        ],
+        "type": "object"
+      },
+      "domain_Course": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "regionCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "regionCode",
+          "region"
+        ],
+        "type": "object"
+      },
+      "domain_Distance": {
+        "properties": {
+          "furlongs": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "furlongs"
+        ],
+        "type": "object"
+      },
+      "domain_Finisher": {
+        "properties": {
+          "clothNumber": {
+            "type": "integer"
+          },
+          "damsireID": {
+            "type": "string"
+          },
+          "draw": {
+            "type": "integer"
+          },
+          "headgear": {
+            "type": "string"
+          },
+          "headgearKnown": {
+            "type": "boolean"
+          },
+          "horseID": {
+            "type": "string"
+          },
+          "horseName": {
+            "type": "string"
+          },
+          "jockeyID": {
+            "type": "string"
+          },
+          "officialRating": {
+            "type": "integer"
+          },
+          "position": {
+            "$ref": "#/components/schemas/FinishPosition"
+          },
+          "sireID": {
+            "type": "string"
+          },
+          "startingPriceDecimal": {
+            "type": "number"
+          },
+          "trainerID": {
+            "type": "string"
+          },
+          "weightPounds": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "horseID",
+          "horseName",
+          "position"
+        ],
+        "type": "object"
+      },
+      "domain_MarketReference": {
+        "properties": {
+          "marketID": {
+            "type": "string"
+          },
+          "selectionIDsByHorseID": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "nullable": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "marketID",
+          "selectionIDsByHorseID"
+        ],
+        "type": "object"
+      },
+      "domain_MarketSnapshot": {
+        "properties": {
+          "capturedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "firstObservedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "firstObservedPrices": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/domain_RunnerPrice"
+            },
+            "nullable": true,
+            "type": "object"
+          },
+          "isDelayed": {
+            "type": "boolean"
+          },
+          "marketID": {
+            "type": "string"
+          },
+          "prices": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/domain_RunnerPrice"
+            },
+            "nullable": true,
+            "type": "object"
+          },
+          "source": {
+            "type": "string"
+          },
+          "totalMatched": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "source",
+          "capturedAt",
+          "isDelayed",
+          "prices"
+        ],
+        "type": "object"
+      },
+      "domain_Race": {
+        "properties": {
+          "ageBand": {
+            "type": "string"
+          },
+          "courseID": {
+            "type": "string"
+          },
+          "courseName": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "distance": {
+            "$ref": "#/components/schemas/domain_Distance"
+          },
+          "fieldSize": {
+            "type": "integer"
+          },
+          "going": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "offDateTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "offTime": {
+            "type": "string"
+          },
+          "pattern": {
+            "type": "string"
+          },
+          "prize": {
+            "type": "string"
+          },
+          "raceClass": {
+            "type": "integer"
+          },
+          "ratingBand": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "type": "array"
+          },
+          "regionCode": {
+            "type": "string"
+          },
+          "runners": {
+            "items": {
+              "$ref": "#/components/schemas/domain_Runner"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "status": {
+            "type": "string"
+          },
+          "surface": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "courseName",
+          "name",
+          "offTime",
+          "date",
+          "going",
+          "surface",
+          "type",
+          "runners"
+        ],
+        "type": "object"
+      },
+      "domain_RaceResult": {
+        "properties": {
+          "courseName": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "distance": {
+            "$ref": "#/components/schemas/domain_Distance"
+          },
+          "finishers": {
+            "items": {
+              "$ref": "#/components/schemas/domain_Finisher"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "going": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "offDateTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "raceClass": {
+            "type": "integer"
+          },
+          "surface": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "courseName",
+          "name",
+          "date",
+          "going",
+          "surface",
+          "type",
+          "finishers"
+        ],
+        "type": "object"
+      },
+      "domain_Runner": {
+        "properties": {
+          "age": {
+            "type": "integer"
+          },
+          "clothNumber": {
+            "type": "integer"
+          },
+          "damID": {
+            "type": "string"
+          },
+          "damName": {
+            "type": "string"
+          },
+          "damsireID": {
+            "type": "string"
+          },
+          "daysSinceLastRun": {
+            "type": "integer"
+          },
+          "draw": {
+            "type": "integer"
+          },
+          "form": {
+            "type": "string"
+          },
+          "headgear": {
+            "type": "string"
+          },
+          "headgearKnown": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "jockeyID": {
+            "type": "string"
+          },
+          "jockeyName": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "officialRating": {
+            "type": "integer"
+          },
+          "ownerName": {
+            "type": "string"
+          },
+          "racingPostRating": {
+            "type": "integer"
+          },
+          "regionCode": {
+            "type": "string"
+          },
+          "sex": {
+            "type": "string"
+          },
+          "silkURL": {
+            "type": "string"
+          },
+          "sireID": {
+            "type": "string"
+          },
+          "sireName": {
+            "type": "string"
+          },
+          "spotlight": {
+            "type": "string"
+          },
+          "topspeedRating": {
+            "type": "integer"
+          },
+          "trainerID": {
+            "type": "string"
+          },
+          "trainerName": {
+            "type": "string"
+          },
+          "weightPounds": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "domain_RunnerPrice": {
+        "properties": {
+          "backPrice": {
+            "type": "number"
+          },
+          "backSize": {
+            "type": "number"
+          },
+          "forecastPrice": {
+            "type": "number"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "lastTraded": {
+            "type": "number"
+          },
+          "layPrice": {
+            "type": "number"
+          },
+          "laySize": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "isActive"
+        ],
+        "type": "object"
+      },
+      "importer_Summary": {
+        "properties": {
+          "archiveRacesAdded": {
+            "type": "integer"
+          },
+          "archiveSkipped": {
+            "type": "boolean"
+          },
+          "device": {
+            "type": "string"
+          },
+          "pendingAdded": {
+            "type": "integer"
+          },
+          "samplesAdded": {
+            "type": "integer"
+          },
+          "samplesReceived": {
+            "type": "integer"
+          },
+          "tipsAdded": {
+            "type": "integer"
+          },
+          "tipsKept": {
+            "type": "integer"
+          },
+          "tipsReceived": {
+            "type": "integer"
+          },
+          "tipsReplaced": {
+            "type": "integer"
+          },
+          "unreadableDocuments": {
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "weightsAdded": {
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          }
+        },
+        "required": [
+          "device",
+          "tipsReceived",
+          "tipsAdded",
+          "tipsReplaced",
+          "tipsKept",
+          "archiveRacesAdded",
+          "archiveSkipped",
+          "samplesReceived",
+          "samplesAdded",
+          "pendingAdded",
+          "weightsAdded",
+          "unreadableDocuments"
+        ],
+        "type": "object"
+      },
+      "importer_Upload": {
+        "properties": {
+          "archive": {},
+          "device": {
+            "type": "string"
+          },
+          "tips": {},
+          "training": {}
+        },
+        "required": [
+          "device"
+        ],
+        "type": "object"
+      },
+      "rating_Assessment": {
+        "properties": {
+          "confidence": {
+            "type": "string"
+          },
+          "generatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "isMarketDelayed": {
+            "type": "boolean"
+          },
+          "marketCoverage": {
+            "type": "number"
+          },
+          "marketSource": {
+            "type": "string"
+          },
+          "minimumValueEdge": {
+            "type": "number"
+          },
+          "minimumValueProbability": {
+            "type": "number"
+          },
+          "modelVersion": {
+            "type": "string"
+          },
+          "raceID": {
+            "type": "string"
+          },
+          "runners": {
+            "items": {
+              "$ref": "#/components/schemas/rating_RunnerAssessment"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "trainingSnapshot": {
+            "$ref": "#/components/schemas/rating_TrainingSnapshot"
+          },
+          "weightsID": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "raceID",
+          "generatedAt",
+          "modelVersion",
+          "weightsID",
+          "marketCoverage",
+          "isMarketDelayed",
+          "runners",
+          "confidence",
+          "minimumValueEdge",
+          "minimumValueProbability"
+        ],
+        "type": "object"
+      },
+      "rating_Contribution": {
+        "properties": {
+          "availability": {
+            "$ref": "#/components/schemas/Availability"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "factor": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "probabilityDelta": {
+            "type": "number"
+          },
+          "weight": {
+            "type": "number"
+          },
+          "zScore": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "factor",
+          "label",
+          "detail",
+          "weight",
+          "probabilityDelta",
+          "availability"
+        ],
+        "type": "object"
+      },
+      "rating_RunnerAssessment": {
+        "properties": {
+          "clothNumber": {
+            "type": "integer"
+          },
+          "contributions": {
+            "items": {
+              "$ref": "#/components/schemas/rating_Contribution"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "formScore": {
+            "type": "number"
+          },
+          "horseID": {
+            "type": "string"
+          },
+          "horseName": {
+            "type": "string"
+          },
+          "marketBackPrice": {
+            "type": "number"
+          },
+          "marketProbability": {
+            "type": "number"
+          },
+          "winProbability": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "horseID",
+          "horseName",
+          "formScore",
+          "winProbability",
+          "contributions"
+        ],
+        "type": "object"
+      },
+      "rating_TrainingSnapshot": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "factorIDs": {
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "marketProbabilities": {
+            "items": {
+              "type": "number"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "raceID": {
+            "type": "string"
+          },
+          "runnerIDs": {
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "zScores": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "nullable": true,
+              "type": "array"
+            },
+            "nullable": true,
+            "type": "array"
+          }
+        },
+        "required": [
+          "raceID",
+          "createdAt",
+          "runnerIDs",
+          "marketProbabilities",
+          "factorIDs",
+          "zScores"
+        ],
+        "type": "object"
+      },
+      "rating_Weights": {
+        "properties": {
+          "clip": {
+            "type": "number"
+          },
+          "factorWeights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "nullable": true,
+            "type": "object"
+          },
+          "formDecay": {
+            "type": "number"
+          },
+          "formInfluence": {
+            "type": "number"
+          },
+          "formInfluenceNoMarket": {
+            "type": "number"
+          },
+          "formLongBreakPenalty": {
+            "type": "number"
+          },
+          "formMaxRuns": {
+            "type": "integer"
+          },
+          "formPoints": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "nullable": true,
+            "type": "object"
+          },
+          "formSeasonBreakPenalty": {
+            "type": "number"
+          },
+          "id": {
+            "type": "string"
+          },
+          "marketExponent": {
+            "type": "number"
+          },
+          "minimumMarketCoverage": {
+            "type": "number"
+          },
+          "minimumStrikeRateSample": {
+            "type": "integer"
+          },
+          "minimumValueEdge": {
+            "type": "number"
+          },
+          "minimumValueProbability": {
+            "type": "number"
+          },
+          "overroundMethod": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "marketExponent",
+          "formInfluence",
+          "formInfluenceNoMarket",
+          "clip",
+          "overroundMethod",
+          "minimumMarketCoverage",
+          "factorWeights",
+          "formDecay",
+          "formPoints",
+          "formSeasonBreakPenalty",
+          "formLongBreakPenalty",
+          "formMaxRuns",
+          "minimumStrikeRateSample",
+          "minimumValueEdge",
+          "minimumValueProbability"
+        ],
+        "type": "object"
+      },
+      "service_Record": {
+        "properties": {
+          "activeWeightsID": {
+            "type": "string"
+          },
+          "archivedRaces": {
+            "type": "integer"
+          },
+          "commission": {
+            "type": "number"
+          },
+          "recentTips": {
+            "items": {
+              "$ref": "#/components/schemas/service_RecordTip"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "report": {
+            "$ref": "#/components/schemas/tracking_Report"
+          },
+          "sources": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "nullable": true,
+            "type": "object"
+          },
+          "weightsID": {
+            "type": "string"
+          },
+          "weightsInUse": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "nullable": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "commission",
+          "report",
+          "recentTips",
+          "weightsInUse",
+          "sources",
+          "archivedRaces"
+        ],
+        "type": "object"
+      },
+      "service_RecordTip": {
+        "properties": {
+          "agreedWithFavourite": {
+            "type": "boolean"
+          },
+          "confidence": {
+            "type": "string"
+          },
+          "contributions": {
+            "items": {
+              "$ref": "#/components/schemas/rating_Contribution"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "courseName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "favouriteOutcome": {
+            "$ref": "#/components/schemas/tracking_FavouriteOutcome"
+          },
+          "fieldSizeAtTip": {
+            "type": "integer"
+          },
+          "marketBackPriceAtTip": {
+            "type": "number"
+          },
+          "marketFavouriteHorseID": {
+            "type": "string"
+          },
+          "marketProbabilityAtTip": {
+            "type": "number"
+          },
+          "marketReference": {
+            "$ref": "#/components/schemas/domain_MarketReference"
+          },
+          "modelVersion": {
+            "type": "string"
+          },
+          "offAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/Outcome"
+          },
+          "predictedProbability": {
+            "type": "number"
+          },
+          "raceDate": {
+            "type": "string"
+          },
+          "raceID": {
+            "type": "string"
+          },
+          "raceName": {
+            "type": "string"
+          },
+          "raceType": {
+            "type": "string"
+          },
+          "sealedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "selectionHorseID": {
+            "type": "string"
+          },
+          "selectionHorseName": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "wasFormOnly": {
+            "type": "boolean"
+          },
+          "weightsID": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "raceID",
+          "raceDate",
+          "courseName",
+          "raceName",
+          "raceType",
+          "fieldSizeAtTip",
+          "selectionHorseID",
+          "selectionHorseName",
+          "predictedProbability",
+          "wasFormOnly",
+          "confidence",
+          "modelVersion",
+          "weightsID",
+          "contributions",
+          "createdAt",
+          "source"
+        ],
+        "type": "object"
+      },
+      "store_BacktestRow": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "report": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/backtest_Report"
+              },
+              {
+                "$ref": "#/components/schemas/backtest_SweepReport"
+              }
+            ]
+          },
+          "request": {
+            "$ref": "#/components/schemas/backtest_Request"
+          },
+          "weightsID": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "weightsID",
+          "request",
+          "report"
+        ],
+        "type": "object"
+      },
+      "store_JobRun": {
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "finishedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "succeededAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "store_WeightsRow": {
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "origin": {
+            "type": "string"
+          },
+          "weights": {
+            "$ref": "#/components/schemas/rating_Weights"
+          }
+        },
+        "required": [
+          "weights",
+          "origin",
+          "createdAt",
+          "active"
+        ],
+        "type": "object"
+      },
+      "tracking_FavouriteOutcome": {
+        "properties": {
+          "betfairSP": {
+            "type": "number"
+          },
+          "horseID": {
+            "type": "string"
+          },
+          "won": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "horseID",
+          "won"
+        ],
+        "type": "object"
+      },
+      "tracking_ROI": {
+        "properties": {
+          "bets": {
+            "type": "integer"
+          },
+          "returned": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "bets",
+          "returned"
+        ],
+        "type": "object"
+      },
+      "tracking_Report": {
+        "properties": {
+          "benchmarkedModel": {
+            "$ref": "#/components/schemas/tracking_Subset"
+          },
+          "brierScore": {
+            "type": "number"
+          },
+          "coverage": {
+            "type": "number"
+          },
+          "expectedWins": {
+            "type": "number"
+          },
+          "expired": {
+            "type": "integer"
+          },
+          "favouriteBaseline": {
+            "$ref": "#/components/schemas/tracking_Subset"
+          },
+          "favouriteWilson": {
+            "$ref": "#/components/schemas/tracking_WilsonInterval"
+          },
+          "modelWilson": {
+            "$ref": "#/components/schemas/tracking_WilsonInterval"
+          },
+          "pending": {
+            "type": "integer"
+          },
+          "roi": {
+            "$ref": "#/components/schemas/tracking_ROI"
+          },
+          "settled": {
+            "type": "integer"
+          },
+          "settledWithoutPrice": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "unresolved": {
+            "type": "integer"
+          },
+          "voided": {
+            "type": "integer"
+          },
+          "whenAgreeingWithFavourite": {
+            "$ref": "#/components/schemas/tracking_Subset"
+          },
+          "whenDisagreeing": {
+            "$ref": "#/components/schemas/tracking_Subset"
+          },
+          "wins": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "settled",
+          "wins",
+          "voided",
+          "unresolved",
+          "expired",
+          "pending",
+          "coverage",
+          "expectedWins",
+          "settledWithoutPrice",
+          "favouriteBaseline",
+          "benchmarkedModel",
+          "whenAgreeingWithFavourite",
+          "whenDisagreeing"
+        ],
+        "type": "object"
+      },
+      "tracking_Subset": {
+        "properties": {
+          "roi": {
+            "$ref": "#/components/schemas/tracking_ROI"
+          },
+          "settled": {
+            "type": "integer"
+          },
+          "wins": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "settled",
+          "wins"
+        ],
+        "type": "object"
+      },
+      "tracking_Tip": {
+        "properties": {
+          "agreedWithFavourite": {
+            "type": "boolean"
+          },
+          "confidence": {
+            "type": "string"
+          },
+          "contributions": {
+            "items": {
+              "$ref": "#/components/schemas/rating_Contribution"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "courseName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "favouriteOutcome": {
+            "$ref": "#/components/schemas/tracking_FavouriteOutcome"
+          },
+          "fieldSizeAtTip": {
+            "type": "integer"
+          },
+          "marketBackPriceAtTip": {
+            "type": "number"
+          },
+          "marketFavouriteHorseID": {
+            "type": "string"
+          },
+          "marketProbabilityAtTip": {
+            "type": "number"
+          },
+          "marketReference": {
+            "$ref": "#/components/schemas/domain_MarketReference"
+          },
+          "modelVersion": {
+            "type": "string"
+          },
+          "offAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/Outcome"
+          },
+          "predictedProbability": {
+            "type": "number"
+          },
+          "raceDate": {
+            "type": "string"
+          },
+          "raceID": {
+            "type": "string"
+          },
+          "raceName": {
+            "type": "string"
+          },
+          "raceType": {
+            "type": "string"
+          },
+          "sealedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "selectionHorseID": {
+            "type": "string"
+          },
+          "selectionHorseName": {
+            "type": "string"
+          },
+          "wasFormOnly": {
+            "type": "boolean"
+          },
+          "weightsID": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "raceID",
+          "raceDate",
+          "courseName",
+          "raceName",
+          "raceType",
+          "fieldSizeAtTip",
+          "selectionHorseID",
+          "selectionHorseName",
+          "predictedProbability",
+          "wasFormOnly",
+          "confidence",
+          "modelVersion",
+          "weightsID",
+          "contributions",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "tracking_WilsonInterval": {
+        "properties": {
+          "lower": {
+            "type": "number"
+          },
+          "upper": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "lower",
+          "upper"
+        ],
+        "type": "object"
+      },
+      "Outcome": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "won": {
+                "type": "object",
+                "properties": {
+                  "betfairSP": {
+                    "type": "number"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "won"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "lost": {
+                "type": "object",
+                "properties": {
+                  "betfairSP": {
+                    "type": "number"
+                  },
+                  "position": {
+                    "type": "integer"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "lost"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "nonRunner": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "nonRunner"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "abandoned": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "abandoned"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "unresolved": {
+                "type": "object",
+                "properties": {
+                  "lastCheckedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "attempts": {
+                    "type": "integer"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "lastCheckedAt",
+                  "attempts"
+                ]
+              }
+            },
+            "required": [
+              "unresolved"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "expired": {
+                "type": "object",
+                "properties": {
+                  "at": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "at"
+                ]
+              }
+            },
+            "required": [
+              "expired"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "Availability": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "available": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "available"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "missingData": {
+                "type": "object",
+                "properties": {
+                  "_0": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "_0"
+                ]
+              }
+            },
+            "required": [
+              "missingData"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "notApplicable": {
+                "type": "object",
+                "properties": {
+                  "_0": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "_0"
+                ]
+              }
+            },
+            "required": [
+              "notApplicable"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "requiresPaidTier": {
+                "type": "object",
+                "properties": {
+                  "_0": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "_0"
+                ]
+              }
+            },
+            "required": [
+              "requiresPaidTier"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "FinishPosition": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "finished": {
+                "type": "object",
+                "properties": {
+                  "_0": {
+                    "type": "integer"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "_0"
+                ]
+              }
+            },
+            "required": [
+              "finished"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "other": {
+                "type": "object",
+                "properties": {
+                  "_0": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "_0"
+                ]
+              }
+            },
+            "required": [
+              "other"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "pulledUp": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "pulledUp"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "unseatedRider": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "unseatedRider"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "fell": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "fell"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "refused": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "refused"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "broughtDown": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "broughtDown"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "slippedUp": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "slippedUp"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "disqualified": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "disqualified"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "voided": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "voided"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "MarketRefusal": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "noOffTime",
+              "noCandidate",
+              "ambiguous",
+              "noOverlap",
+              "noRunners"
+            ]
+          },
+          "marketIDs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "marketID": {
+            "type": "string"
+          },
+          "overlap": {
+            "type": "number"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "displayName"
+        ]
+      },
+      "TrainingReport": {
+        "type": "object",
+        "properties": {
+          "trained": {
+            "type": "boolean"
+          },
+          "settledRaceCount": {
+            "type": "integer"
+          },
+          "trainingLogLoss": {
+            "type": "number"
+          },
+          "baselineValidationLogLoss": {
+            "type": "number"
+          },
+          "candidateValidationLogLoss": {
+            "type": "number"
+          },
+          "promoted": {
+            "type": "boolean"
+          },
+          "weights": {
+            "$ref": "#/components/schemas/rating_Weights"
+          }
+        },
+        "required": [
+          "trained",
+          "settledRaceCount",
+          "promoted",
+          "weights"
+        ]
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Current server"
+    }
+  ]
+}
