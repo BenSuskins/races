@@ -5,26 +5,34 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/bensuskins/races/server/internal/rating"
 	"github.com/bensuskins/races/server/internal/tracking"
 )
 
 type fakeRecordReader struct {
 	active   string
-	tips     []RecordTip
+	tips     []tracking.RecordedTip
 	used     map[string]int
 	archived int
 	err      error
 }
 
-func (f fakeRecordReader) ActiveWeightsID(context.Context) (string, error) { return f.active, f.err }
-func (f fakeRecordReader) RecordTips(context.Context, string) ([]RecordTip, error) {
+func (f fakeRecordReader) ActiveWeights(context.Context) (*rating.Weights, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &rating.Weights{ID: f.active}, nil
+}
+func (f fakeRecordReader) Tips(context.Context, string, string) ([]tracking.RecordedTip, error) {
 	return f.tips, nil
 }
-func (f fakeRecordReader) WeightsInUse(context.Context) (map[string]int, error) { return f.used, nil }
-func (f fakeRecordReader) ArchivedRaces(context.Context) int                    { return f.archived }
+func (f fakeRecordReader) WeightsIDsInUse(context.Context) (map[string]int, error) {
+	return f.used, nil
+}
+func (f fakeRecordReader) ArchivedRaces(context.Context) int { return f.archived }
 
 func TestRecordUsesActiveWeightsAndCountsSettledTips(t *testing.T) {
-	reader := fakeRecordReader{active: "active", archived: 4, used: map[string]int{"active": 2}, tips: []RecordTip{
+	reader := fakeRecordReader{active: "active", archived: 4, used: map[string]int{"active": 2}, tips: []tracking.RecordedTip{
 		{Tip: tracking.Tip{RaceID: "settled", Outcome: &tracking.Outcome{Kind: tracking.Won}}, Source: "server"},
 		{Tip: tracking.Tip{RaceID: "pending"}, Source: "server"},
 	}}

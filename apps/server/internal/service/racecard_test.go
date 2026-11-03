@@ -7,29 +7,30 @@ import (
 	"time"
 
 	"github.com/bensuskins/races/server/internal/domain"
+	"github.com/bensuskins/races/server/internal/matching"
 	"github.com/bensuskins/races/server/internal/rating"
 	"github.com/bensuskins/races/server/internal/tracking"
 )
 
 type fakeRacecardReader struct{ err error }
 
-func (f fakeRacecardReader) Races(context.Context, string) ([]domain.Race, error) {
+func (f fakeRacecardReader) RacesOn(context.Context, string) ([]domain.Race, error) {
 	return []domain.Race{{ID: "race"}}, f.err
 }
-func (f fakeRacecardReader) FetchedAt(context.Context, string) (time.Time, bool) {
+func (f fakeRacecardReader) RacecardsFetchedAt(context.Context, string) (time.Time, bool) {
 	return time.Time{}, false
 }
-func (f fakeRacecardReader) Assessments(context.Context, string) (map[string]rating.Assessment, error) {
+func (f fakeRacecardReader) AssessmentsOn(context.Context, string) (map[string]rating.Assessment, error) {
 	return map[string]rating.Assessment{}, nil
 }
-func (f fakeRacecardReader) RacecardTips(context.Context, string) ([]tracking.Tip, error) {
-	return []tracking.Tip{{RaceID: "race"}}, nil
+func (f fakeRacecardReader) Tips(context.Context, string, string) ([]tracking.RecordedTip, error) {
+	return []tracking.RecordedTip{{Tip: tracking.Tip{RaceID: "race"}}}, nil
 }
-func (f fakeRacecardReader) Results(context.Context, string) ([]domain.RaceResult, error) {
+func (f fakeRacecardReader) ResultsOn(context.Context, string) ([]domain.RaceResult, error) {
 	return []domain.RaceResult{{ID: "race"}}, nil
 }
-func (f fakeRacecardReader) Refusals(context.Context, []string) (map[string][]byte, error) {
-	return map[string][]byte{"race": []byte(`{"reason":"ambiguous"}`)}, nil
+func (f fakeRacecardReader) Matches(context.Context, []string) (map[string]matching.Record, error) {
+	return map[string]matching.Record{"race": {Refusal: []byte(`{"reason":"ambiguous"}`)}}, nil
 }
 func (f fakeRacecardReader) ArchivedRaces(context.Context) int { return 3 }
 

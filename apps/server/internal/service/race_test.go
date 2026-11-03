@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/bensuskins/races/server/internal/domain"
+	"github.com/bensuskins/races/server/internal/matching"
 	"github.com/bensuskins/races/server/internal/rating"
 	"github.com/bensuskins/races/server/internal/tracking"
 )
@@ -20,16 +21,23 @@ func (f *fakeRaceReader) Race(context.Context, string) (*domain.Race, error) { r
 func (f *fakeRaceReader) Assessment(context.Context, string) (*rating.Assessment, error) {
 	return nil, nil
 }
-func (f *fakeRaceReader) Tip(context.Context, string) (*tracking.Tip, error)         { return f.tip, nil }
+func (f *fakeRaceReader) Tip(context.Context, string) (*tracking.RecordedTip, error) {
+	if f.tip == nil {
+		return nil, nil
+	}
+	return &tracking.RecordedTip{Tip: *f.tip}, nil
+}
 func (f *fakeRaceReader) Result(context.Context, string) (*domain.RaceResult, error) { return nil, nil }
-func (f *fakeRaceReader) Snapshot(_ context.Context, _ string, kind string) (*domain.MarketSnapshot, error) {
+func (f *fakeRaceReader) LatestSnapshot(_ context.Context, _ string, kind string) (*domain.MarketSnapshot, error) {
 	f.snapshots = append(f.snapshots, kind)
 	if kind == "seal" {
 		return &domain.MarketSnapshot{}, nil
 	}
 	return nil, nil
 }
-func (f *fakeRaceReader) Refusal(context.Context, string) ([]byte, error) { return nil, nil }
+func (f *fakeRaceReader) Matches(context.Context, []string) (map[string]matching.Record, error) {
+	return nil, nil
+}
 
 func TestRaceDetailUsesSealSnapshotForSealedTip(t *testing.T) {
 	reader := &fakeRaceReader{race: &domain.Race{ID: "race"}, tip: &tracking.Tip{SealedAt: domain.Ptr(time.Unix(1800000000, 0))}}

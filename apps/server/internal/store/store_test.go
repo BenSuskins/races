@@ -213,3 +213,48 @@ func TestResultFactsRespectKnownTime(t *testing.T) {
 		t.Fatalf("later going fact was not available after collection: %+v", rate)
 	}
 }
+
+func TestTrainingPromotionRollsBackWhenReportWriteFails(t *testing.T) {
+	ctx := context.Background()
+	storage := open(t)
+	now := time.Date(2026, 9, 22, 12, 0, 0, 0, time.UTC)
+	previous := rating.V3()
+	if _, err := storage.EnsureWeights(ctx, previous, "preset", now); err != nil {
+		t.Fatal(err)
+	}
+	if err := storage.SetActiveWeights(ctx, previous.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := storage.SaveDocument(ctx, "training-report", map[string]int{"version": 1}, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := storage.db.ExecContext(ctx, `CREATE TRIGGER fail_training_report BEFORE UPDATE ON documents BEGIN SELECT RAISE(ABORT, 'report write failed'); END`); err != nil {
+		t.Fatal(err)
+	}
+	candidate := previous.Clone()
+	candidate.ID = "candidate"
+	err := storage.Tx(ctx, func(transaction *Tx) error {
+		if _, err := transaction.EnsureWeights(ctx, candidate, "trained", now); err != nil {
+			return err
+		}
+		if err := transaction.SetActiveWeights(ctx, candidate.ID); err != nil {
+			return err
+		}
+		return transaction.SaveDocument(ctx, "training-report", map[string]int{"version": 2}, now)
+	})
+	if err == nil {
+		t.Fatal("expected the report write to fail")
+	}
+	active, err := storage.ActiveWeights(ctx)
+	if err != nil || active == nil || active.ID != previous.ID {
+		t.Fatalf("active weights changed: %+v, %v", active, err)
+	}
+	weights, err := storage.Weights(ctx, candidate.ID)
+	if err != nil || weights != nil {
+		t.Fatalf("candidate was retained: %+v, %v", weights, err)
+	}
+	var report map[string]int
+	if found, err := storage.LoadDocument(ctx, "training-report", &report); err != nil || !found || report["version"] != 1 {
+		t.Fatalf("report changed: %+v, %v", report, err)
+	}
+}

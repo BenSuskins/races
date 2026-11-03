@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/bensuskins/races/server/internal/domain"
+	"github.com/bensuskins/races/server/internal/matching"
 	"github.com/bensuskins/races/server/internal/rating"
 	"github.com/bensuskins/races/server/internal/tracking"
 )
@@ -25,12 +26,12 @@ type Racecard struct {
 
 // RacecardReader supplies the information needed to assemble a daily card.
 type RacecardReader interface {
-	Races(context.Context, string) ([]domain.Race, error)
-	FetchedAt(context.Context, string) (time.Time, bool)
-	Assessments(context.Context, string) (map[string]rating.Assessment, error)
-	RacecardTips(context.Context, string) ([]tracking.Tip, error)
-	Results(context.Context, string) ([]domain.RaceResult, error)
-	Refusals(context.Context, []string) (map[string][]byte, error)
+	RacesOn(context.Context, string) ([]domain.Race, error)
+	RacecardsFetchedAt(context.Context, string) (time.Time, bool)
+	AssessmentsOn(context.Context, string) (map[string]rating.Assessment, error)
+	Tips(context.Context, string, string) ([]tracking.RecordedTip, error)
+	ResultsOn(context.Context, string) ([]domain.RaceResult, error)
+	Matches(context.Context, []string) (map[string]matching.Record, error)
 	ArchivedRaces(context.Context) int
 }
 
@@ -38,23 +39,23 @@ func BuildRacecard(ctx context.Context, reader RacecardReader, day domain.RaceDa
 	date := domain.DayStringFor(day, now)
 	card := Racecard{Day: day, Date: date, Races: []domain.Race{}, Tips: map[string]tracking.Tip{}, Results: map[string]domain.RaceResult{}, Refusals: map[string]json.RawMessage{}}
 	var err error
-	if card.Races, err = reader.Races(ctx, date); err != nil {
+	if card.Races, err = reader.RacesOn(ctx, date); err != nil {
 		return Racecard{}, err
 	}
 	if card.Races == nil {
 		card.Races = []domain.Race{}
 	}
-	if at, ok := reader.FetchedAt(ctx, date); ok {
+	if at, ok := reader.RacecardsFetchedAt(ctx, date); ok {
 		card.FetchedAt = domain.Ptr(at)
 	}
-	if card.Assessments, err = reader.Assessments(ctx, date); err != nil {
+	if card.Assessments, err = reader.AssessmentsOn(ctx, date); err != nil {
 		return Racecard{}, err
 	}
-	tips, _ := reader.RacecardTips(ctx, date)
+	tips, _ := reader.Tips(ctx, "", date)
 	for _, tip := range tips {
-		card.Tips[tip.RaceID] = tip
+		card.Tips[tip.Tip.RaceID] = tip.Tip
 	}
-	results, _ := reader.Results(ctx, date)
+	results, _ := reader.ResultsOn(ctx, date)
 	for _, result := range results {
 		card.Results[result.ID] = result
 	}
@@ -62,10 +63,10 @@ func BuildRacecard(ctx context.Context, reader RacecardReader, day domain.RaceDa
 	for i, race := range card.Races {
 		ids[i] = race.ID
 	}
-	refusals, _ := reader.Refusals(ctx, ids)
-	for id, refusal := range refusals {
-		if len(refusal) > 0 {
-			card.Refusals[id] = refusal
+	refusals, _ := reader.Matches(ctx, ids)
+	for id, match := range refusals {
+		if len(match.Refusal) > 0 {
+			card.Refusals[id] = match.Refusal
 		}
 	}
 	card.ArchivedRaces = reader.ArchivedRaces(ctx)

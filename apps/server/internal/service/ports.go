@@ -86,8 +86,20 @@ type assessmentsPort interface {
 	SaveAssessment(context.Context, rating.Assessment) error
 }
 
+type TrainingPromotionTx interface {
+	EnsureWeights(context.Context, rating.Weights, string, time.Time) (bool, error)
+	Weights(context.Context, string) (*rating.Weights, error)
+	SetActiveWeights(context.Context, string) error
+	SaveDocument(context.Context, string, any, time.Time) error
+}
+
+type trainingPromotionPort interface {
+	TrainingTransaction(context.Context, func(TrainingPromotionTx) error) error
+}
+
 // Persistence groups the independent capabilities used by the application.
 type Persistence struct {
+	Promotion   trainingPromotionPort
 	Imports     importer.Repository
 	Weights     weightsPort
 	Jobs        jobsPort

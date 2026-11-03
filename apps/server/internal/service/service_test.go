@@ -100,12 +100,16 @@ func (c *clock) now() time.Time { return c.t }
 
 type testImportStore struct{ *store.Store }
 
+func (r testImportStore) TrainingTransaction(ctx context.Context, run func(TrainingPromotionTx) error) error {
+	return r.Store.Tx(ctx, func(transaction *store.Tx) error { return run(transaction) })
+}
+
 func (r testImportStore) ImportTransaction(ctx context.Context, run func(importer.Transaction) error) error {
 	return r.Store.Tx(ctx, func(transaction *store.Tx) error { return run(transaction) })
 }
 
 func testPersistence(st *store.Store) Persistence {
-	return Persistence{Imports: testImportStore{st}, Weights: st, Jobs: st, Cards: st, Markets: st, Tips: st, Results: st, Training: st, Documents: st, History: st, Assessments: st}
+	return Persistence{Promotion: testImportStore{st}, Imports: testImportStore{st}, Weights: st, Jobs: st, Cards: st, Markets: st, Tips: st, Results: st, Training: st, Documents: st, History: st, Assessments: st}
 }
 
 func testStore(service *Service) *store.Store {

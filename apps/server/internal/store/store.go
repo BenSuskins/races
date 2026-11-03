@@ -875,10 +875,8 @@ func (s *Store) JobRuns(ctx context.Context) ([]JobRun, error) {
 }
 
 // Counts for /metrics and /v1/status.
-type Counts = domain.Counts
-
-func (s *Store) Counts(ctx context.Context) Counts {
-	var c Counts
+func (s *Store) Counts(ctx context.Context) domain.Counts {
+	var c domain.Counts
 	s.db.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM races), (SELECT COUNT(*) FROM results), (SELECT COUNT(*) FROM tips),
 		(SELECT COUNT(*) FROM tips WHERE sealed_at IS NOT NULL), (SELECT COUNT(*) FROM tips WHERE outcome_kind IN ('won','lost')),
 		(SELECT COUNT(*) FROM raw_payloads)`).Scan(&c.Races, &c.Results, &c.Tips, &c.SealedTips, &c.SettledTips, &c.Payloads)
@@ -940,6 +938,36 @@ func (s *Store) Tx(ctx context.Context, fn func(tx *Tx) error) error {
 
 // Tx exposes the writes an import needs, atomically.
 type Tx struct{ tx *sql.Tx }
+
+func (t *Tx) EnsureWeights(ctx context.Context, weights rating.Weights, origin string, at time.Time) (bool, error) {
+	result, err := t.tx.ExecContext(ctx, `INSERT INTO weights (id, origin, created_at, active, json) VALUES (?,?,?,0,?) ON CONFLICT(id) DO NOTHING`, weights.ID, origin, ts(at), mustJSON(weights))
+	if err != nil {
+		return false, err
+	}
+	count, err := result.RowsAffected()
+	return count > 0, err
+}
+
+func (t *Tx) Weights(ctx context.Context, id string) (*rating.Weights, error) {
+	return queryOne[rating.Weights](ctx, t.tx, `SELECT json FROM weights WHERE id = ?`, id)
+}
+
+func (t *Tx) SetActiveWeights(ctx context.Context, id string) error {
+	var count int
+	if err := t.tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM weights WHERE id = ?`, id).Scan(&count); err != nil {
+		return err
+	}
+	if count == 0 {
+		return fmt.Errorf("no weights %q", id)
+	}
+	_, err := t.tx.ExecContext(ctx, `UPDATE weights SET active = CASE WHEN id = ? THEN 1 ELSE 0 END`, id)
+	return err
+}
+
+func (t *Tx) SaveDocument(ctx context.Context, name string, value any, at time.Time) error {
+	_, err := t.tx.ExecContext(ctx, `INSERT INTO documents (name, updated_at, json) VALUES (?,?,?) ON CONFLICT(name) DO UPDATE SET updated_at = excluded.updated_at, json = excluded.json`, name, ts(at), mustJSON(value))
+	return err
+}
 
 func (t *Tx) Tip(ctx context.Context, raceID string) (*TipRow, error) {
 	var raw, source string

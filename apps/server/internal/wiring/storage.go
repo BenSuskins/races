@@ -10,11 +10,15 @@ import (
 
 type importStore struct{ *store.Store }
 
+func (r importStore) TrainingTransaction(ctx context.Context, run func(service.TrainingPromotionTx) error) error {
+	return r.Store.Tx(ctx, func(transaction *store.Tx) error { return run(transaction) })
+}
+
 func (r importStore) ImportTransaction(ctx context.Context, run func(importer.Transaction) error) error {
 	return r.Store.Tx(ctx, func(transaction *store.Tx) error { return run(transaction) })
 }
 
 // Storage connects the SQLite adapter to the application ports.
 func Storage(st *store.Store) service.Persistence {
-	return service.Persistence{Imports: importStore{st}, Weights: st, Jobs: st, Cards: st, Markets: st, Tips: st, Results: st, Training: st, Documents: st, History: st, Assessments: st}
+	return service.Persistence{Promotion: importStore{st}, Imports: importStore{st}, Weights: st, Jobs: st, Cards: st, Markets: st, Tips: st, Results: st, Training: st, Documents: st, History: st, Assessments: st}
 }
