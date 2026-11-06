@@ -147,7 +147,7 @@ jobs:
       # ios-test-results.xcresult and found nothing.
       - name: Upload result bundle
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ios-test-results
           path: |
