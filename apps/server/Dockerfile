@@ -1,6 +1,6 @@
 # The Races server. Pure Go — the SQLite driver is modernc.org/sqlite, not
 # cgo — so the binary is static and the runtime image is distroless.
-FROM golang:1.25 AS build
+FROM golang:1.27 AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
